@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>HammerFenix — Hammerfest Modern Remake</title>
+    <meta
+      name="description"
+      content="A faithful high-performance recreation of Motion Twin's classic 2D platformer Hammerfest (2006) using TypeScript, PixiJS v8, and Web Audio."
+    />
+    <link rel="icon" type="image/png" href="./gfx/bitmaps/0023.png" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app" class="app-container">
+      <header class="app-header">
+        <div class="header-brand">
+          <h1 class="logo-text">HammerFenix</h1>
+          <span class="badge">v0.1</span>
+        </div>
+
+        <div class="header-controls">
+          <div class="control-group">
+            <label for="levelset-select" class="sr-only">Level Set</label>
+            <select id="levelset-select" class="select-field" title="Select Level Set">
+              <option value="adventure">Adventure</option>
+              <option value="basicAdventure">Basic Adventure</option>
+              <option value="tutorial">Tutorial</option>
+              <option value="deepnight">Deepnight</option>
+              <option value="timeAttack">Time Attack</option>
+              <option value="ayame">Ayame</option>
+              <option value="bumdum">Bumdum</option>
+              <option value="dev">Dev</option>
+              <option value="soccer">Soccer</option>
+            </select>
+
+            <label for="level-input" class="sr-only">Level Number</label>
+            <div class="level-input-box">
+              <span class="level-prefix">Lvl</span>
+              <input
+                id="level-input"
+                type="number"
+                min="0"
+                max="103"
+                value="0"
+                class="input-number"
+                title="Level Number"
+              />
+            </div>
+          </div>
+
+          <div class="control-group action-buttons">
+            <button id="btn-restart" class="btn btn-icon" title="Restart Game (R)">
+              <span class="icon">↻</span>
+              <span class="btn-text">Restart</span>
+            </button>
+            <button id="btn-pause" class="btn btn-icon" title="Pause Game (P)">
+              <span class="icon">⏸</span>
+              <span class="btn-text">Pause</span>
+            </button>
+            <button id="btn-mute" class="btn btn-icon" title="Mute Audio (M)">
+              <span class="icon" id="mute-icon">🔊</span>
+              <span class="btn-text">Audio</span>
+            </button>
+          </div>
+
+          <div class="control-group meta-buttons">
+            <label for="lang-select" class="sr-only">Language</label>
+            <select id="lang-select" class="select-field lang-select" title="Change Language">
+              <option value="en">EN</option>
+              <option value="fr">FR</option>
+              <option value="es">ES</option>
+            </select>
+
+            <button
+              id="btn-open-symbols"
+              class="btn btn-secondary"
+              title="Inspect SWF Vector Assets"
+            >
+              Assets
+            </button>
+            <button
+              id="btn-open-about"
+              class="btn btn-primary"
+              title="About HammerFenix & Controls"
+            >
+              Help &amp; About
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="app-main">
+        <div id="game-wrapper" class="game-wrapper">
+          <div id="game-canvas-container" class="game-canvas-container">
+            <!-- PixiJS canvas injected dynamically -->
+          </div>
+
+          <!-- On-screen responsive touch controls for mobile / tablet -->
+          <div id="touch-controls" class="touch-controls" aria-label="Touch Game Controls">
+            <div class="touch-dpad">
+              <button
+                type="button"
+                id="touch-up"
+                class="touch-btn dpad-btn dpad-up"
+                aria-label="Up / Jump"
+              >
+                ▲
+              </button>
+              <div class="dpad-middle">
+                <button
+                  type="button"
+                  id="touch-left"
+                  class="touch-btn dpad-btn dpad-left"
+                  aria-label="Left"
+                >
+                  ◀
+                </button>
+                <div class="dpad-center"></div>
+                <button
+                  type="button"
+                  id="touch-right"
+                  class="touch-btn dpad-btn dpad-right"
+                  aria-label="Right"
+                >
+                  ▶
+                </button>
+              </div>
+              <button
+                type="button"
+                id="touch-down"
+                class="touch-btn dpad-btn dpad-down"
+                aria-label="Down"
+              >
+                ▼
+              </button>
+            </div>
+
+            <div class="touch-actions">
+              <button
+                type="button"
+                id="touch-jump"
+                class="touch-btn action-btn btn-jump"
+                aria-label="Jump"
+              >
+                JUMP
+              </button>
+              <button
+                type="button"
+                id="touch-bomb"
+                class="touch-btn action-btn btn-bomb"
+                aria-label="Bomb"
+              >
+                BOMB
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <footer class="app-footer">
+        <p>
+          HammerFenix — Hammerfest remake. Original game © Motion Twin (CC BY-NC-SA 4.0).
+          <button type="button" class="link-btn" id="footer-about-link">
+            Credits &amp; License
+          </button>
+        </p>
+      </footer>
+    </div>
+
+    <!-- About & Controls Dialog: native dialog with closedby="any" -->
+    <dialog id="about-dialog" closedby="any" aria-labelledby="about-dialog-title">
+      <div class="dialog-content">
+        <header class="dialog-header">
+          <h2 id="about-dialog-title">About HammerFenix</h2>
+          <form method="dialog">
+            <button class="btn btn-close" aria-label="Close dialog">✕</button>
+          </form>
+        </header>
+
+        <div class="dialog-body">
+          <section class="about-section">
+            <h3>🎮 How to Play</h3>
+            <p>
+              Guide Igor the snowman through treacherous caverns! Collect lost items, stun and
+              defeat fruit monsters with bombs, and find the portal to reach the next level before
+              the Hurry-Up timer summons Tubby!
+            </p>
+          </section>
+
+          <section class="about-section">
+            <h3>⌨️ Controls</h3>
+            <div class="controls-grid">
+              <div><kbd>◀</kbd> <kbd>▶</kbd> / <kbd>A</kbd> <kbd>D</kbd></div>
+              <div>Walk Left / Right</div>
+              <div><kbd>▲</kbd> / <kbd>W</kbd></div>
+              <div>Jump</div>
+              <div><kbd>▼</kbd> / <kbd>S</kbd></div>
+              <div>Crouch / Drop through one-way platforms</div>
+              <div><kbd>Space</kbd></div>
+              <div>Drop Bomb / Detonate</div>
+              <div><kbd>P</kbd></div>
+              <div>Pause / Resume</div>
+              <div><kbd>R</kbd></div>
+              <div>Restart Level</div>
+              <div><kbd>M</kbd></div>
+              <div>Toggle Sound / Mute</div>
+            </div>
+          </section>
+
+          <section class="about-section">
+            <h3>📜 Credits &amp; Attribution</h3>
+            <p>
+              <strong>Hammerfest</strong> was originally created and released in 2006 by
+              <strong>Motion Twin</strong>.
+            </p>
+            <p>
+              In 2020, Motion Twin open-sourced the original Flash/ActionScript assets and codebase
+              under the
+              <strong
+                >Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC
+                BY-NC-SA 4.0)</strong
+              >
+              license.
+            </p>
+            <p>
+              HammerFenix is an independent open-source recreation created for digital preservation,
+              archival, and non-commercial educational use. All original graphics, sounds, and game
+              designs remain the intellectual property of Motion Twin.
+            </p>
+            <ul class="credits-links">
+              <li>
+                <a
+                  href="https://github.com/motion-twin/hammerfest"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Original Motion Twin Repository (GitHub)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/Greaple/HammerFenix"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  HammerFenix Source Code (GitHub)
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  CC BY-NC-SA 4.0 License Deed
+                </a>
+              </li>
+            </ul>
+          </section>
+        </div>
+
+        <footer class="dialog-footer">
+          <form method="dialog">
+            <button class="btn btn-primary">Got it!</button>
+          </form>
+        </footer>
+      </div>
+    </dialog>
+
+    <!-- Symbol Browser Dialog: native dialog with closedby="any" -->
+    <dialog id="symbol-browser-dialog" closedby="any" aria-labelledby="symbol-browser-title">
+      <!-- Populated dynamically by SymbolBrowser.ts -->
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
