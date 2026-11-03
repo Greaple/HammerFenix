@@ -13,6 +13,7 @@ export class FixedGameLoop {
   private lastTimeMs = 0;
   private logicAccum = 0;
   private animAccum = 0;
+  timeScale = 1.0;
 
   private readonly onLogicStep: () => void;
   private readonly onAnimStep: () => void;
@@ -45,9 +46,14 @@ export class FixedGameLoop {
     }
   }
 
+  stepSingleFrame(): void {
+    this.onLogicStep();
+    this.onAnimStep();
+  }
+
   private readonly tick = (nowMs: number) => {
     if (!this.running) return;
-    const dtSec = Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000));
+    const dtSec = Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000)) * this.timeScale;
     this.lastTimeMs = nowMs;
 
     const logicDt = 1 / FixedGameLoop.LOGIC_HZ;

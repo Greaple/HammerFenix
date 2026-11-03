@@ -10,7 +10,8 @@ import type { LevelData, LevelSet, PortalLink } from './data/types';
 import { BaseEntity } from './entity/Entity';
 import { ItemEntity, ScoreItem, SpecialItem } from './entity/Item';
 import { PlayerEntity } from './entity/Player';
-import { createBad, FireBallBad } from './entity/Bad';
+import { BadEntity, createBad, FireBallBad } from './entity/Bad';
+import { BombEntity } from './entity/Bomb';
 import { FxManager } from './FxManager';
 import { GameHud } from './gui/GameHud';
 import type { IGameContext } from './GameContext';
@@ -455,6 +456,18 @@ export class GameSession implements IGameContext {
   getList(type: number): BaseEntity[] {
     const id = this.getListId(type);
     return this.lists[id] ?? [];
+  }
+
+  getBads(): BadEntity[] {
+    return this.getList(Data.BAD) as BadEntity[];
+  }
+
+  getBombs(): BombEntity[] {
+    return this.getList(Data.BOMB) as BombEntity[];
+  }
+
+  getItems(): ItemEntity[] {
+    return this.getList(Data.ITEM) as ItemEntity[];
   }
 
   getListAt(type: number, cx: number, cy: number): BaseEntity[] {

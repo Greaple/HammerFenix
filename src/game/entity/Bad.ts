@@ -431,7 +431,7 @@ export class BadEntity extends MoverEntity {
  */
 export class WalkerBad extends BadEntity {
   speed = 2;
-  dir: number = Math.random() < 0.5 ? -1 : 1;
+  override dir: number = Math.random() < 0.5 ? -1 : 1;
 
   fl_fall = false;
   fl_willFallDown = false;
@@ -628,7 +628,7 @@ export class WalkerBad extends BadEntity {
     if (!this.fl_freeze && !this.fl_knock) {
       if (this.dx < 0) this.dir = -1;
       if (this.dx > 0) this.dir = 1;
-      this.mc._xscale = this.dir * Math.abs(this.mc._xscale);
+      this.mc._xscale = this.dir * Math.abs(this.mc._xscale || 100);
     }
   }
 
@@ -947,7 +947,7 @@ export class FlyerBad extends BadEntity {
   ySpeed: number;
   fl_fly = false;
   speed = 4;
-  dir: number = Math.random() < 0.5 ? -1 : 1;
+  override dir: number = Math.random() < 0.5 ? -1 : 1;
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
     super(game, mc);
@@ -1075,7 +1075,7 @@ export class FlyerBad extends BadEntity {
 
   override endUpdate(): void {
     super.endUpdate();
-    this.mc._xscale = this.dir * Math.abs(this.mc._xscale);
+    this.mc._xscale = this.dir * Math.abs(this.mc._xscale || 100);
   }
 }
 

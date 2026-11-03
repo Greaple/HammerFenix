@@ -44,10 +44,10 @@ export class PlayerEntity extends PhysicsEntity {
   lastBomb: number = Data.WEAPON_B_CLASSIC;
   initialMaxBombs = 1;
   maxBombs = 1;
-  dir = 1;
   coolDown = 0;
 
   fl_shield = false;
+  fl_godMode = false;
   shieldTimer = 0;
   private shieldMC: FxAnim | null = null;
   oxygen = 100;
@@ -116,12 +116,13 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   forceKill(dx: number | null): void {
+    if (this.fl_godMode) return;
     this.fl_shield = false;
     this.killHit(dx);
   }
 
   override killHit(dx: number | null): void {
-    if (this.fl_kill || this.fl_shield) return;
+    if (this.fl_kill || this.fl_shield || this.fl_godMode) return;
 
     this.fl_knock = false;
     this.game.audio.playSound('sound_player_death', Data.CHAN_PLAYER);
@@ -379,7 +380,8 @@ export class PlayerEntity extends PhysicsEntity {
 
   override scale(n: number): void {
     super.scale(n);
-    this.mc._xscale *= this.dir;
+    const d = this.dir || 1;
+    this.mc._xscale *= d;
   }
 
   override destroy(): void {
@@ -1318,7 +1320,7 @@ export class PlayerEntity extends PhysicsEntity {
       this.shieldMC.mc._y += (this.y - 20 - this.shieldMC.mc._y) * 0.75;
     }
 
-    this.mc._xscale = this.dir * Math.abs(this.mc._xscale);
+    this.mc._xscale = this.dir * Math.abs(this.mc._xscale || 100);
   }
 
   override update(): void {

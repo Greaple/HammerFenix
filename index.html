@@ -76,6 +76,20 @@
             </select>
 
             <button
+              id="btn-open-debug"
+              class="btn btn-secondary"
+              title="Open Testing & Debug Toolkit (~)"
+            >
+              🛠️ Debug
+            </button>
+            <button
+              id="btn-open-compare"
+              class="btn btn-secondary"
+              title="Compare with Original Flash Game (Ruffle)"
+            >
+              ⚡ Flash
+            </button>
+            <button
               id="btn-open-symbols"
               class="btn btn-secondary"
               title="Inspect SWF Vector Assets"
@@ -274,6 +288,31 @@
     <!-- Symbol Browser Dialog: native dialog with closedby="any" -->
     <dialog id="symbol-browser-dialog" closedby="any" aria-labelledby="symbol-browser-title">
       <!-- Populated dynamically by SymbolBrowser.ts -->
+    </dialog>
+
+    <!-- Original Flash Game Comparison Dialog -->
+    <dialog id="flash-compare-dialog" closedby="any" aria-labelledby="flash-compare-title">
+      <div class="dialog-content flash-dialog-content">
+        <header class="dialog-header">
+          <h2 id="flash-compare-title">⚡ Original Hammerfest (Flash / Ruffle)</h2>
+          <form method="dialog">
+            <button class="btn btn-close" aria-label="Close dialog">✕</button>
+          </form>
+        </header>
+
+        <div class="dialog-body flash-compare-body">
+          <div class="flash-compare-desc">
+            <p>
+              Running the authentic Motion Twin <code>game.swf</code> (2006) via
+              <strong>Ruffle WebAssembly</strong>. Use this side-by-side to verify player physics,
+              monster walk speeds, bomb timing, sound effects, and level layouts.
+            </p>
+          </div>
+          <div id="ruffle-container" class="ruffle-container">
+            <!-- Ruffle player injected dynamically on first open -->
+          </div>
+        </div>
+      </div>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>

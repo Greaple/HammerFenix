@@ -156,7 +156,7 @@ export class LevelWorld {
       return (this.current.map[cx]?.[0] ?? 0) > 0 ? Data.WALL : 0;
     }
     if (cy >= Data.LEVEL_HEIGHT) {
-      return 0;
+      return Data.OUT_WALL;
     }
     if (cy === 0) {
       return this.current.map[cx][0] > 0 ? Data.WALL : 0;

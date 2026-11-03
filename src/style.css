@@ -671,3 +671,164 @@ kbd {
   color: var(--accent-cyan);
   font-family: var(--font-mono);
 }
+
+/* ========================================================
+   Debug & Testing Toolkit Styles
+   ======================================================== */
+
+.debug-panel {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: min(380px, 92vw);
+  max-height: min(80dvh, 600px);
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.8),
+    0 0 15px rgba(56, 189, 248, 0.2);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 0.82rem;
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background-color: #0f172a;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.debug-title {
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.debug-body {
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.debug-stats {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background-color: var(--bg-dark);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  color: #4ade80;
+}
+
+.debug-section h4 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.debug-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.debug-btn-row .btn.active {
+  background-color: #0369a1;
+  border-color: #38bdf8;
+  color: #fff;
+}
+
+.debug-spawn-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.debug-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.debug-desc code {
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+}
+
+.debug-desc a {
+  color: var(--accent-cyan);
+}
+
+/* ========================================================
+   Original Flash Game Comparison (Ruffle)
+   ======================================================== */
+.flash-dialog-content {
+  width: min(740px, 95vw);
+  max-width: 740px;
+}
+
+.flash-compare-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.flash-compare-desc p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.flash-compare-desc code {
+  color: var(--accent-gold);
+}
+
+.ruffle-container {
+  width: 100%;
+  aspect-ratio: 420 / 520;
+  max-height: 540px;
+  background-color: #000;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ruffle-container ruffle-player,
+.ruffle-container .ruffle-player {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.flash-loading {
+  color: var(--accent-cyan);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 30px;
+  text-align: center;
+}
+
+.flash-error {
+  color: #f87171;
+  background-color: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  font-size: 0.85rem;
+}

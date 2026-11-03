@@ -138,11 +138,15 @@ export class SwfTextField extends Container {
 /** Unpadded vector stencil mask container used for SWF `clipDepth` layers. */
 export class SwfMaskClip extends Container {
   readonly gfx: Graphics;
+  private maskWidth = 20;
+  private maskHeight = 20;
 
   constructor(bounds: [number, number, number, number]) {
     super();
+    this.maskWidth = Math.max(1, bounds[2]);
+    this.maskHeight = Math.max(1, bounds[3]);
     this.gfx = new Graphics();
-    this.gfx.rect(bounds[0], bounds[1], bounds[2], bounds[3]).fill(0xffffff);
+    this.gfx.rect(0, -20, this.maskWidth, 80).fill(0xffffff);
     this.addChild(this.gfx);
   }
 
@@ -159,28 +163,32 @@ export class SwfMaskClip extends Container {
     this.y = v;
   }
   get _width(): number {
-    return this.width;
+    return this.maskWidth;
   }
   set _width(v: number) {
-    this.width = v;
+    this.maskWidth = v;
+    this.gfx.clear();
+    this.gfx.rect(0, -20, Math.max(1, v), 80).fill(0xffffff);
   }
   get _height(): number {
-    return this.height;
+    return this.maskHeight;
   }
   set _height(v: number) {
-    this.height = v;
+    this.maskHeight = v;
+    this.gfx.clear();
+    this.gfx.rect(0, -20, Math.max(1, this.maskWidth), Math.max(1, v)).fill(0xffffff);
   }
   get _xscale(): number {
     return this.scale.x * 100;
   }
   set _xscale(v: number) {
-    this.scale.x = v / 100;
+    if (Number.isFinite(v)) this.scale.x = v / 100;
   }
   get _yscale(): number {
     return this.scale.y * 100;
   }
   set _yscale(v: number) {
-    this.scale.y = v / 100;
+    if (Number.isFinite(v)) this.scale.y = v / 100;
   }
 }
 
@@ -256,16 +264,18 @@ export class SwfMovieClip extends Container {
   }
 
   get _xscale(): number {
-    return this.scale.x * 100;
+    return (this.scale.x || 1) * 100;
   }
   set _xscale(v: number) {
+    if (!Number.isFinite(v)) return;
     this.scale.x = v / 100;
   }
 
   get _yscale(): number {
-    return this.scale.y * 100;
+    return (this.scale.y || 1) * 100;
   }
   set _yscale(v: number) {
+    if (!Number.isFinite(v)) return;
     this.scale.y = v / 100;
   }
 

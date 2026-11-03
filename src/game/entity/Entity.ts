@@ -57,6 +57,7 @@ export class BaseEntity {
   private stickTimer = 0;
   private fl_stick = false;
   private fl_elastick = false;
+  dir = 1;
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
     this.game = game;

@@ -5,6 +5,8 @@ import { SwfLibrary } from './engine/swf/SwfLibrary';
 import { GameDataStore } from './game/Data';
 import { GameSession } from './game/GameSession';
 import { SymbolBrowser } from './ui/SymbolBrowser';
+import { DebugToolkit } from './ui/DebugToolkit';
+import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -101,10 +103,20 @@ async function main(): Promise<void> {
   const aboutDialog = document.getElementById('about-dialog') as HTMLDialogElement;
   const symbolDialog = document.getElementById('symbol-browser-dialog') as HTMLDialogElement;
   const symbolBrowser = new SymbolBrowser(lib, symbolDialog);
+  const compareDialog = document.getElementById('flash-compare-dialog') as HTMLDialogElement;
+  const originalCompare = new OriginalCompareDialog(compareDialog);
+  (window as any).originalCompare = originalCompare;
 
   // 5. Create GameSession (starts on Adventure Level 0)
   const session = await GameSession.create(app, lib, dataStore, audio, input, 'adventure');
   session.start();
+  (window as any).gameSession = session;
+  (window as any).pixiApp = app;
+  (window as any).gameLib = lib;
+
+  // Initialize Debug Toolkit
+  const debugToolkit = new DebugToolkit(session, document.body);
+  (window as any).debugToolkit = debugToolkit;
 
   // 6. Connect UI Toolbar Controls
   const levelSetSelect = document.getElementById('levelset-select') as HTMLSelectElement;
@@ -115,6 +127,8 @@ async function main(): Promise<void> {
   const muteIcon = document.getElementById('mute-icon') as HTMLElement;
   const langSelect = document.getElementById('lang-select') as HTMLSelectElement;
   const btnOpenSymbols = document.getElementById('btn-open-symbols') as HTMLButtonElement;
+  const btnOpenDebug = document.getElementById('btn-open-debug') as HTMLButtonElement;
+  const btnOpenCompare = document.getElementById('btn-open-compare') as HTMLButtonElement;
   const btnOpenAbout = document.getElementById('btn-open-about') as HTMLButtonElement;
   const footerAboutLink = document.getElementById('footer-about-link') as HTMLButtonElement;
 
@@ -169,7 +183,15 @@ async function main(): Promise<void> {
     await dataStore.setLang(langSelect.value);
   });
 
-  // Dialog open triggers
+  // Dialog & Debug open triggers
+  btnOpenDebug?.addEventListener('click', () => {
+    debugToolkit.toggle();
+  });
+
+  btnOpenCompare?.addEventListener('click', () => {
+    originalCompare.open();
+  });
+
   btnOpenSymbols?.addEventListener('click', () => {
     symbolBrowser.open();
   });
