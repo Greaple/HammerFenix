@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "assets": "tsx tools/build-data.ts && tsx tools/build-swf.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "orig": "tsx tools/normalize-original.ts"
   },
   "dependencies": {
     "pixi.js": "^8.22.0"
