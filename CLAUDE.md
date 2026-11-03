@@ -44,6 +44,12 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
   `s = window.gameSession; s.gameLoop.stop(); s.gameLoop.stepSingleFrame()` (one logic tick), and send keys with `window.dispatchEvent(new KeyboardEvent('keydown', {key: ' ', code: 'Space'}))`.
 - Level 0 (village): bombing the bucket at tile (11,19) is the original's secret warp to level 10. It is not a bug.
 
+## Replay regression tests
+
+- `tests/replay.test.ts` plays every `tests/replays/*.json` headless (`tests/helpers/headless.ts`) and compares the state with `tests/__snapshots__/`. A diff means game behavior changed. If the change is intended, check the diff, then run `npx vitest run -u` to accept it.
+- Add replays by recording in the browser (Debug > Record & Replay, save the file into `tests/replays/`) or with `npx tsx tools/make-replays.ts` (seeded random input).
+- In code: `session.startRecording(level)`, `session.stopRecording()`, `await session.playReplay(replay)`.
+
 ## End of each session
 
 Tick finished tasks in `docs/ROADMAP.md`, update "Next up", and fix any line in `docs/PORT_STATUS.md` that changed.

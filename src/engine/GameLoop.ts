@@ -2,7 +2,9 @@
  * Deterministic fixed-timestep game loop matching Motion Twin's `Timer.wantedFPS = 32`
  * (`Data.SECOND = 32` cycles per second, `tmod = 1.0` per fixed step).
  *
- * Also drives Flash MovieClip visual timelines at 40 Hz (`loader.xml` `fps="40"`).
+ * Also drives Flash MovieClip visual timelines at 40 Hz (`loader.xml` `fps="40"`). Animation
+ * steps are tied to logic ticks (5 per 4 ticks) rather than to wall-clock time, because some
+ * logic reads clip frames: a replay must see the same interleaving as live play.
  */
 export class FixedGameLoop {
   static readonly LOGIC_HZ = 32;
@@ -12,7 +14,8 @@ export class FixedGameLoop {
   private running = false;
   private lastTimeMs = 0;
   private logicAccum = 0;
-  private animAccum = 0;
+  private logicTicks = 0;
+  private animTicks = 0;
   timeScale = 1.0;
 
   private readonly onLogicStep: () => void;
@@ -34,7 +37,6 @@ export class FixedGameLoop {
     this.running = true;
     this.lastTimeMs = performance.now();
     this.logicAccum = 0;
-    this.animAccum = 0;
     this.rafId = requestAnimationFrame(this.tick);
   }
 
@@ -46,9 +48,21 @@ export class FixedGameLoop {
     }
   }
 
+  /** Runs one logic tick, plus the animation steps that fall in it. */
   stepSingleFrame(): void {
     this.onLogicStep();
-    this.onAnimStep();
+    this.logicTicks++;
+    const target = Math.floor((this.logicTicks * FixedGameLoop.ANIM_HZ) / FixedGameLoop.LOGIC_HZ);
+    while (this.animTicks < target) {
+      this.onAnimStep();
+      this.animTicks++;
+    }
+  }
+
+  /** Restarts the logic/animation interleaving, so a new game always starts in the same phase. */
+  resetPhase(): void {
+    this.logicTicks = 0;
+    this.animTicks = 0;
   }
 
   private readonly tick = (nowMs: number) => {
@@ -57,23 +71,13 @@ export class FixedGameLoop {
     this.lastTimeMs = nowMs;
 
     const logicDt = 1 / FixedGameLoop.LOGIC_HZ;
-    const animDt = 1 / FixedGameLoop.ANIM_HZ;
-
     this.logicAccum += dtSec;
-    this.animAccum += dtSec;
 
     let steps = 0;
     while (this.logicAccum >= logicDt && steps < 4) {
-      this.onLogicStep();
+      this.stepSingleFrame();
       this.logicAccum -= logicDt;
       steps++;
-    }
-
-    let animSteps = 0;
-    while (this.animAccum >= animDt && animSteps < 5) {
-      this.onAnimStep();
-      this.animAccum -= animDt;
-      animSteps++;
     }
 
     this.onRender?.(this.logicAccum / logicDt);

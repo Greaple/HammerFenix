@@ -1,8 +1,9 @@
-import { Application, Container } from 'pixi.js';
+import type { Container } from 'pixi.js';
 import { AudioEngine } from '../engine/Audio';
 import { DepthManager } from '../engine/DepthManager';
 import { FixedGameLoop } from '../engine/GameLoop';
 import { InputController } from '../engine/Input';
+import { InputPlayer, InputRecorder, type Replay } from '../engine/InputRecording';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { Data, GameDataStore } from './Data';
@@ -38,8 +39,13 @@ export interface GameSaveData {
   muted: boolean;
 }
 
+/** What the session needs from the PixiJS app: a stage to put the game on. */
+export interface GameHost {
+  readonly stage: Container;
+}
+
 export class GameSession implements IGameContext {
-  readonly app: Application;
+  readonly app: GameHost;
   readonly lib: SwfLibrary;
   readonly depthMan: DepthManager;
   readonly audio: AudioEngine;
@@ -61,6 +67,13 @@ export class GameSession implements IGameContext {
   /** Seed of the current game, set by `initGame()`. */
   seed = 0;
   randMan: RandomManager = new RandomManager(this.rand);
+  /** Random source of the SWF frame scripts: seeded with the game, but apart from `rand`. */
+  private readonly animRand = new Random();
+
+  private recorder: InputRecorder | null = null;
+  private recordStart: { set: string; level: number; seed: number } | null = null;
+  /** The last recording, kept after it stops (also when a debug restart ends it). */
+  lastRecording: Replay | null = null;
 
   readonly xOffset = 10;
   cycle = 0;
@@ -134,7 +147,7 @@ export class GameSession implements IGameContext {
   onStateChange?: (state: { isOver: boolean; isPaused: boolean }) => void;
 
   constructor(
-    app: Application,
+    app: GameHost,
     lib: SwfLibrary,
     dataStore: GameDataStore,
     audio: AudioEngine,
@@ -160,6 +173,7 @@ export class GameSession implements IGameContext {
     app.stage.addChild(this.gameRoot);
 
     this.depthMan = new DepthManager(this.gameRoot);
+    lib.random = () => this.animRand.next();
     this.world = new LevelWorld(initialSet, 0, true);
     this.dimensions.push(this.world);
 
@@ -174,7 +188,7 @@ export class GameSession implements IGameContext {
   }
 
   static async create(
-    app: Application,
+    app: GameHost,
     lib: SwfLibrary,
     dataStore: GameDataStore,
     audio: AudioEngine,
@@ -250,7 +264,9 @@ export class GameSession implements IGameContext {
     this.resetGameState();
     this.seed = seed;
     this.rand.reseed(seed);
+    this.animRand.reseed(seed ^ 0x5eed);
     this.initRandMan();
+    this.gameLoop.resetPhase();
 
     this.fl_gameOver = false;
     this.fl_clear = false;
@@ -996,7 +1012,8 @@ export class GameSession implements IGameContext {
 
     if (this.fl_gameOver) {
       if (this.input.consumePress('attack') || this.input.consumePress('jump')) {
-        this.initGame();
+        // Seed drawn from the game, so a replay that restarts after a game over stays in sync.
+        this.initGame(0, (this.rand.next() * 0x100000000) >>> 0);
       }
       return;
     }
@@ -1080,15 +1097,72 @@ export class GameSession implements IGameContext {
   }
 
   restartLevel(): void {
+    this.stopInputCapture();
     this.initGame(this.world.currentId);
   }
 
   changeLevel(levelId: number): void {
     if (levelId < 0 || levelId >= this.world.set.levels.length) return;
+    this.stopInputCapture();
     this.initGame(levelId);
   }
 
+  // ------------------------------------------------------ Recording & replay
+
+  /** Starts a new game at `levelId` of the current set, recording every tick's input. */
+  startRecording(levelId = this.world.currentId): void {
+    this.stopInputCapture();
+    this.backToMainWorld();
+    this.initGame(levelId);
+    this.input.resetState();
+    this.recorder = new InputRecorder();
+    this.recordStart = { set: this.currentSetName, level: levelId, seed: this.seed };
+    this.input.startRecording(this.recorder);
+  }
+
+  get isRecording(): boolean {
+    return this.recorder !== null;
+  }
+
+  /** Ends the recording and returns it (also kept as `lastRecording`). */
+  stopRecording(): Replay | null {
+    if (!this.recorder || !this.recordStart) return null;
+    this.input.stopRecording();
+    const { set, level, seed } = this.recordStart;
+    this.lastRecording = this.recorder.toReplay(set, level, seed);
+    this.recorder = null;
+    this.recordStart = null;
+    return this.lastRecording;
+  }
+
+  /** Starts the replay's game; from the next tick on, input comes from the replay. */
+  async playReplay(replay: Replay): Promise<InputPlayer> {
+    this.stopInputCapture();
+    if (replay.set !== this.currentSetName) {
+      await this.changeSet(replay.set, replay.level);
+    }
+    this.backToMainWorld();
+    this.initGame(replay.level, replay.seed);
+    const player = new InputPlayer(replay.input);
+    this.input.startReplay(player);
+    return player;
+  }
+
+  private stopInputCapture(): void {
+    this.stopRecording();
+    this.input.stopReplay();
+  }
+
+  private backToMainWorld(): void {
+    if (this.currentDim === 0) return;
+    this.currentDim = 0;
+    this.world = this.dimensions[0];
+    this.view.destroy();
+    this.view = new LevelView(this.world, this.depthMan);
+  }
+
   async changeSet(setName: string, levelId = 0): Promise<void> {
+    this.stopInputCapture();
     const set = await this.dataStore.loadLevelSet(setName);
     const extraDims = await GameSession.loadExtraDimensions(this.dataStore, setName);
     this.currentSetName = setName;

@@ -34,10 +34,15 @@ export class SwfTextField extends Container {
   private readonly boxX0: number;
   private readonly boxWidth: number;
   private readonly align: DynamicTextDef['align'];
+  private readonly fontSize: number;
+  /** Without a canvas, text size is estimated instead of measured (headless runs). */
+  private readonly headless: boolean;
   private rawText = '';
 
-  constructor(def: DynamicTextDef) {
+  constructor(def: DynamicTextDef, headless = false) {
     super();
+    this.fontSize = def.size;
+    this.headless = headless;
     const [x0, y0, x1] = def.bounds;
     this.boxX0 = x0;
     this.boxWidth = Math.max(4, x1 - x0);
@@ -96,10 +101,15 @@ export class SwfTextField extends Container {
   }
 
   get textWidth(): number {
+    if (this.headless) {
+      const longest = Math.max(0, ...this.rawText.split('\n').map((l) => l.length));
+      return Math.min(this.boxWidth, longest * this.fontSize * 0.55);
+    }
     return this.pixiText.width;
   }
 
   get textHeight(): number {
+    if (this.headless) return (this.rawText.split('\n').length || 1) * this.fontSize * 1.2;
     return this.pixiText.height;
   }
 
@@ -221,6 +231,49 @@ const PROP_INDEX: Record<string, number> = {
   _rotation: 10,
   _name: 13,
 };
+
+/** Bounds `b` mapped through `node`'s local matrix (with or without its translation). */
+function transformRect(
+  node: Container,
+  [x0, y0, x1, y1]: [number, number, number, number],
+  withTranslation: boolean,
+): [number, number, number, number] {
+  node.updateLocalTransform();
+  const { a, b, c, d } = node.localTransform;
+  const tx = withTranslation ? node.localTransform.tx : 0;
+  const ty = withTranslation ? node.localTransform.ty : 0;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [px, py] of [
+    [x0, y0],
+    [x1, y0],
+    [x1, y1],
+    [x0, y1],
+  ]) {
+    const gx = a * px + c * py + tx;
+    const gy = b * px + d * py + ty;
+    if (gx < minX) minX = gx;
+    if (gy < minY) minY = gy;
+    if (gx > maxX) maxX = gx;
+    if (gy > maxY) maxY = gy;
+  }
+  return [minX, minY, maxX, maxY];
+}
+
+function unionBounds(
+  acc: [number, number, number, number] | null,
+  b: [number, number, number, number],
+): [number, number, number, number] {
+  if (!acc) return b;
+  return [
+    Math.min(acc[0], b[0]),
+    Math.min(acc[1], b[1]),
+    Math.max(acc[2], b[2]),
+    Math.max(acc[3], b[3]),
+  ];
+}
 
 /** Timeline state of one depth while replaying frames for a backward seek. */
 interface DepthRecord {
@@ -345,18 +398,61 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     this.visible = v;
   }
 
+  /**
+   * Flash `_width`: the exact vector bounds of the content, scaled and rotated by this clip.
+   * Not the rendered size (that has anti-aliasing padding), and hidden children count, as in
+   * Flash. Entities use it for hit boxes, so it must not depend on rendering.
+   */
   get _width(): number {
-    return this.width;
+    const b = this.ownSwfBounds();
+    return b ? b[2] - b[0] : 0;
   }
   set _width(v: number) {
-    this.width = v;
+    const b = this.swfBounds();
+    const w = b ? b[2] - b[0] : 0;
+    if (w > 0) this.scale.x = (v / w) * (this.scale.x < 0 ? -1 : 1);
   }
 
   get _height(): number {
-    return this.height;
+    const b = this.ownSwfBounds();
+    return b ? b[3] - b[1] : 0;
   }
   set _height(v: number) {
-    this.height = v;
+    const b = this.swfBounds();
+    const h = b ? b[3] - b[1] : 0;
+    if (h > 0) this.scale.y = (v / h) * (this.scale.y < 0 ? -1 : 1);
+  }
+
+  /** Vector bounds `[xMin, yMin, xMax, yMax]` of the content, in this clip's own space. */
+  swfBounds(): [number, number, number, number] | null {
+    let acc: [number, number, number, number] | null = null;
+    const slotNodes = new Set<Container>();
+    for (const slot of this.depthSlots.values()) {
+      slotNodes.add(slot.node);
+      if (slot.clipDepth !== undefined) continue; // mask layers
+      const node = slot.node;
+      let b: [number, number, number, number] | null;
+      if (node instanceof SwfMovieClip) {
+        b = node.swfBounds();
+      } else {
+        const [x, y, w, h] = this.lib.getCharacterBounds(slot.charId);
+        b = [x, y, x + w, y + h];
+      }
+      if (b) acc = unionBounds(acc, transformRect(node, b, true));
+    }
+    // Clips attached by code rather than by the timeline
+    for (const child of this.children) {
+      if (slotNodes.has(child) || !(child instanceof SwfMovieClip)) continue;
+      const b = child.swfBounds();
+      if (b) acc = unionBounds(acc, transformRect(child, b, true));
+    }
+    return acc;
+  }
+
+  /** `swfBounds()` after this clip's own scale and rotation (not its position). */
+  private ownSwfBounds(): [number, number, number, number] | null {
+    const b = this.swfBounds();
+    return b ? transformRect(this, b, false) : null;
   }
 
   get _currentframe(): number {
@@ -469,6 +565,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     const g = ((hex >> 8) & 0xff) / 255;
     const b = (hex & 0xff) / 255;
     if (!this.tintFilter) {
+      if (this.lib.headless) return;
       this.tintFilter = new ColorMatrixFilter();
       this.filters = [this.tintFilter];
     }
@@ -796,6 +893,10 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     return typeof fn === 'function' ? fn(...args) : undefined;
   }
 
+  avmRandom(): number {
+    return this.lib.random();
+  }
+
   /** Script goto: unknown labels and invalid numbers are ignored, as in Flash. */
   avmGoto(frame: unknown, play: boolean): void {
     let target: number;
@@ -911,6 +1012,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     }
     slot.node.alpha = 1;
     if (!slot.cxFilter) {
+      if (this.lib.headless) return;
       slot.cxFilter = new ColorMatrixFilter();
       slot.node.filters = [slot.cxFilter];
     }

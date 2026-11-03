@@ -1,3 +1,5 @@
+import { ACTION_BITS, type InputPlayer, type InputRecorder } from './InputRecording';
+
 export type ControlAction = 'left' | 'right' | 'jump' | 'down' | 'attack' | 'pause';
 
 const KEY_MAP: Record<string, ControlAction> = {
@@ -26,12 +28,19 @@ const KEY_MAP: Record<string, ControlAction> = {
  *
  * Implements Hammerfest's lockable edge-triggered `consumePress(action)`
  * alongside continuous `isDown(action)` (used for pogo-jumping on `jump`).
+ *
+ * Input is sampled once per logic tick by `poll()`, so a tick sees one consistent state. That
+ * sample can be recorded, or replaced by a replay's.
  */
 export class InputController {
   private readonly keyHeld = new Set<ControlAction>();
   private readonly touchHeld = new Set<ControlAction>();
   private readonly padHeld = new Set<ControlAction>();
   private readonly locked = new Set<ControlAction>();
+  /** Actions held this tick, as `ACTION_BITS`. */
+  private sampled = 0;
+  private recorder: InputRecorder | null = null;
+  private player: InputPlayer | null = null;
 
   onAnyGesture?: () => void;
 
@@ -100,6 +109,17 @@ export class InputController {
       }
     }
 
+    let mask = 0;
+    for (const [act, bit] of Object.entries(ACTION_BITS) as [ControlAction, number][]) {
+      if (this.keyHeld.has(act) || this.touchHeld.has(act) || this.padHeld.has(act)) mask |= bit;
+    }
+    if (this.player) {
+      mask = this.player.next();
+      if (this.player.done) this.player = null; // replay over: back to live input
+    }
+    this.sampled = mask;
+    this.recorder?.push(mask);
+
     for (const act of [...this.locked]) {
       if (!this.isDown(act)) {
         this.locked.delete(act);
@@ -108,7 +128,38 @@ export class InputController {
   }
 
   isDown(action: ControlAction): boolean {
-    return this.keyHeld.has(action) || this.touchHeld.has(action) || this.padHeld.has(action);
+    return (this.sampled & ACTION_BITS[action]) !== 0;
+  }
+
+  /** Records every tick's sample from the next `poll()` on. */
+  startRecording(recorder: InputRecorder): void {
+    this.recorder = recorder;
+  }
+
+  stopRecording(): InputRecorder | null {
+    const r = this.recorder;
+    this.recorder = null;
+    return r;
+  }
+
+  /** Replaces live input with a replay's, from the next `poll()` on. */
+  startReplay(player: InputPlayer): void {
+    this.player = player;
+    this.resetState();
+  }
+
+  stopReplay(): void {
+    this.player = null;
+  }
+
+  get replaying(): InputPlayer | null {
+    return this.player;
+  }
+
+  /** Forgets the current sample and key locks, so a new game starts from a clean input state. */
+  resetState(): void {
+    this.sampled = 0;
+    this.locked.clear();
   }
 
   /** Edge-triggered press matching `PlayerController.keyIsDown` + `lockKey`. */

@@ -90,6 +90,21 @@ export class DebugToolkit {
         </div>
 
         <div class="debug-section">
+          <h4>Record &amp; Replay</h4>
+          <div class="debug-btn-row">
+            <button type="button" class="btn btn-sm" id="dbg-btn-record">⏺ Record from this level</button>
+            <button type="button" class="btn btn-sm" id="dbg-btn-record-stop" disabled>⏹ Stop &amp; save</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="dbg-btn-replay">▶ Play replay file…</button>
+            <input type="file" id="dbg-replay-file" accept=".json,application/json" hidden />
+          </div>
+          <p class="debug-desc" id="dbg-record-status">
+            Restarts the level and records your input. Debug actions (spawns, god mode, kills) are
+            not recorded, so avoid them while recording. Saved files go in
+            <code>tests/replays/</code> to become regression tests.
+          </p>
+        </div>
+
+        <div class="debug-section">
           <h4>Spawn Entity</h4>
           <div class="debug-spawn-grid">
             <select id="dbg-spawn-bad-select" class="select-field">
@@ -210,6 +225,8 @@ export class DebugToolkit {
       (window as any).originalCompare?.open();
     });
 
+    this.bindRecordReplay(this.panelEl);
+
     // Spawners
     const spawnBadSelect = this.panelEl.querySelector('#dbg-spawn-bad-select') as HTMLSelectElement;
     this.panelEl.querySelector('#dbg-btn-spawn-bad')?.addEventListener('click', () => {
@@ -249,6 +266,58 @@ export class DebugToolkit {
         case 'mine':
           MineBomb.attach(this.session, p.x, p.y);
           break;
+      }
+    });
+  }
+
+  private bindRecordReplay(panel: HTMLElement): void {
+    const recordBtn = panel.querySelector('#dbg-btn-record') as HTMLButtonElement;
+    const stopBtn = panel.querySelector('#dbg-btn-record-stop') as HTMLButtonElement;
+    const replayBtn = panel.querySelector('#dbg-btn-replay') as HTMLButtonElement;
+    const fileInput = panel.querySelector('#dbg-replay-file') as HTMLInputElement;
+    const status = panel.querySelector('#dbg-record-status') as HTMLElement;
+
+    recordBtn.addEventListener('click', () => {
+      this.session.startRecording();
+      recordBtn.disabled = true;
+      stopBtn.disabled = false;
+      status.textContent = `Recording level ${this.session.world.currentId} (seed ${this.session.seed})…`;
+    });
+
+    stopBtn.addEventListener('click', () => {
+      const replay = this.session.stopRecording() ?? this.session.lastRecording;
+      recordBtn.disabled = false;
+      stopBtn.disabled = true;
+      if (!replay) {
+        status.textContent = 'The recording was ended by a restart or level change.';
+        return;
+      }
+      const ticks = replay.input.reduce((n, [, c]) => n + c, 0);
+      const name = `${replay.set}-${String(replay.level).padStart(2, '0')}-${replay.seed}.json`;
+      const url = URL.createObjectURL(
+        new Blob([JSON.stringify(replay) + '\n'], { type: 'application/json' }),
+      );
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+      status.textContent = `Saved ${name} (${ticks} ticks).`;
+    });
+
+    replayBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      fileInput.value = '';
+      if (!file) return;
+      try {
+        const replay = JSON.parse(await file.text());
+        const player = await this.session.playReplay(replay);
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
+        status.textContent = `Playing ${file.name} (${player.ticks} ticks). Keyboard control comes back when it ends.`;
+      } catch (e) {
+        status.textContent = `Could not play ${file.name}: ${(e as Error).message}`;
       }
     });
   }

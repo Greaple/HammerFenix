@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1: input recorder and headless replay (1.4). The groundwork is in place: `GameSession.initGame(levelId, seed)` starts a fresh game, and every random draw in `src/game` goes through `game.rand`, so a seed plus the same key events per tick gives the same game (checked by hand on levels 1, 5, 12 and 30).
+Phase 1: line-by-line audit of `Player.ts` and `Bad.ts` (1.5). Use the replay tests as a safety net: each fix that changes behavior shows up as a snapshot diff in `tests/replay.test.ts`; review it, then accept it with `npx vitest run -u`. Start with `BaseEntity.hitWidth` / `hitHeight`, which clamp the size to 8-80 px (else 20) where the original's `hitBound` uses `_width` / `_height` directly.
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -14,7 +14,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 1.2 Bug: `GameSession.changeSet()` replaces `this.view` without destroying the old view (`switchLevelSet()` does destroy it). Merge the two functions.
 - [x] 1.3 Port `RandomManager.mt` (rarity-weighted draws) and a seeded generator. Replace all ~83 `Math.random` calls in `src/game` with it. Also: `initGame()` now resets game-wide state (visited levels, keys, pick counts, combos, portals) as the original's fresh `GameMode` does.
 - [x] Bug (found in play): the player's head and skin cycled through every frame and the carrot showed on his neck. The SWF frame scripts that pick those frames were dropped at build time; they now run in an AVM1 interpreter.
-- [ ] 1.4 Input recorder and headless replay: record key events per tick, replay with `stepSingleFrame()`, snapshot entity state. Add Vitest regression tests from replays.
+- [x] 1.4 Input recorder and headless replay: record key events per tick, replay with `stepSingleFrame()`, snapshot entity state. Add Vitest regression tests from replays. Also: animation steps are tied to logic ticks (5 per 4), Flash scripts use a seeded random source, and `_width` / `_height` (hit boxes) come from vector bounds instead of rendered sprites, so a browser recording replays identically in Node.
 - [ ] 1.5 Line-by-line audit of `Player.ts` and `Bad.ts` against the original, logging deviations in PORT_STATUS.md.
 
 ## Phase 2: Finish the Adventure (critical path)

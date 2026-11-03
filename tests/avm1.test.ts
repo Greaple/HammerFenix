@@ -29,6 +29,7 @@ function makePart(host: Record<string, unknown>) {
         if (i === 7) calls.visible.push(v);
       },
       avmCall: () => undefined,
+      avmRandom: () => 0,
       avmGoto: (f, play) => calls.goto.push([f, play]),
       play: () => {},
       stop: () => {},

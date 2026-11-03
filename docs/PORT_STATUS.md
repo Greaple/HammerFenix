@@ -27,6 +27,9 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 - SWF frame scripts: 86 of 89 run in `src/engine/swf/Avm1.ts`. Not run: 2 particle emitters (`_gfx` #234, `_anims` #150) and a ghost effect (`_anims` #3200), which define functions.
 - Backward timeline seeks keep children that stay on the same depth, as Flash does.
+- `_width` / `_height` are the exact vector bounds, hidden children included, as in Flash. Hit boxes no longer include the 1 px rasterization margin.
+- Animation runs at 40 Hz, tied to the 32 Hz logic (5 steps per 4 ticks).
+- Input is sampled once per tick (`InputController.poll`), and can be recorded and replayed (`InputRecording.ts`). `SwfLibrary.headless()` runs the game in Node.
 
 ## Modes
 

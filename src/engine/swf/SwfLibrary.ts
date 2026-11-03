@@ -41,6 +41,13 @@ async function decodeBitmapAsset(
  */
 export class SwfLibrary {
   readonly data: SwfLibraryData;
+  /**
+   * No bitmaps, no rasterized shapes, no filters: clips keep their timelines, names, scripts and
+   * vector bounds. Used to run the game in Node (replay tests).
+   */
+  readonly headless: boolean;
+  /** Random source of frame scripts (`random(n)`). The game session seeds it. */
+  random: () => number = Math.random;
   private readonly bitmaps: Map<number, HTMLCanvasElement | HTMLImageElement>;
   private readonly bitmapTextures = new Map<number, Texture>();
   private readonly rasterizer: ShapeRasterizer;
@@ -49,9 +56,11 @@ export class SwfLibrary {
   private constructor(
     data: SwfLibraryData,
     bitmaps: Map<number, HTMLCanvasElement | HTMLImageElement>,
+    headless = false,
   ) {
     this.data = data;
     this.bitmaps = bitmaps;
+    this.headless = headless;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     this.rasterizer = new ShapeRasterizer(bitmaps, Math.min(3, Math.max(2, Math.ceil(dpr))));
   }
@@ -89,6 +98,11 @@ export class SwfLibrary {
     }
 
     return new SwfLibrary(data, bitmaps);
+  }
+
+  /** A library that never renders, for running the game outside a browser. */
+  static headless(data: SwfLibraryData): SwfLibrary {
+    return new SwfLibrary(data, new Map(), true);
   }
 
   hasSymbol(name: string): boolean {
@@ -148,6 +162,7 @@ export class SwfLibrary {
       case 'sprite':
         return new SwfMovieClip(this, def);
       case 'shape': {
+        if (this.headless) return new Container();
         const ras = this.rasterizer.get(id, def);
         const container = new Container();
         const sp = new Sprite(ras.texture);
@@ -156,11 +171,12 @@ export class SwfLibrary {
         return container;
       }
       case 'bitmap': {
+        if (this.headless) return new Container();
         const tex = this.getBitmapTexture(id, def);
         return tex ? new Sprite(tex) : null;
       }
       case 'text':
-        return new SwfTextField(def);
+        return new SwfTextField(def, this.headless);
     }
   }
 

@@ -17,6 +17,8 @@ export interface Avm1Clip {
   avmCall(name: string, args: unknown[]): unknown;
   /** `frame` is a 1-based number or a label. */
   avmGoto(frame: unknown, play: boolean): void;
+  /** Float in [0, 1) for `random(n)`. Seeded by the game, so replays stay deterministic. */
+  avmRandom(): number;
   play(): void;
   stop(): void;
   removeMovieClip(): void;
@@ -189,8 +191,8 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
       case 0x25: // RemoveSprite
         resolveTarget(pop())?.removeMovieClip();
         break;
-      case 0x30: // RandomNumber (display only: never feeds game logic, so not seeded)
-        stack.push(Math.floor(Math.random() * toNumber(pop())));
+      case 0x30: // RandomNumber
+        stack.push(Math.floor(clip.avmRandom() * toNumber(pop())));
         break;
       case 0x3d: {
         // CallFunction

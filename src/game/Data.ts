@@ -319,6 +319,9 @@ export const Data = {
   },
 } as const;
 
+/** Reads one JSON file under `public/data/` by its relative path (e.g. `levels/adventure.json`). */
+export type DataLoader = (rel: string) => Promise<unknown>;
+
 /**
  * Runtime loader & store for the generated JSON data (`public/data/*`).
  */
@@ -331,17 +334,17 @@ export class GameDataStore {
   private readonly langs = new Map<string, LangData>();
   private readonly levelSets = new Map<string, LevelSet>();
   private currentLangId: string;
-  private readonly baseUrl: string;
+  private readonly loader: DataLoader;
 
   private constructor(
-    baseUrl: string,
+    loader: DataLoader,
     manifest: DataManifest,
     items: ItemsData,
     quests: QuestDef[],
     portalLinks: PortalLinksData,
     initialLang: LangData,
   ) {
-    this.baseUrl = baseUrl;
+    this.loader = loader;
     this.manifest = manifest;
     this.items = items;
     this.quests = quests;
@@ -357,11 +360,15 @@ export class GameDataStore {
   }
 
   static async load(baseUrl = './', preferredLang = 'en'): Promise<GameDataStore> {
-    const fetchJson = async <T>(rel: string): Promise<T> => {
+    return GameDataStore.fromLoader(async (rel) => {
       const r = await fetch(`${baseUrl}data/${rel}`);
       if (!r.ok) throw new Error(`Failed to fetch data/${rel} (${r.status})`);
-      return (await r.json()) as T;
-    };
+      return r.json();
+    }, preferredLang);
+  }
+
+  static async fromLoader(loader: DataLoader, preferredLang = 'en'): Promise<GameDataStore> {
+    const fetchJson = async <T>(rel: string): Promise<T> => (await loader(rel)) as T;
 
     const manifest = await fetchJson<DataManifest>('manifest.json');
     const langId = manifest.langs.includes(preferredLang)
@@ -375,7 +382,7 @@ export class GameDataStore {
       fetchJson<LangData>(`lang/${langId}.json`),
     ]);
 
-    return new GameDataStore(baseUrl, manifest, items, quests, portalLinks, lang);
+    return new GameDataStore(loader, manifest, items, quests, portalLinks, lang);
   }
 
   get lang(): LangData {
@@ -388,9 +395,7 @@ export class GameDataStore {
 
   async setLang(id: string): Promise<LangData> {
     if (!this.langs.has(id)) {
-      const r = await fetch(`${this.baseUrl}data/lang/${id}.json`);
-      if (!r.ok) throw new Error(`Language ${id} not found`);
-      this.langs.set(id, (await r.json()) as LangData);
+      this.langs.set(id, (await this.loader(`lang/${id}.json`)) as LangData);
     }
     this.currentLangId = id;
     return this.lang;
@@ -399,9 +404,7 @@ export class GameDataStore {
   async loadLevelSet(name: string): Promise<LevelSet> {
     const cached = this.levelSets.get(name);
     if (cached) return cached;
-    const r = await fetch(`${this.baseUrl}data/levels/${name}.json`);
-    if (!r.ok) throw new Error(`Level set ${name} not found`);
-    const set = (await r.json()) as LevelSet;
+    const set = (await this.loader(`levels/${name}.json`)) as LevelSet;
     this.levelSets.set(name, set);
     return set;
   }
