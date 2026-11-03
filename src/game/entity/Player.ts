@@ -37,12 +37,15 @@ export class PlayerEntity extends PhysicsEntity {
   fl_entering = false;
 
   score = 0;
-  lives = 2;
+  lives = 1;
   extraLifeCurrent = 0;
 
   // Read by the SWF frame scripts of the body parts (head frame, skin frame, carrot, tuft)
   fl_chourou = false;
   fl_carot = false;
+  /** Quest rewards that light up dark levels (families 106 and 107). Used by the darkness (2.7). */
+  fl_candle = false;
+  fl_torch = false;
   defaultHead: number = Data.HEAD_NORMAL;
   head: number = this.defaultHead;
   skin = 1;
@@ -63,7 +66,8 @@ export class PlayerEntity extends PhysicsEntity {
   knockTimer = 0;
   private lockTimer = 0;
 
-  fl_upKick = true;
+  /** Down-kick of bombs: a quest reward in the original (family 101). */
+  fl_upKick = false;
   private walkTimer = 0;
   private waterJump = 0;
   private edgeTimer = 0;
@@ -88,12 +92,25 @@ export class PlayerEntity extends PhysicsEntity {
   constructor(game: IGameContext, mc: SwfMovieClip) {
     super(game, mc);
     this.fallFactor = 1.1;
-    this.fl_slide = false;
     this.fl_teleport = true;
     this.fl_portal = true;
     this.fl_wind = true;
     this.fl_strictGravity = false;
     this.fl_bump = true;
+
+    // Quest rewards (`GameManager.CONFIG.hasFamily`)
+    if (game.hasFamily(100)) this.initialMaxBombs++;
+    this.maxBombs = this.initialMaxBombs;
+    if (game.hasFamily(102)) this.lives++; // heart 1
+    if (game.hasFamily(103)) this.lives++; // heart 2
+    if (game.hasFamily(104)) this.lives++; // heart 3
+    if (game.hasFamily(105)) this.lives++; // ig'or
+    if (game.hasFamily(108)) this.lives++; // carrot
+    if (game.hasFamily(106)) this.fl_candle = true;
+    if (game.hasFamily(107)) this.fl_torch = true;
+    if (game.hasFamily(108)) this.fl_carot = true;
+    this.fl_upKick = game.hasFamily(101);
+
     this.register(Data.PLAYER);
   }
 
@@ -109,7 +126,6 @@ export class PlayerEntity extends PhysicsEntity {
     if (this.game.fl_nightmare) {
       this.speedFactor = 1.3;
     }
-    this.playAnim(this.baseStopAnim);
     this.endUpdate();
   }
 
@@ -134,7 +150,8 @@ export class PlayerEntity extends PhysicsEntity {
     this.fl_knock = false;
     this.game.audio.playSound('sound_player_death', Data.CHAN_PLAYER);
 
-    let sign = dx !== null && dx !== 0 ? Math.sign(dx) : this.game.rand.next() < 0.5 ? -1 : 1;
+    // `dx/Math.abs(dx)` is NaN for 0 or null: random side
+    let sign = dx !== null && dx !== 0 ? Math.sign(dx) : this.game.rand.random(2) * 2 - 1;
     if (this.x >= 0.85 * Data.GAME_WIDTH) sign = -1;
     if (this.x <= 0.15 * Data.GAME_WIDTH) sign = 1;
 
@@ -243,7 +260,8 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     if (id === Data.FIELD_PEACE) {
-      if (this.currentWeapon !== Data.WEAPON_NONE) {
+      // The original compares with abs(FIELD_PEACE), not WEAPON_NONE: the shine plays on each entry
+      if (this.currentWeapon !== Math.abs(id)) {
         const fx = this.game.fxMan.attachShine(this.x, this.y - Data.CASE_HEIGHT * 0.5);
         if (fx) {
           fx.mc._xscale = 65;
@@ -338,7 +356,9 @@ export class PlayerEntity extends PhysicsEntity {
     this.stickAnim();
     this.fl_lockControls = true;
 
-    this.speedFactor = this.game.fl_nightmare ? 1.3 : 1.0;
+    if (this.game.fl_nightmare) {
+      this.speedFactor = 1.3;
+    }
     this.game.onResurrect();
   }
 
@@ -535,11 +555,12 @@ export class PlayerEntity extends PhysicsEntity {
 
         if (this.dir < 0 && this.world.checkFlag(this.cx, this.cy, Data.IA_CLIMB_LEFT)) {
           const h = this.world.getWallHeight(this.cx - 1, this.cy, Data.IA_CLIMB);
-          if (h !== null && h <= 1) b.moveTo(b.x, b.y - Data.CASE_HEIGHT * 0.5);
+          // AS2: a null height (wall too high) still passes `h <= 1`
+          if ((h ?? 0) <= 1) b.moveTo(b.x, b.y - Data.CASE_HEIGHT * 0.5);
         }
         if (this.dir > 0 && this.world.checkFlag(this.cx, this.cy, Data.IA_CLIMB_RIGHT)) {
           const h = this.world.getWallHeight(this.cx + 1, this.cy, Data.IA_CLIMB);
-          if (h !== null && h <= 1) b.moveTo(b.x, b.y - Data.CASE_HEIGHT * 0.5);
+          if ((h ?? 0) <= 1) b.moveTo(b.x, b.y - Data.CASE_HEIGHT * 0.5);
         }
 
         if (this.actives[13]) b.dx *= 2;
@@ -547,7 +568,6 @@ export class PlayerEntity extends PhysicsEntity {
         if (this.actives[115]) b.dx *= 1.5;
 
         b.dy = -Data.PLAYER_HKICK_Y;
-        b.fl_stable = false;
         b.onKick(this);
         b.next = null;
         b.fl_bounce = true;
@@ -754,7 +774,7 @@ export class PlayerEntity extends PhysicsEntity {
     this.y = this.oldY;
     this.dx = -this.dx;
     this.knock(Data.SECOND * 0.5);
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 6);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(5) + 5);
     this.game.shake(Data.SECOND, 3);
     this.fl_stopStepping = true;
   }
@@ -827,7 +847,6 @@ export class PlayerEntity extends PhysicsEntity {
     // Standard / continuous pogo jump on ground
     if (this.fl_stable && input.isDown('jump')) {
       this.dy = this.actives[88] ? -Data.PLAYER_JUMP * 0.5 : -Data.PLAYER_JUMP;
-      this.fl_stable = false;
       this.game.audio.playSound('sound_jump', Data.CHAN_PLAYER);
       this.playAnim(Data.ANIM_PLAYER_JUMP_UP);
       const fx = this.game.fxMan.attachFx(this.x, this.y, 'hammer_fx_jump');
@@ -839,7 +858,8 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     // Attack / bomb drop / bomb kick
-    if (this.coolDown === 0 && input.consumePress('attack')) {
+    // The key is read (and locked) before the cooldown test, as in `keyIsDown(attack) && coolDown==0`
+    if (input.consumePress('attack') && this.coolDown === 0) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
 
@@ -855,7 +875,7 @@ export class PlayerEntity extends PhysicsEntity {
       } else {
         this.kickBomb(bombList, 1.0);
       }
-    } else if (this.fl_upKick && input.consumePress('down')) {
+    } else if (input.consumePress('down') && this.fl_upKick) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
       const bombList = this.game.getClose(Data.BOMB, this.x, this.y, dist, false) as BombEntity[];
@@ -1339,7 +1359,7 @@ export class PlayerEntity extends PhysicsEntity {
       this.shieldMC.mc._y += (this.y - 20 - this.shieldMC.mc._y) * 0.75;
     }
 
-    this.mc._xscale = this.dir * Math.abs(this.mc._xscale || 100);
+    this.mc._xscale = this.dir * Math.abs(this.mc._xscale);
   }
 
   override update(): void {

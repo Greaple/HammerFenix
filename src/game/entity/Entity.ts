@@ -57,6 +57,9 @@ export class BaseEntity {
   private stickTimer = 0;
   private fl_stick = false;
   private fl_elastick = false;
+  /** Soft recal: the clip lags behind the real position and catches up (`activateSoftRecal`). */
+  fl_softRecal = false;
+  softRecalFactor = 0.1;
   dir = 1;
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
@@ -193,14 +196,14 @@ export class BaseEntity {
 
   // ------------------------------------------------ Geometry & bounding boxes
 
+  /** `_width` of the original's `hitBound`: the clip's vector bounds. */
   get hitWidth(): number {
-    const w = Math.abs(this.mc._width);
-    return w >= 8 && w <= 80 ? w : 20;
+    return this.mc._width;
   }
 
+  /** `_height` of the original's `hitBound`. */
   get hitHeight(): number {
-    const h = Math.abs(this.mc._height);
-    return h >= 8 && h <= 80 ? h : 20;
+    return this.mc._height;
   }
 
   hitBound(e: BaseEntity): boolean {
@@ -291,6 +294,16 @@ export class BaseEntity {
     this.sticker = null;
   }
 
+  /** `sticker._name != null` in the original: a clip is stuck to this entity. */
+  get hasSticker(): boolean {
+    return this.sticker !== null;
+  }
+
+  activateSoftRecal(): void {
+    this.fl_softRecal = true;
+    this.softRecalFactor = 0.1;
+  }
+
   destroy(): void {
     if (this.fl_destroy) return;
     this.fl_kill = true;
@@ -325,8 +338,23 @@ export class BaseEntity {
 
   endUpdate(): void {
     this.updateCoords();
-    this.mc._x = this.x + this._xOffset;
-    this.mc._y = this.y + this._yOffset;
+    if (this.fl_softRecal) {
+      const tx = this.x + this._xOffset;
+      const ty = this.y + this._yOffset;
+      this.mc._x = this.mc._x + (tx - this.mc._x) * this.softRecalFactor;
+      this.mc._y = this.mc._y + (ty - this.mc._y) * this.softRecalFactor;
+      this.softRecalFactor += 0.02;
+      if (
+        this.softRecalFactor >= 1 ||
+        (Math.abs(tx - this.mc._x) <= 1.5 && Math.abs(ty - this.mc._y) <= 1.5)
+      ) {
+        this.fl_softRecal = false;
+      }
+    }
+    if (!this.fl_softRecal) {
+      this.mc._x = this.x + this._xOffset;
+      this.mc._y = this.y + this._yOffset;
+    }
     this.mc.rotationDeg = this.rotation;
     this.mc._alpha = Math.max(this.minAlpha, this.alpha);
     this.oldX = this.x;
@@ -391,6 +419,7 @@ export class AnimatorEntity extends BaseEntity {
 
   disableAnimator(): void {
     this.fl_anim = false;
+    this.mc.play();
   }
 
   blink(duration: number): void {
@@ -470,7 +499,6 @@ export class AnimatorEntity extends BaseEntity {
             this.fl_blinked = true;
           }
           this.blinkLife();
-          if (this.blinkTimer <= 0) this.blinkTimer = Data.BLINK_DURATION_FAST;
         }
       }
     }
@@ -558,7 +586,7 @@ export class PhysicsEntity extends AnimatorEntity {
     if (!e.fl_moveable) return;
     const adjPower = power / e.shockResistance;
     const dist = e.distance(this.x, this.y);
-    const ratio = Math.max(0, 1 - dist / radius);
+    const ratio = 1 - dist / radius;
     const ang = Math.atan2(e.y - this.y, e.x - this.x);
     e.dx = Math.cos(ang) * ratio * adjPower;
     if (e.fl_stable) {
@@ -577,7 +605,8 @@ export class PhysicsEntity extends AnimatorEntity {
 
   killHit(dx: number | null): void {
     if (this.fl_kill) return;
-    this.dx = dx ?? this.game.rand.next() * 20 * (this.game.rand.next() < 0.5 ? -1 : 1);
+    // The original stores `dx` as is; a null dx then acts as 0 in arithmetic.
+    this.dx = dx ?? 0;
     this.dy = -10;
     this.fl_hitGround = false;
     this.fl_hitWall = false;
@@ -615,7 +644,7 @@ export class PhysicsEntity extends AnimatorEntity {
   }
 
   moveFrom(e: BaseEntity, speed: number): void {
-    const ang = -this.game.rand.next() * Math.PI;
+    const ang = -this.game.rand.random(Math.round(100 * Math.PI)) / 100;
     this.x = e.x + Math.cos(ang) * Data.CASE_WIDTH * 2;
     this.y = e.y + Math.sin(ang) * Data.CASE_HEIGHT * 2;
     this.moveToTarget(e, speed);
@@ -633,11 +662,9 @@ export class PhysicsEntity extends AnimatorEntity {
     const list = this.getByType(Data.ENTITY);
     for (let i = 0; i < list.length; i++) {
       const other = list[i];
-      if (!other.fl_kill && !this.fl_kill && other.uniqId !== this.uniqId && this.hitBound(other)) {
+      if (!other.fl_kill && !this.fl_kill && this.hitBound(other) && other.uniqId !== this.uniqId) {
         this.hit(other);
-        if (!other.fl_kill && !this.fl_kill) {
-          other.hit(this);
-        }
+        other.hit(this);
       }
     }
   }
@@ -746,10 +773,11 @@ export class PhysicsEntity extends AnimatorEntity {
 
   calcSteps(dxStep: number, dyStep: number): { total: number; dx: number; dy: number } {
     const total = Math.max(
-      1,
       Math.ceil(Math.abs(dxStep) / Data.STEP_MAX),
       Math.ceil(Math.abs(dyStep) / Data.STEP_MAX),
     );
+    // With no speed the original gets 0 steps (and NaN per-step speeds, never used).
+    if (total === 0) return { total: 0, dx: 0, dy: 0 };
     return {
       total,
       dx: dxStep / total,
@@ -904,8 +932,8 @@ export class PhysicsEntity extends AnimatorEntity {
                 this.fl_skipNextGround = false;
               } else {
                 stepInfos.dy = 0;
-                const fallH = this.fallStart !== null ? this.y - this.fallStart : 0;
-                this.onHitGround(fallH);
+                // AS2: `y - null` is `y`
+                this.onHitGround(this.y - (this.fallStart ?? 0));
                 this.fallStart = null;
                 this.updateCoords();
               }
@@ -942,8 +970,8 @@ export class PhysicsEntity extends AnimatorEntity {
               this.y = BaseEntity.y_ctr(ocy);
               stepInfos.dy = 0;
               this.updateCoords();
-              this.onHitGround(this.fallStart !== null ? this.y - this.fallStart : 0);
-              this.fallStart = null;
+              // The stair patch does not reset fallStart (unlike a normal landing)
+              this.onHitGround(this.y - (this.fallStart ?? 0));
               patched = true;
             }
           }

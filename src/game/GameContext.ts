@@ -8,6 +8,7 @@ import type { BaseEntity } from './entity/Entity';
 import type { GameHud } from './gui/GameHud';
 import type { LevelView } from './levels/LevelView';
 import type { LevelWorld } from './levels/LevelWorld';
+import type { ScriptRunner } from './levels/ScriptRunner';
 import type { Random } from './Random';
 import type { RandomManager } from './RandomManager';
 
@@ -34,6 +35,8 @@ export interface IGameContext {
   gFriction: number;
   sFriction: number;
   speedFactor: number;
+  readonly diffFactor: number;
+  readonly scriptRunner: ScriptRunner | null;
 
   fl_lock: boolean;
   fl_clear: boolean;
@@ -54,6 +57,8 @@ export interface IGameContext {
 
   readonly globalActives: boolean[];
 
+  /** `GameManager.CONFIG.hasFamily`: whether the player has unlocked this item family. */
+  hasFamily(id: number): boolean;
   getUniqId(): number;
   addToList(type: number, e: BaseEntity): void;
   removeFromList(type: number, e: BaseEntity): void;
@@ -64,6 +69,7 @@ export interface IGameContext {
   countList(type: number): number;
   getClose(type: number, x: number, y: number, radius: number, flOnGround: boolean): BaseEntity[];
   getOne(type: number): BaseEntity | null;
+  getAnotherOne(type: number, e: BaseEntity): BaseEntity | null;
   destroyList(type: number): void;
   cleanKills(): void;
 

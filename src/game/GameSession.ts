@@ -286,6 +286,10 @@ export class GameSession implements IGameContext {
       BaseEntity.x_ctr(sx),
       BaseEntity.y_ctr(this.world.current.playerY),
     );
+    // `GameInterface.initSingle` reads the new player's score and lives
+    this.hud.setScore(this.player.score, true);
+    this.hud.setLives(this.player.lives);
+    this.hud.clearExtends();
 
     this.startLevel();
   }
@@ -311,7 +315,13 @@ export class GameSession implements IGameContext {
     this.killPortals();
     this.nextLink = null;
     this.keyLock = null;
-    this.shake(null, null);
+    this.shakeTimer = 0;
+    this.shakeTotal = 0;
+    this.shakePower = 0;
+  }
+
+  hasFamily(id: number): boolean {
+    return SPECIAL_ITEM_FAMILIES.includes(id) || SCORE_ITEM_FAMILIES.includes(id);
   }
 
   /** From `GameMode.init`: register the extend letters and the unlocked item families. */
@@ -567,6 +577,17 @@ export class GameSession implements IGameContext {
     return list[this.rand.random(list.length)];
   }
 
+  /** A random entity of `type` other than `e`, or null when there is no other one. */
+  getAnotherOne(type: number, e: BaseEntity): BaseEntity | null {
+    const l = this.getList(type);
+    if (l.length <= 1) return null;
+    let i: number;
+    do {
+      i = this.rand.random(l.length);
+    } while (l[i] === e);
+    return l[i];
+  }
+
   destroyList(type: number): void {
     const list = [...this.getList(type)];
     for (const e of list) {
@@ -610,11 +631,10 @@ export class GameSession implements IGameContext {
 
   shake(duration: number | null, power: number | null): void {
     if (duration === null || power === null) {
-      this.shakeTimer = 0;
-      this.shakePower = 0;
+      this.shakeTimer = 0; // the original resets the timer only (twice), not the power
       return;
     }
-    if (duration < this.shakeTimer && power < this.shakePower) return;
+    if (duration < this.shakeTimer || power < this.shakePower) return;
     this.shakeTotal = duration;
     this.shakeTimer = duration;
     this.shakePower = power;
