@@ -261,7 +261,7 @@ export class ClassicBomb extends PlayerBomb {
       e.freeze(Data.FREEZE_DURATION);
       this.shockWave(e, this.radius, this.power);
     }
-    this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 2) + 2);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
 
     const badBombs = this.bombGetClose(Data.BAD_BOMB) as BadBomb[];
     for (const bb of badBombs) {
@@ -310,7 +310,7 @@ export class BlackBomb extends PlayerBomb {
       e.setCombo(this.uniqId);
       e.killHit(0);
       this.shockWave(e, this.radius, this.power);
-      e.dy = -10 - Math.floor(Math.random() * 20);
+      e.dy = -10 - this.game.rand.random(20);
     }
   }
 }
@@ -396,7 +396,7 @@ export class GreenBomb extends PlayerBomb {
       e.freeze(Data.FREEZE_DURATION);
       this.shockWave(e, this.radius, this.power);
     }
-    this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 2) + 2);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
 
     const badBombs = this.bombGetClose(Data.BAD_BOMB) as BadBomb[];
     for (const bb of badBombs) {
@@ -452,7 +452,7 @@ export class RedBomb extends PlayerBomb {
       }
     }
 
-    this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 2) + 2);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
     this.game.fxMan.attachExplodeZone(this.x, this.y, this.radius);
 
     const players = this.game.getList(Data.PLAYER) as PlayerEntity[];
@@ -515,7 +515,7 @@ export class RepelBomb extends PlayerBomb {
     if (this.fl_explode) return;
     super.onExplode();
 
-    this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 2) + 2);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
     this.game.fxMan.attachExplodeZone(this.x, this.y, this.radius);
 
     const players = this.game.getList(Data.PLAYER) as PlayerEntity[];
@@ -610,7 +610,7 @@ export class PoireBomb extends BadBomb {
       e.killHit(0);
       this.shockWave(e, this.radius, this.power);
       if (!e.fl_shield) {
-        e.dy = -10 - Math.floor(Math.random() * 20);
+        e.dy = -10 - this.game.rand.random(20);
       }
     }
   }
@@ -688,7 +688,7 @@ export class MineBomb extends BadBomb {
         e.killHit(0);
         this.shockWave(e, this.radius, this.power);
         if (!e.fl_shield) {
-          e.dy = -10 - Math.floor(Math.random() * 20);
+          e.dy = -10 - this.game.rand.random(20);
         }
       }
     }
@@ -698,7 +698,7 @@ export class MineBomb extends BadBomb {
     super.onKick(p);
     this.triggerMine();
     this.updateLifeTimer(Data.SECOND * 0.7);
-    this.dx *= 0.8 + Math.floor(Math.random() * 10) / 10;
+    this.dx *= 0.8 + this.game.rand.random(10) / 10;
   }
 
   triggerMine(): void {

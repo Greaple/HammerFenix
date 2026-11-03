@@ -8,6 +8,8 @@ import type { BaseEntity } from './entity/Entity';
 import type { GameHud } from './gui/GameHud';
 import type { LevelView } from './levels/LevelView';
 import type { LevelWorld } from './levels/LevelWorld';
+import type { Random } from './Random';
+import type { RandomManager } from './RandomManager';
 
 /**
  * Shared runtime contract exposed by `GameSession` to entities, FX, HUD, and level scripts.
@@ -22,6 +24,8 @@ export interface IGameContext {
   readonly view: LevelView;
   readonly fxMan: FxManager;
   readonly hud: GameHud;
+  readonly rand: Random;
+  readonly randMan: RandomManager;
 
   readonly xOffset: number;
   cycle: number;

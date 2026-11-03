@@ -1,5 +1,6 @@
 import type {
   DataManifest,
+  ItemFamily,
   ItemsData,
   LangData,
   LevelSet,
@@ -28,6 +29,11 @@ export const Data = {
   SCROLL_SPEED: 0.04,
   FADE_SPEED: 8,
   MIN_DARKNESS_LEVEL: 16,
+
+  // RandomManager table ids (`auto_inc` values in the original)
+  RAND_EXTENDS_ID: 23,
+  RAND_ITEMS_ID: 24,
+  RAND_SCORES_ID: 25,
   RAND_EXTENDS: [10, 10, 6, 5, 5, 10, 4] as readonly number[],
 
   // Render depth planes (DepthManager)
@@ -284,6 +290,20 @@ export const Data = {
 
   RARITY: [0, 2000, 1000, 300, 100, 10, 1, 60] as readonly number[],
 
+  // Player heads (frames of the head clip)
+  HEAD_NORMAL: 1,
+  HEAD_AFRO: 2,
+  HEAD_CERBERE: 3,
+  HEAD_PIOU: 4,
+  HEAD_MARIO: 5,
+  HEAD_TUB: 6,
+  HEAD_IGORETTE: 7,
+  HEAD_LOSE: 8,
+  HEAD_CROWN: 9,
+  HEAD_SANDY: 10,
+  HEAD_SANDY_LOSE: 11,
+  HEAD_SANDY_CROWN: 12,
+
   getCrystalValue(comboIndex: number): number {
     return Math.round(Math.min(50000, 500 * Math.round(Math.pow(comboIndex + 1, 2))));
   },
@@ -403,40 +423,19 @@ export class GameDataStore {
     return '';
   }
 
-  /** Picks a random unlocked score item id weighted by rarity (defaulting to basic families). */
-  pickRandomScoreItem(families: number[] = [1000, 1001, 1002]): number {
-    return this.pickWeightedFromFamilies(this.items.score, families, 1000);
-  }
-
-  /** Picks a random unlocked special item id weighted by rarity (defaulting to basic families). */
-  pickRandomSpecialItem(families: number[] = [0, 1, 2]): number {
-    return this.pickWeightedFromFamilies(this.items.special, families, 0);
-  }
-
-  private pickWeightedFromFamilies(
-    pool: ItemsData['score'],
-    familyIds: number[],
-    fallback: number,
-  ): number {
-    const set = new Set(familyIds);
-    const entries: { id: number; w: number }[] = [];
-    let total = 0;
-    for (const fam of pool) {
-      if (!set.has(fam.id)) continue;
-      for (const it of fam.items) {
-        const w = Data.RARITY[it.rarity] ?? 0;
-        if (w > 0) {
-          entries.push({ id: it.id, w });
-          total += w;
-        }
+  /**
+   * Port of `Data.getRandFromFamilies`: a RandomManager table indexed by item id, holding the
+   * rarity weight of every item in the given families. Ids not in those families are holes.
+   */
+  getRandFromFamilies(familySet: ItemFamily[], familiesId: readonly number[]): number[] {
+    const tab: number[] = [];
+    for (const fid of familiesId) {
+      const family = familySet.find((f) => f.id === fid);
+      if (!family) continue;
+      for (const it of family.items) {
+        tab[it.id] = Data.RARITY[it.rarity];
       }
     }
-    if (total <= 0) return fallback;
-    let roll = Math.random() * total;
-    for (const e of entries) {
-      roll -= e.w;
-      if (roll <= 0) return e.id;
-    }
-    return entries[entries.length - 1].id;
+    return tab;
   }
 }

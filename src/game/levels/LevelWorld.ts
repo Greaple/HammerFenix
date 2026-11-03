@@ -1,6 +1,7 @@
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { LevelData, LevelSet } from '../data/types';
+import type { Random } from '../Random';
 
 export class TeleporterData {
   mc: SwfMovieClip | null = null;
@@ -377,7 +378,10 @@ export class LevelWorld {
     return null;
   }
 
-  getNextTeleporter(start: TeleporterData): { td: TeleporterData; fl_rand: boolean } | null {
+  getNextTeleporter(
+    start: TeleporterData,
+    rand: Random,
+  ): { td: TeleporterData; fl_rand: boolean } | null {
     // 1. Face-to-face match (same alignment, coordinate, and length)
     for (const td of this.teleporterList) {
       if (td.cx !== start.cx || td.cy !== start.cy) {
@@ -409,7 +413,7 @@ export class LevelWorld {
     );
     if (sameShape.length > 0) {
       return {
-        td: sameShape[Math.floor(Math.random() * sameShape.length)],
+        td: sameShape[rand.random(sameShape.length)],
         fl_rand: sameShape.length > 1,
       };
     }
@@ -418,7 +422,7 @@ export class LevelWorld {
     const anyOther = this.teleporterList.filter((td) => td.cx !== start.cx || td.cy !== start.cy);
     if (anyOther.length === 0) return null;
     return {
-      td: anyOther[Math.floor(Math.random() * anyOther.length)],
+      td: anyOther[rand.random(anyOther.length)],
       fl_rand: true,
     };
   }

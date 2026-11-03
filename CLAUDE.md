@@ -23,6 +23,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 ## Code layout
 
 - `src/engine/`: loop (`GameLoop.ts`, fixed 32 Hz logic with `tmod = 1`, 40 Hz movie clips), audio, input, SWF runtime (`swf/`), save codec
+- SWF frame scripts run in `swf/Avm1.ts`. They read an entity's fields through `mc.scriptHost` (e.g. the player's `head`, `skin`, `currentWeapon`), so keep the original field names on entities.
 - `src/game/GameSession.ts`: port of `mode/GameMode.mt` + `mode/Adventure.mt` (the only mode so far)
 - `src/game/entity/`: `Entity.ts` (Entity, Animator, Physics, Mover), `Player.ts` (Player + PlayerController + SpecialManager), `Bad.ts` (all enemies), `Bomb.ts`, `Shoot.ts`, `Item.ts`
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
@@ -32,6 +33,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 ## Conventions
 
 - Port faithfully: same names, logic and order as the original. Doc comment each class with its source, e.g. ``Port of `entity.item.SpecialItem` (`class/hammer/entity/item/SpecialItem.mt`)``.
+- No `Math.random` in `src/game`: use `game.rand.random(n)` for `Std.random(n)` and `game.rand.next()` for `Math.random()`, so seeded replays stay deterministic.
 - Never invent behavior. If the original is unclear, check the Ruffle side-by-side ("Flash" button) and note it.
 - Prettier: single quotes, width 100, trailing commas.
 

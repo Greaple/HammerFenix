@@ -4,15 +4,16 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1, starting with the two bugs (1.1, 1.2), then the seeded random generator (1.3).
+Phase 1: input recorder and headless replay (1.4). The groundwork is in place: `GameSession.initGame(levelId, seed)` starts a fresh game, and every random draw in `src/game` goes through `game.rand`, so a seed plus the same key events per tick gives the same game (checked by hand on levels 1, 5, 12 and 30).
 
 ## Phase 1: Stabilize and make fidelity measurable
 
 Without reproducible runs you can't check whether the clone matches the original.
 
-- [ ] 1.1 Bug: `GameSession.initGame()` attaches a new player without destroying the old one. Restart, the level picker and set switching leave extra players running.
-- [ ] 1.2 Bug: `GameSession.changeSet()` replaces `this.view` without destroying the old view (`switchLevelSet()` does destroy it). Merge the two functions.
-- [ ] 1.3 Port `RandomManager.mt` (rarity-weighted draws) and a seeded generator. Replace all ~83 `Math.random` calls in `src/game` with it.
+- [x] 1.1 Bug: `GameSession.initGame()` attaches a new player without destroying the old one. Restart, the level picker and set switching leave extra players running.
+- [x] 1.2 Bug: `GameSession.changeSet()` replaces `this.view` without destroying the old view (`switchLevelSet()` does destroy it). Merge the two functions.
+- [x] 1.3 Port `RandomManager.mt` (rarity-weighted draws) and a seeded generator. Replace all ~83 `Math.random` calls in `src/game` with it. Also: `initGame()` now resets game-wide state (visited levels, keys, pick counts, combos, portals) as the original's fresh `GameMode` does.
+- [x] Bug (found in play): the player's head and skin cycled through every frame and the carrot showed on his neck. The SWF frame scripts that pick those frames were dropped at build time; they now run in an AVM1 interpreter.
 - [ ] 1.4 Input recorder and headless replay: record key events per tick, replay with `stepSingleFrame()`, snapshot entity state. Add Vitest regression tests from replays.
 - [ ] 1.5 Line-by-line audit of `Player.ts` and `Bad.ts` against the original, logging deviations in PORT_STATUS.md.
 

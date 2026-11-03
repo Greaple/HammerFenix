@@ -40,6 +40,13 @@ export class PlayerEntity extends PhysicsEntity {
   lives = 2;
   extraLifeCurrent = 0;
 
+  // Read by the SWF frame scripts of the body parts (head frame, skin frame, carrot, tuft)
+  fl_chourou = false;
+  fl_carot = false;
+  defaultHead: number = Data.HEAD_NORMAL;
+  head: number = this.defaultHead;
+  skin = 1;
+
   currentWeapon: number = Data.WEAPON_B_CLASSIC;
   lastBomb: number = Data.WEAPON_B_CLASSIC;
   initialMaxBombs = 1;
@@ -127,7 +134,7 @@ export class PlayerEntity extends PhysicsEntity {
     this.fl_knock = false;
     this.game.audio.playSound('sound_player_death', Data.CHAN_PLAYER);
 
-    let sign = dx !== null && dx !== 0 ? Math.sign(dx) : Math.random() < 0.5 ? -1 : 1;
+    let sign = dx !== null && dx !== 0 ? Math.sign(dx) : this.game.rand.next() < 0.5 ? -1 : 1;
     if (this.x >= 0.85 * Data.GAME_WIDTH) sign = -1;
     if (this.x <= 0.15 * Data.GAME_WIDTH) sign = 1;
 
@@ -290,7 +297,7 @@ export class PlayerEntity extends PhysicsEntity {
 
       if (close) {
         this.world.showField(td);
-        const next = this.world.getNextTeleporter(td);
+        const next = this.world.getNextTeleporter(td, this.game.rand);
         if (next && !next.fl_rand) {
           this.world.showField(next.td);
         }
@@ -926,6 +933,11 @@ export class PlayerEntity extends PhysicsEntity {
       case 114:
         this.unstick();
         break;
+      case 99:
+        this.fl_chourou = false;
+        this.replayAnim();
+        this.clearRec();
+        break;
       default:
         break;
     }
@@ -982,13 +994,13 @@ export class PlayerEntity extends PhysicsEntity {
       bad.y - Data.CASE_HEIGHT * 0.5,
       'hammer_fx_strike',
     );
-    const dir = Math.random() < 0.5 ? -1 : 1;
+    const dir = this.game.rand.next() < 0.5 ? -1 : 1;
     if (s) {
       s.mc._xscale *= dir;
-      s.mc._yscale = Math.floor(Math.random() * 50) + 50;
+      s.mc._yscale = this.game.rand.random(50) + 50;
     }
     this.game.fxMan.attachShine(bad.x, bad.y);
-    bad.forceKill(dir * (Math.floor(Math.random() * 10) + 15));
+    bad.forceKill(dir * (this.game.rand.random(10) + 15));
   }
 
   executeSpecialItem(item: SpecialItem): void {
@@ -1067,7 +1079,7 @@ export class PlayerEntity extends PhysicsEntity {
         break;
       case 20:
         for (let i = 0; i < 5; i++) {
-          const s = ScoreItem.attach(this.game, item.x, item.y, 0, Math.floor(Math.random() * 4));
+          const s = ScoreItem.attach(this.game, item.x, item.y, 0, this.game.rand.random(4));
           s.moveFrom(item, 8);
         }
         break;
@@ -1090,7 +1102,7 @@ export class PlayerEntity extends PhysicsEntity {
           const s = PlayerPearlShoot.attach(this.game, this.x, this.y - Data.CASE_WIDTH);
           s.moveToTarget(b, s.shootSpeed);
           s.fl_borderBounce = true;
-          s.setLifeTimer(Data.SECOND * 3 + Math.floor(Math.random() * 40));
+          s.setLifeTimer(Data.SECOND * 3 + this.game.rand.random(40));
           s.endUpdate();
         }
         break;
@@ -1137,12 +1149,17 @@ export class PlayerEntity extends PhysicsEntity {
         }
         break;
       case 36:
+        this.lives++;
+        this.game.hud.setLives(this.lives);
+        this.game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        break;
       case 103:
       case 104:
       case 105:
         this.lives++;
         this.game.hud.setLives(this.lives);
         this.game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        this.game.randMan.remove(Data.RAND_ITEMS_ID, id);
         break;
       case 37:
         this.changeWeapon(Data.WEAPON_S_ICE);
@@ -1155,15 +1172,15 @@ export class PlayerEntity extends PhysicsEntity {
       case 64:
         for (let i = 0; i < 5; i++) {
           const pt = this.world.getGround(
-            Math.floor(Math.random() * Data.LEVEL_WIDTH),
-            Math.floor(Math.random() * Data.LEVEL_HEIGHT),
+            this.game.rand.random(Data.LEVEL_WIDTH),
+            this.game.rand.random(Data.LEVEL_HEIGHT),
           );
           SpecialItem.attach(
             this.game,
             pt.x * Data.CASE_WIDTH,
             pt.y * Data.CASE_HEIGHT,
             0,
-            Math.floor(Math.random() * 7),
+            this.game.rand.random(7),
           );
         }
         break;
@@ -1209,12 +1226,12 @@ export class PlayerEntity extends PhysicsEntity {
         for (let i = 0; i < 7; i++) {
           const it = ScoreItem.attach(
             this.game,
-            Math.floor(Math.random() * Data.GAME_WIDTH),
+            this.game.rand.random(Data.GAME_WIDTH),
             Data.GAME_HEIGHT,
             scoreId,
             null,
           );
-          it.moveToAng(-20 - Math.floor(Math.random() * 160), Math.floor(Math.random() * 15) + 10);
+          it.moveToAng(-20 - this.game.rand.random(160), this.game.rand.random(15) + 10);
         }
         break;
       }
@@ -1276,10 +1293,11 @@ export class PlayerEntity extends PhysicsEntity {
           fl_repeat: true,
           func: () => this.getScore(this, 250),
         });
+        this.fl_chourou = true;
         this.temporary(id, null);
         break;
       case 101:
-        if (Math.random() < 0.5) {
+        if (this.game.rand.next() < 0.5) {
           this.getScore(item, 5000);
         } else {
           const b = PoireBomb.attach(this.game, item.x, item.y);
@@ -1289,6 +1307,7 @@ export class PlayerEntity extends PhysicsEntity {
       case 102:
         this.game.huTimer = 0;
         this.getScore(item, 100000);
+        this.fl_carot = true;
         break;
       case 114:
       case 115:
@@ -1406,7 +1425,7 @@ export class PlayerEntity extends PhysicsEntity {
         this.waitTimer -= 1;
         if (this.waitTimer <= 0) {
           this.playAnim(
-            Math.floor(Math.random() * 20) === 0 ? Data.ANIM_PLAYER_WAIT1 : Data.ANIM_PLAYER_WAIT2,
+            this.game.rand.random(20) === 0 ? Data.ANIM_PLAYER_WAIT1 : Data.ANIM_PLAYER_WAIT2,
           );
         }
       }

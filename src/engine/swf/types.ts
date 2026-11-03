@@ -64,7 +64,9 @@ export type FrameAction =
   | { op: 'play' }
   | { op: 'removeSelf' }
   | { op: 'gotoFrame'; frame: number; play: boolean }
-  | { op: 'gotoLabel'; label: string; play: boolean };
+  | { op: 'gotoLabel'; label: string; play: boolean }
+  /** A frame script too rich for the ops above, run by `Avm1.ts`. `code` is base64 AVM1 bytecode. */
+  | { op: 'avm1'; code: string };
 
 export interface PlaceCmd {
   op: 'place';

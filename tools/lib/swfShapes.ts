@@ -365,7 +365,60 @@ export function compileStaticText(tag: any, fonts: Map<number, any>): ShapeDef {
 }
 
 /** Extracts timeline control actions (`stop`, `play`, `gotoFrame`, `gotoLabel`, `removeSelf`) from AVM1 bytecode. */
+/** Opcodes the simple parser below turns into `stop` / `play` / `gotoFrame` / `gotoLabel`. */
+const SIMPLE_OPS = new Set([0x06, 0x07, 0x81, 0x8c]);
+
+/** Opcodes the runtime interpreter (`src/engine/swf/Avm1.ts`) supports. Keep both lists in sync. */
+export const AVM1_SUPPORTED_OPS = new Set([
+  0x04, 0x05, 0x06, 0x07, 0x0a, 0x0b, 0x0c, 0x0d, 0x10, 0x11, 0x12, 0x17, 0x18, 0x1c, 0x1d, 0x22,
+  0x23, 0x25, 0x30, 0x3c, 0x3d, 0x47, 0x48, 0x49, 0x4c, 0x4e, 0x4f, 0x50, 0x51, 0x52, 0x67, 0x81,
+  0x87, 0x88, 0x8c, 0x96, 0x99, 0x9d, 0x9f,
+]);
+
+/** Lists the opcodes of an action block, up to `ActionEnd`. */
+export function scanActionOps(raw: Uint8Array): number[] {
+  const ops: number[] = [];
+  let i = 0;
+  while (i < raw.length) {
+    const op = raw[i++];
+    if (op === 0x00) break;
+    ops.push(op);
+    if (op >= 0x80) i += 2 + (raw[i] | (raw[i + 1] << 8));
+  }
+  return ops;
+}
+
+/**
+ * Compiles one `DoAction` block. Plain timeline control becomes simple ops. Anything richer
+ * (reading the owner's fields, timers, conditions) is kept as bytecode for the runtime
+ * interpreter, unless it uses an unsupported opcode (function definitions), in which case only
+ * the simple ops found in it are kept.
+ */
 export function parseFrameActions(raw: Uint8Array): FrameAction[] {
+  const ops = scanActionOps(raw);
+  const legacy = parseSimpleFrameActions(raw);
+  const isSimple = ops.every((op) => SIMPLE_OPS.has(op));
+  const isRemoveSelf = legacy.some((a) => a.op === 'removeSelf');
+  if (isSimple || isRemoveSelf) return legacy;
+  if (ops.every((op) => AVM1_SUPPORTED_OPS.has(op))) {
+    const end = findActionEnd(raw);
+    return [{ op: 'avm1', code: Buffer.from(raw.subarray(0, end)).toString('base64') }];
+  }
+  return legacy;
+}
+
+/** Byte length of an action block including its `ActionEnd`. */
+function findActionEnd(raw: Uint8Array): number {
+  let i = 0;
+  while (i < raw.length) {
+    const op = raw[i++];
+    if (op === 0x00) return i;
+    if (op >= 0x80) i += 2 + (raw[i] | (raw[i + 1] << 8));
+  }
+  return raw.length;
+}
+
+function parseSimpleFrameActions(raw: Uint8Array): FrameAction[] {
   const actions: FrameAction[] = [];
   const buf = Buffer.from(raw.buffer, raw.byteOffset, raw.byteLength);
 

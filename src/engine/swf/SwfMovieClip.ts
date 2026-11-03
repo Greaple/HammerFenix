@@ -1,5 +1,6 @@
 import type { BLEND_MODES } from 'pixi.js';
 import { ColorMatrixFilter, Container, Graphics, Matrix, Sprite, Text, TextStyle } from 'pixi.js';
+import { type Avm1Clip, runAvm1 } from './Avm1';
 import type { SwfLibrary } from './SwfLibrary';
 import type { Cxform8, DynamicTextDef, Matrix6, PlaceCmd, SpriteDef } from './types';
 
@@ -202,6 +203,35 @@ interface DepthSlot {
 }
 
 const TMP_MAT = new Matrix();
+const IDENTITY_MATRIX: Matrix6 = [1, 0, 0, 1, 0, 0];
+const IDENTITY_CXFORM: Cxform8 = [1, 1, 1, 1, 0, 0, 0, 0];
+
+/** AVM1 `GetProperty` / `SetProperty` indexes. */
+const PROP_INDEX: Record<string, number> = {
+  _x: 0,
+  _y: 1,
+  _xscale: 2,
+  _yscale: 3,
+  _currentframe: 4,
+  _totalframes: 5,
+  _alpha: 6,
+  _visible: 7,
+  _width: 8,
+  _height: 9,
+  _rotation: 10,
+  _name: 13,
+};
+
+/** Timeline state of one depth while replaying frames for a backward seek. */
+interface DepthRecord {
+  id: number;
+  m?: Matrix6;
+  cx?: Cxform8;
+  n?: string;
+  clip?: number;
+  blend?: number;
+  visible?: boolean;
+}
 
 function mapFlashBlendMode(mode?: number): BLEND_MODES {
   switch (mode) {
@@ -223,9 +253,24 @@ function mapFlashBlendMode(mode?: number): BLEND_MODES {
  * `mc.skin`, `mc.maskTile`, etc.), `clipDepth` stencil masks, color transforms,
  * frame labels, frame actions, and AS2 underscore properties.
  */
-export class SwfMovieClip extends Container {
+export class SwfMovieClip extends Container implements Avm1Clip {
   readonly lib: SwfLibrary;
   readonly def: SpriteDef;
+
+  /**
+   * Object whose fields frame scripts see as this clip's variables. In the original, entities
+   * *are* their MovieClip, so a body part reads `_parent._parent.head` straight off the player.
+   */
+  scriptHost: Record<string, any> | null = null;
+  private readonly avmVars = new Map<string, unknown>();
+  /**
+   * Frame scripts (`avm1` actions) wait until the clip is live: in the display tree and
+   * reached by an animation step, so `_parent` and `scriptHost` are set when they run.
+   */
+  private live = false;
+  private pendingFrame = 0;
+  private actionHop = 0;
+  private removed = false;
 
   private curFrame = 0; // 0 = not yet initialized; 1..frameCount once constructed
   private playing = true;
@@ -384,6 +429,7 @@ export class SwfMovieClip extends Container {
 
   removeMovieClip(): void {
     this.playing = false;
+    this.removed = true;
     if (this.parent) {
       this.parent.removeChild(this);
     }
@@ -459,6 +505,7 @@ export class SwfMovieClip extends Container {
 
   /** Advances this clip and all playing descendant MovieClips by one timeline frame. */
   stepAnimation(guardDepth = 0): void {
+    this.goLive();
     if (!this.visible || guardDepth > 32) return;
 
     if (this.playing && this.def.frameCount > 1) {
@@ -493,11 +540,12 @@ export class SwfMovieClip extends Container {
   private seekToFrame(target: number, runActions: boolean, actionHop = 0): void {
     if (target === this.curFrame) return;
 
-    if (target < this.curFrame || this.curFrame === 0) {
-      this.clearAllSlots();
+    if (this.curFrame === 0) {
       for (let f = 1; f <= target; f++) {
         this.applyFrameCmds(f);
       }
+    } else if (target < this.curFrame) {
+      this.rewindTo(target);
     } else {
       for (let f = this.curFrame + 1; f <= target; f++) {
         this.applyFrameCmds(f);
@@ -507,39 +555,263 @@ export class SwfMovieClip extends Container {
     this.refreshClipMasks();
 
     if (runActions && actionHop < 4) {
-      const frameDef = this.def.frames[target - 1];
-      if (frameDef?.actions) {
-        for (const act of frameDef.actions) {
-          switch (act.op) {
-            case 'stop':
-              this.playing = false;
-              break;
-            case 'play':
-              if (this.def.frameCount > 1) this.playing = true;
-              break;
-            case 'removeSelf':
-              this.removeMovieClip();
-              return;
-            case 'gotoFrame':
-              this.playing = act.play && this.def.frameCount > 1;
-              this.seekToFrame(this.resolveFrame(act.frame), true, actionHop + 1);
-              return;
-            case 'gotoLabel':
-              this.playing = act.play && this.def.frameCount > 1;
-              this.seekToFrame(this.resolveFrame(act.label), true, actionHop + 1);
-              return;
+      this.runFrameActions(target, actionHop);
+    }
+  }
+
+  private runFrameActions(frame: number, actionHop: number): void {
+    const actions = this.def.frames[frame - 1]?.actions;
+    if (!actions) return;
+    for (const act of actions) {
+      switch (act.op) {
+        case 'stop':
+          this.playing = false;
+          break;
+        case 'play':
+          if (this.def.frameCount > 1) this.playing = true;
+          break;
+        case 'removeSelf':
+          this.removeMovieClip();
+          return;
+        case 'gotoFrame':
+          this.playing = act.play && this.def.frameCount > 1;
+          this.seekToFrame(this.resolveFrame(act.frame), true, actionHop + 1);
+          return;
+        case 'gotoLabel':
+          this.playing = act.play && this.def.frameCount > 1;
+          this.seekToFrame(this.resolveFrame(act.label), true, actionHop + 1);
+          return;
+        case 'avm1':
+          if (!this.live) {
+            this.pendingFrame = frame;
+            break;
           }
-        }
+          this.actionHop = actionHop;
+          runAvm1(act.code, this);
+          if (this.curFrame !== frame || this.removed) return;
+          break;
       }
     }
   }
 
-  private clearAllSlots(): void {
-    for (const slot of this.depthSlots.values()) {
-      if (slot.name) this.unregisterName(slot.name, slot.node);
-      this.removeChild(slot.node);
+  /** Runs the frame scripts that waited for this clip to be live, then does the same below it. */
+  goLive(): void {
+    if (this.live) return;
+    this.live = true;
+    const frame = this.pendingFrame;
+    this.pendingFrame = 0;
+    if (frame !== 0 && frame === this.curFrame) {
+      for (const act of this.def.frames[frame - 1]?.actions ?? []) {
+        if (act.op !== 'avm1') continue;
+        this.actionHop = 0;
+        runAvm1(act.code, this);
+        if (this.curFrame !== frame || this.removed) break;
+      }
     }
-    this.depthSlots.clear();
+    for (const child of [...this.children]) {
+      if (child instanceof SwfMovieClip) child.goLive();
+    }
+  }
+
+  /**
+   * Backward seek. Like Flash, children still on the same depth with the same character are kept
+   * (with their own state, text and running animations); only the others are replaced.
+   */
+  private rewindTo(target: number): void {
+    const sim = new Map<number, DepthRecord>();
+    for (let f = 1; f <= target; f++) {
+      for (const cmd of this.def.frames[f - 1]?.cmds ?? []) {
+        if (cmd.op === 'remove') {
+          sim.delete(cmd.d);
+          continue;
+        }
+        const prev = sim.get(cmd.d);
+        if (cmd.u && prev && (cmd.id === undefined || cmd.id === prev.id)) {
+          if (cmd.m) prev.m = cmd.m;
+          if (cmd.cx) prev.cx = cmd.cx;
+          if (cmd.visible !== undefined) prev.visible = cmd.visible;
+          if (cmd.blend !== undefined) prev.blend = cmd.blend;
+          if (cmd.n) prev.n = cmd.n;
+        } else if (cmd.id !== undefined) {
+          sim.set(cmd.d, {
+            id: cmd.id,
+            m: cmd.m ?? (cmd.u ? prev?.m : undefined),
+            cx: cmd.cx,
+            n: cmd.n,
+            clip: cmd.clip,
+            blend: cmd.blend,
+            visible: cmd.visible,
+          });
+        } else if (!cmd.u) {
+          sim.delete(cmd.d);
+        }
+      }
+    }
+
+    for (const [depth, slot] of [...this.depthSlots]) {
+      const rec = sim.get(depth);
+      if (!rec || rec.id !== slot.charId || rec.clip !== slot.clipDepth) this.removeSlot(depth);
+    }
+    for (const [depth, rec] of sim) {
+      const slot = this.depthSlots.get(depth);
+      if (!slot) {
+        this.applyPlace({ op: 'place', d: depth, ...rec });
+        continue;
+      }
+      this.applyMatrix(slot.node, rec.m ?? IDENTITY_MATRIX);
+      this.applyCxform(slot, rec.cx ?? IDENTITY_CXFORM);
+      if (rec.visible !== undefined) slot.node.visible = rec.visible;
+      slot.node.blendMode = mapFlashBlendMode(rec.blend);
+      if (rec.n !== slot.name) {
+        if (slot.name) this.unregisterName(slot.name, slot.node);
+        slot.name = rec.n;
+        if (rec.n) this.registerName(rec.n, slot.node);
+      }
+    }
+  }
+
+  // ------------------------------------------------------ AVM1 script access
+
+  avmGet(name: string): unknown {
+    if (name === '_parent') return this.parent instanceof SwfMovieClip ? this.parent : undefined;
+    const index = PROP_INDEX[name];
+    if (index !== undefined) return this.avmGetProp(index);
+    const child = this.namedChildren.get(name);
+    if (child) return child;
+    if (this.avmVars.has(name)) return this.avmVars.get(name);
+    const host = this.scriptHost;
+    if (host && name in host) return host[name];
+    return undefined;
+  }
+
+  avmSet(name: string, value: unknown): void {
+    const index = PROP_INDEX[name];
+    if (index !== undefined) {
+      this.avmSetProp(index, value);
+    } else if (
+      this.scriptHost &&
+      name in this.scriptHost &&
+      typeof this.scriptHost[name] !== 'function'
+    ) {
+      this.scriptHost[name] = value;
+    } else {
+      this.avmVars.set(name, value);
+    }
+  }
+
+  avmGetProp(index: number): unknown {
+    switch (index) {
+      case 0:
+        return this._x;
+      case 1:
+        return this._y;
+      case 2:
+        return this._xscale;
+      case 3:
+        return this._yscale;
+      case 4:
+        return this._currentframe;
+      case 5:
+        return this._totalframes;
+      case 6:
+        return this._alpha;
+      case 7:
+        return this._visible;
+      case 8:
+        return this._width;
+      case 9:
+        return this._height;
+      case 10:
+        return this.rotationDeg;
+      case 13:
+        return this._name;
+      default:
+        return undefined;
+    }
+  }
+
+  avmSetProp(index: number, value: unknown): void {
+    const n = Number(value);
+    switch (index) {
+      case 0:
+        if (Number.isFinite(n)) this._x = n;
+        break;
+      case 1:
+        if (Number.isFinite(n)) this._y = n;
+        break;
+      case 2:
+        if (Number.isFinite(n)) this._xscale = n;
+        break;
+      case 3:
+        if (Number.isFinite(n)) this._yscale = n;
+        break;
+      case 6:
+        if (Number.isFinite(n)) this._alpha = n;
+        break;
+      case 7:
+        this._visible = Boolean(value);
+        break;
+      case 8:
+        if (Number.isFinite(n)) this._width = n;
+        break;
+      case 9:
+        if (Number.isFinite(n)) this._height = n;
+        break;
+      case 10:
+        if (Number.isFinite(n)) this.rotationDeg = n;
+        break;
+      case 13:
+        this._name = String(value);
+        break;
+    }
+  }
+
+  avmCall(name: string, args: unknown[]): unknown {
+    switch (name) {
+      case 'gotoAndStop':
+        this.avmGoto(args[0], false);
+        return undefined;
+      case 'gotoAndPlay':
+        this.avmGoto(args[0], true);
+        return undefined;
+      case 'play':
+        this.play();
+        return undefined;
+      case 'stop':
+        this.stop();
+        return undefined;
+      case 'nextFrame':
+        this.avmGoto(this.curFrame + 1, false);
+        return undefined;
+      case 'prevFrame':
+        this.avmGoto(this.curFrame - 1, false);
+        return undefined;
+      case 'removeMovieClip':
+        this.removeMovieClip();
+        return undefined;
+    }
+    const host = this.scriptHost;
+    if (host && typeof host[name] === 'function') return host[name](...args);
+    const fn = this.avmVars.get(name);
+    return typeof fn === 'function' ? fn(...args) : undefined;
+  }
+
+  /** Script goto: unknown labels and invalid numbers are ignored, as in Flash. */
+  avmGoto(frame: unknown, play: boolean): void {
+    let target: number;
+    if (typeof frame === 'number') {
+      if (!Number.isFinite(frame)) return;
+      target = this.resolveFrame(frame);
+    } else if (typeof frame === 'string') {
+      const asNum = Number(frame);
+      if (frame.trim() !== '' && Number.isFinite(asNum)) target = this.resolveFrame(asNum);
+      else if (this.def.labels?.[frame] !== undefined) target = this.resolveFrame(frame);
+      else return;
+    } else {
+      return;
+    }
+    this.playing = play && this.def.frameCount > 1;
+    this.seekToFrame(target, true, this.actionHop + 1);
   }
 
   private applyFrameCmds(frame1: number): void {
@@ -618,6 +890,7 @@ export class SwfMovieClip extends Container {
     this.depthSlots.set(cmd.d, slot);
     this.addChild(node);
     if (cmd.n) this.registerName(cmd.n, node);
+    if (this.live && node instanceof SwfMovieClip) node.goLive();
   }
 
   private applyMatrix(node: Container, [a, b, c, d, tx, ty]: Matrix6): void {

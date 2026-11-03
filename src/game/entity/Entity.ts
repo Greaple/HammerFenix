@@ -62,6 +62,8 @@ export class BaseEntity {
   constructor(game: IGameContext, mc: SwfMovieClip) {
     this.game = game;
     this.mc = mc;
+    // In the original the entity is its MovieClip: frame scripts read its fields.
+    mc.scriptHost = this;
     this.world = game.world;
     this.uniqId = game.getUniqId();
     this.register(Data.ENTITY);
@@ -575,7 +577,7 @@ export class PhysicsEntity extends AnimatorEntity {
 
   killHit(dx: number | null): void {
     if (this.fl_kill) return;
-    this.dx = dx ?? Math.random() * 20 * (Math.random() < 0.5 ? -1 : 1);
+    this.dx = dx ?? this.game.rand.next() * 20 * (this.game.rand.next() < 0.5 ? -1 : 1);
     this.dy = -10;
     this.fl_hitGround = false;
     this.fl_hitWall = false;
@@ -613,7 +615,7 @@ export class PhysicsEntity extends AnimatorEntity {
   }
 
   moveFrom(e: BaseEntity, speed: number): void {
-    const ang = -Math.random() * Math.PI;
+    const ang = -this.game.rand.next() * Math.PI;
     this.x = e.x + Math.cos(ang) * Data.CASE_WIDTH * 2;
     this.y = e.y + Math.sin(ang) * Data.CASE_HEIGHT * 2;
     this.moveToTarget(e, speed);
@@ -654,7 +656,7 @@ export class PhysicsEntity extends AnimatorEntity {
       if (cid === Data.FIELD_TELEPORT) {
         const start = this.world.getTeleporter(this.cx, this.cy);
         if (start && start !== this.lastTeleporter) {
-          const target = this.world.getNextTeleporter(start);
+          const target = this.world.getNextTeleporter(start, this.game.rand);
           if (target) {
             this.game.fxMan.attachFx(this.x, this.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
             if (target.td.dir === Data.HORIZONTAL) {

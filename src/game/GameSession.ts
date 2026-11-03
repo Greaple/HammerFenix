@@ -13,6 +13,8 @@ import { PlayerEntity } from './entity/Player';
 import { BadEntity, createBad, FireBallBad } from './entity/Bad';
 import { BombEntity } from './entity/Bomb';
 import { FxManager } from './FxManager';
+import { Random } from './Random';
+import { RandomManager } from './RandomManager';
 import { GameHud } from './gui/GameHud';
 import type { IGameContext } from './GameContext';
 import { LevelView } from './levels/LevelView';
@@ -20,6 +22,14 @@ import { LevelWorld } from './levels/LevelWorld';
 import { ScriptRunner } from './levels/ScriptRunner';
 
 const SAVE_KEY = 'hammerfenix_save_v1';
+
+/**
+ * Item families the player has unlocked. The original reads them from the player profile
+ * (`GameParameters.specialItemFamilies` / `scoreItemFamilies`). Until profiles exist (roadmap 3.2),
+ * use the base families.
+ */
+const SPECIAL_ITEM_FAMILIES: readonly number[] = [0, 1, 2];
+const SCORE_ITEM_FAMILIES: readonly number[] = [1000, 1001, 1002];
 
 export interface GameSaveData {
   highScore: number;
@@ -45,6 +55,12 @@ export class GameSession implements IGameContext {
   hud: GameHud;
   scriptRunner: ScriptRunner | null = null;
   player: PlayerEntity | null = null;
+
+  /** Every random draw of the game goes through `rand`, so a seed and inputs replay a game. */
+  readonly rand = new Random();
+  /** Seed of the current game, set by `initGame()`. */
+  seed = 0;
+  randMan: RandomManager = new RandomManager(this.rand);
 
   readonly xOffset = 10;
   cycle = 0;
@@ -167,23 +183,26 @@ export class GameSession implements IGameContext {
   ): Promise<GameSession> {
     const set = await dataStore.loadLevelSet(preferredSet);
     const session = new GameSession(app, lib, dataStore, audio, input, set, preferredSet);
-
-    // If starting in adventure mode, eagerly preload the other 4 linked dimensions
-    if (preferredSet === 'adventure') {
-      const extraDims = ['deepnight', 'hiko', 'ayame', 'hk'];
-      for (const name of extraDims) {
-        try {
-          const extraSet = await dataStore.loadLevelSet(name);
-          const extraWorld = new LevelWorld(extraSet, 0, false);
-          session.dimensions.push(extraWorld);
-        } catch {
-          // non-critical if optional dimension file fails
-        }
-      }
-    }
-
+    session.dimensions.push(...(await GameSession.loadExtraDimensions(dataStore, preferredSet)));
     session.initGame();
     return session;
+  }
+
+  /** The adventure links to 4 other dimensions through portals; load them as secondary worlds. */
+  private static async loadExtraDimensions(
+    dataStore: GameDataStore,
+    setName: string,
+  ): Promise<LevelWorld[]> {
+    if (setName !== 'adventure') return [];
+    const out: LevelWorld[] = [];
+    for (const name of ['deepnight', 'hiko', 'ayame', 'hk']) {
+      try {
+        out.push(new LevelWorld(await dataStore.loadLevelSet(name), 0, false));
+      } catch {
+        // non-critical if optional dimension file fails
+      }
+    }
+    return out;
   }
 
   // ------------------------------------------------------------- Persistence
@@ -222,8 +241,17 @@ export class GameSession implements IGameContext {
 
   // -------------------------------------------------------- Game Lifecycle
 
-  initGame(startLevelId = 0): void {
+  initGame(startLevelId = 0, seed = Random.makeSeed()): void {
+    // Drop the previous game's players; clearLevel() leaves them alive between levels.
+    this.destroyList(Data.PLAYER);
+    this.player = null;
     this.clearLevel();
+
+    this.resetGameState();
+    this.seed = seed;
+    this.rand.reseed(seed);
+    this.initRandMan();
+
     this.fl_gameOver = false;
     this.fl_clear = false;
     this.fl_lock = false;
@@ -244,6 +272,44 @@ export class GameSession implements IGameContext {
     );
 
     this.startLevel();
+  }
+
+  /**
+   * The original starts each game with a new `GameMode` object. This session object is reused,
+   * so clear everything a previous game may have changed.
+   */
+  private resetGameState(): void {
+    for (const w of this.dimensions) w.visited.clear();
+    this.globalActives.fill(false);
+    this.worldKeys.fill(false);
+    this.comboMap.clear();
+    this.specialPicks.length = 0;
+    this.scorePicks.length = 0;
+    this.uniqIdCounter = 1;
+    this.speedFactor = 1.0;
+    this.diffFactor = 1.0;
+    this.fl_warpStart = false;
+    this.fakeLevelId = null;
+    this.forcedDarkness = null;
+    this.extraHoles = [];
+    this.killPortals();
+    this.nextLink = null;
+    this.keyLock = null;
+    this.shake(null, null);
+  }
+
+  /** From `GameMode.init`: register the extend letters and the unlocked item families. */
+  private initRandMan(): void {
+    this.randMan = new RandomManager(this.rand);
+    this.randMan.register(Data.RAND_EXTENDS_ID, [...Data.RAND_EXTENDS]);
+    this.randMan.register(
+      Data.RAND_ITEMS_ID,
+      this.dataStore.getRandFromFamilies(this.dataStore.items.special, SPECIAL_ITEM_FAMILIES),
+    );
+    this.randMan.register(
+      Data.RAND_SCORES_ID,
+      this.dataStore.getRandFromFamilies(this.dataStore.items.score, SCORE_ITEM_FAMILIES),
+    );
   }
 
   startLevel(): void {
@@ -308,12 +374,9 @@ export class GameSession implements IGameContext {
   private addLevelItems(): void {
     if (this.world.current.specialSlots.length > 0) {
       const pt =
-        this.world.current.specialSlots[
-          Math.floor(Math.random() * this.world.current.specialSlots.length)
-        ];
-      const id = this.dataStore.pickRandomSpecialItem();
+        this.world.current.specialSlots[this.rand.random(this.world.current.specialSlots.length)];
       this.scriptRunner?.insertSpecialItem(
-        id,
+        this.randMan.draw(Data.RAND_ITEMS_ID) ?? 0,
         null,
         pt.x,
         pt.y,
@@ -326,12 +389,9 @@ export class GameSession implements IGameContext {
 
     if (this.world.current.scoreSlots.length > 0) {
       const pt =
-        this.world.current.scoreSlots[
-          Math.floor(Math.random() * this.world.current.scoreSlots.length)
-        ];
-      const id = this.dataStore.pickRandomScoreItem();
+        this.world.current.scoreSlots[this.rand.random(this.world.current.scoreSlots.length)];
       this.scriptRunner?.insertScoreItem(
-        id,
+        this.randMan.draw(Data.RAND_SCORES_ID) ?? 0,
         null,
         pt.x,
         pt.y,
@@ -374,6 +434,8 @@ export class GameSession implements IGameContext {
   }
 
   goto(id: number): void {
+    this.clearExtraHoles();
+    this.killPortals();
     this.clearLevel();
     this.world.goto(id);
 
@@ -389,17 +451,6 @@ export class GameSession implements IGameContext {
 
     this.audio.playSound('sound_level_clear', Data.CHAN_INTERF);
     this.startLevel();
-  }
-
-  async switchLevelSet(name: string, levelId = 0): Promise<void> {
-    const set = await this.dataStore.loadLevelSet(name);
-    this.currentSetName = name;
-    this.currentDim = 0;
-    this.dimensions = [new LevelWorld(set, levelId, true)];
-    this.world = this.dimensions[0];
-    this.view.destroy();
-    this.view = new LevelView(this.world, this.depthMan);
-    this.initGame(levelId);
   }
 
   clearLevel(): void {
@@ -497,7 +548,7 @@ export class GameSession implements IGameContext {
   getOne(type: number): BaseEntity | null {
     const list = this.getList(type);
     if (list.length === 0) return null;
-    return list[Math.floor(Math.random() * list.length)];
+    return list[this.rand.random(list.length)];
   }
 
   destroyList(type: number): void {
@@ -637,25 +688,13 @@ export class GameSession implements IGameContext {
   spawnExtend(): void {
     if (this.fl_clear) return;
     const pt = this.world.getGround(
-      Math.floor(Math.random() * Data.LEVEL_WIDTH),
-      Math.floor(Math.random() * Data.LEVEL_HEIGHT),
+      this.rand.random(Data.LEVEL_WIDTH),
+      this.rand.random(Data.LEVEL_HEIGHT),
     );
     const x = BaseEntity.x_ctr(pt.x);
     const y = BaseEntity.y_ctr(pt.y);
-    const id = this.drawRandomExtend();
+    const id = this.randMan.draw(Data.RAND_EXTENDS_ID) ?? 0;
     SpecialItem.attach(this, x, y, 0, id);
-  }
-
-  private drawRandomExtend(): number {
-    const weights = Data.RAND_EXTENDS;
-    let total = 0;
-    for (const w of weights) total += w;
-    let roll = Math.random() * total;
-    for (let i = 0; i < weights.length; i++) {
-      roll -= weights[i];
-      if (roll <= 0) return i;
-    }
-    return weights.length - 1;
   }
 
   // ----------------------------------------------------------- UI & Banners
@@ -734,6 +773,13 @@ export class GameSession implements IGameContext {
   killItemName(): void {
     this.itemNameMC?.removeMovieClip();
     this.itemNameMC = null;
+  }
+
+  killPortals(): void {
+    for (const p of this.portalMcList) {
+      p?.mc.removeMovieClip();
+    }
+    this.portalMcList.length = 0;
   }
 
   // ----------------------------------------------------- Portals & Dimensions
@@ -998,8 +1044,8 @@ export class GameSession implements IGameContext {
     if (this.shakeTimer > 0) {
       this.shakeTimer -= 1;
       const ratio = this.shakeTotal > 0 ? this.shakeTimer / this.shakeTotal : 0;
-      const ox = (Math.random() * 2 - 1) * this.shakePower * ratio;
-      const oy = (Math.random() * 2 - 1) * this.shakePower * ratio;
+      const ox = (this.rand.next() * 2 - 1) * this.shakePower * ratio;
+      const oy = (this.rand.next() * 2 - 1) * this.shakePower * ratio;
       this.gameRoot._x = this.xOffset + Math.round(ox);
       this.gameRoot._y = Math.round(oy);
     } else {
@@ -1044,16 +1090,19 @@ export class GameSession implements IGameContext {
 
   async changeSet(setName: string, levelId = 0): Promise<void> {
     const set = await this.dataStore.loadLevelSet(setName);
+    const extraDims = await GameSession.loadExtraDimensions(this.dataStore, setName);
     this.currentSetName = setName;
     this.currentDim = 0;
-    this.dimensions = [new LevelWorld(set, levelId, true)];
+    this.dimensions = [new LevelWorld(set, levelId, true), ...extraDims];
     this.world = this.dimensions[0];
+    this.view.destroy();
     this.view = new LevelView(this.world, this.depthMan);
     this.initGame(levelId);
   }
 
   destroy(): void {
     this.gameLoop.stop();
+    this.killPortals();
     this.clearLevel();
     this.saveGame();
     this.app.stage.removeChild(this.gameRoot);

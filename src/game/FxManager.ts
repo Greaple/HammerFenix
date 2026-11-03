@@ -208,7 +208,7 @@ export class FxManager {
     if (fx) {
       fx.mc._xscale *= 1.5;
       fx.mc._yscale = fx.mc._xscale;
-      fx.mc._xscale *= Math.random() < 0.5 ? -1 : 1;
+      fx.mc._xscale *= this.game.rand.next() < 0.5 ? -1 : 1;
     }
     return fx;
   }
@@ -252,11 +252,11 @@ export class FxManager {
     const wid = Math.max(1, Math.round(xMax - xMin));
 
     for (let i = 0; i < 6; i++) {
-      const fx = this.attachFx(xMin + Math.floor(Math.random() * wid), y, 'hammer_fx_dust');
+      const fx = this.attachFx(xMin + this.game.rand.random(wid), y, 'hammer_fx_dust');
       if (fx) {
-        fx.mc._xscale = (50 + Math.floor(Math.random() * 50)) * (Math.random() < 0.5 ? -1 : 1);
-        fx.mc._yscale = 20 + Math.floor(Math.random() * 70);
-        fx.mc._alpha = 50 + Math.floor(Math.random() * 50);
+        fx.mc._xscale = (50 + this.game.rand.random(50)) * (this.game.rand.next() < 0.5 ? -1 : 1);
+        fx.mc._yscale = 20 + this.game.rand.random(70);
+        fx.mc._alpha = 50 + this.game.rand.random(50);
       }
     }
   }
@@ -265,12 +265,12 @@ export class FxManager {
     if (this.game.fl_lock) return;
     const count = Math.min(8, Math.max(1, n));
     for (let i = 0; i < count; i++) {
-      const ox = (Math.random() - 0.5) * 28;
-      const oy = -Math.random() * 22;
+      const ox = (this.game.rand.next() - 0.5) * 28;
+      const oy = -this.game.rand.next() * 22;
       const fx = this.attachFx(x + ox, y + oy, 'hammer_fx_partIce');
       if (fx) {
-        fx.mc.rotationDeg = Math.floor(Math.random() * 360);
-        const s = 40 + Math.floor(Math.random() * 70);
+        fx.mc.rotationDeg = this.game.rand.random(360);
+        const s = 40 + this.game.rand.random(70);
         fx.mc._xscale = s;
         fx.mc._yscale = s;
       }

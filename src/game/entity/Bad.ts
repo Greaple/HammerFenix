@@ -68,14 +68,14 @@ export class BadEntity extends MoverEntity {
   override killHit(dx: number | null): void {
     if (this.fl_kill) return;
     if (this.fl_freeze) {
-      this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 3) + 2);
+      this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(3) + 2);
       this.game.fxMan.attachExplosion(this.x, this.y - Data.CASE_HEIGHT * 0.5, Data.CASE_WIDTH * 2);
       this.melt();
     }
     if (this.fl_knock) {
       this.wakeUp();
     }
-    const kdx = dx ?? (Math.floor(Math.random() * 200) / 10) * (Math.random() < 0.5 ? -1 : 1);
+    const kdx = dx ?? (this.game.rand.random(200) / 10) * (this.game.rand.next() < 0.5 ? -1 : 1);
     this.playAnim(Data.ANIM_BAD_DIE);
     super.killHit(kdx);
   }
@@ -114,12 +114,7 @@ export class BadEntity extends MoverEntity {
             this.freeze(Data.FREEZE_DURATION);
             this.setCombo(null);
             this.game.fxMan.attachExplodeZone(this.x, this.y - 5, 30);
-            this.game.fxMan.inGameParticles(
-              0,
-              this.x,
-              this.y - 5,
-              3 + Math.floor(Math.random() * 3),
-            );
+            this.game.fxMan.inGameParticles(0, this.x, this.y - 5, 3 + this.game.rand.random(3));
           } else if (!et.fl_shield) {
             et.killHit(et.x < this.x ? -1 : 1);
           }
@@ -235,7 +230,7 @@ export class BadEntity extends MoverEntity {
       for (const p of plist) {
         if (!p.fl_kill) {
           p.unshield();
-          p.killHit(Math.floor(Math.random() * 20));
+          p.killHit(this.game.rand.random(20));
           this.game.fxMan.detachLastAlert();
           this.game.fxMan.attachAlert(this.game.dataStore.getStatic(44));
         }
@@ -266,7 +261,7 @@ export class BadEntity extends MoverEntity {
   override onHitGround(h: number): void {
     super.onHitGround(h);
     if (this.fl_freeze) {
-      this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 3) + 2);
+      this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(3) + 2);
       if (h >= Data.DUST_FALL_HEIGHT) {
         this.game.fxMan.dust(this.cx, this.cy + 1);
       }
@@ -345,16 +340,16 @@ export class BadEntity extends MoverEntity {
 
     const minSpeed = 2;
     if (this.fl_freeze && this.fl_stable && Math.abs(this.dx) > minSpeed) {
-      const nb = Math.floor(Math.random() * 3) + 1;
+      const nb = this.game.rand.random(3) + 1;
       for (let i = 0; i < nb; i++) {
         const part = this.game.fxMan.attachFx(
-          prevX + Math.floor(Math.random() * 12) * (Math.random() < 0.5 ? -1 : 1),
-          prevY - Math.floor(Math.random() * 5) + 2,
+          prevX + this.game.rand.random(12) * (this.game.rand.next() < 0.5 ? -1 : 1),
+          prevY - this.game.rand.random(5) + 2,
           'hammer_fx_partIce',
         );
         if (part) {
-          part.mc.rotationDeg = Math.floor(Math.random() * 360);
-          part.mc._xscale = Math.floor(Math.random() * 80) + 20;
+          part.mc.rotationDeg = this.game.rand.random(360);
+          part.mc._xscale = this.game.rand.random(80) + 20;
           part.mc._yscale = part.mc._xscale;
           part.mc._alpha = Math.min(100, ((Math.abs(this.dx) - minSpeed) / 5) * 100);
         }
@@ -431,7 +426,7 @@ export class BadEntity extends MoverEntity {
  */
 export class WalkerBad extends BadEntity {
   speed = 2;
-  override dir: number = Math.random() < 0.5 ? -1 : 1;
+  override dir: number = this.game.rand.next() < 0.5 ? -1 : 1;
 
   fl_fall = false;
   fl_willFallDown = false;
@@ -514,11 +509,11 @@ export class WalkerBad extends BadEntity {
   }
 
   decideFall(): boolean {
-    if (!this.player) return Math.random() * 1000 < this.chanceFall;
+    if (!this.player) return this.game.rand.next() * 1000 < this.chanceFall;
     const d = this.player.cy - this.cy;
     const fall = this.world.fallMap[this.cx]?.[this.cy] ?? -1;
     const flGood = fall > 0 && d > 0 && fall <= d + 3;
-    return this.fl_playerClose ? flGood : Math.random() * 1000 < this.chanceFall;
+    return this.fl_playerClose ? flGood : this.game.rand.next() * 1000 < this.chanceFall;
   }
 
   override onNext(): void {
@@ -554,7 +549,7 @@ export class WalkerBad extends BadEntity {
     if (this.fl_freeze && Math.abs(this.dx) >= 4) {
       if (this.recentParticles <= 0) {
         this.game.shake(Math.round(Data.SECOND * 0.2), 2);
-        this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 4) + 1);
+        this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(4) + 1);
         this.recentParticles = 10;
       }
       if (this.fl_stable) {
@@ -705,22 +700,22 @@ export class JumperBad extends WalkerBad {
     if (this.fl_playerClose && this.player) {
       return (
         this.player.cy < this.cy &&
-        Math.random() * 1000 < this.chanceJumpUp * this.chaseFactor &&
+        this.game.rand.next() * 1000 < this.chanceJumpUp * this.chaseFactor &&
         this.isReady()
       );
     }
-    return Math.random() * 1000 < this.chanceJumpUp && this.isReady();
+    return this.game.rand.next() * 1000 < this.chanceJumpUp && this.isReady();
   }
 
   decideJumpDown(): boolean {
     if (this.fl_playerClose && this.player) {
       return (
         this.player.cy > this.cy &&
-        Math.random() * 1000 < this.chanceJumpDown * this.chaseFactor &&
+        this.game.rand.next() * 1000 < this.chanceJumpDown * this.chaseFactor &&
         this.isReady()
       );
     }
-    return Math.random() * 1000 < this.chanceJumpDown && this.isReady();
+    return this.game.rand.next() * 1000 < this.chanceJumpDown && this.isReady();
   }
 
   decideClimb(): boolean {
@@ -737,10 +732,11 @@ export class JumperBad extends WalkerBad {
           ((this.player.cx < this.cx && this.dx < 0) || (this.player.cx > this.cx && this.dx > 0)));
       return (
         this.isReady() &&
-        (flStairway || (flGood && Math.random() * 1000 < this.chanceClimb * this.chaseFactor))
+        (flStairway ||
+          (flGood && this.game.rand.next() * 1000 < this.chanceClimb * this.chaseFactor))
       );
     }
-    return this.isReady() && (flStairway || Math.random() * 1000 < this.chanceClimb);
+    return this.isReady() && (flStairway || this.game.rand.next() * 1000 < this.chanceClimb);
   }
 
   jump(dx: number, dy: number, delay: number): void {
@@ -931,7 +927,7 @@ export class ShooterBad extends JumperBad {
   override update(): void {
     if (this.shootCD > 0) this.shootCD -= 1;
     if (this.fl_shooter && this.shootCD <= 0) {
-      if (this.isReady() && Math.random() * 1000 < this.chanceShoot) {
+      if (this.isReady() && this.game.rand.next() * 1000 < this.chanceShoot) {
         this.startShoot();
       }
     }
@@ -947,7 +943,7 @@ export class FlyerBad extends BadEntity {
   ySpeed: number;
   fl_fly = false;
   speed = 4;
-  override dir: number = Math.random() < 0.5 ? -1 : 1;
+  override dir: number = this.game.rand.next() < 0.5 ? -1 : 1;
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
     super(game, mc);
@@ -1145,7 +1141,7 @@ export class WallWalkerBad extends BadEntity {
         this.world.getCase(this.cx + ch.cpx, this.cy + ch.cpy) > 0,
     );
 
-    const choice = choices[Math.floor(Math.random() * choices.length)];
+    const choice = choices[this.game.rand.random(choices.length)];
     if (choice) {
       this.setDir(choice.x, choice.y);
       this.setCP(choice.cpx, choice.cpy);
@@ -1682,7 +1678,7 @@ class AnanasBad extends JumperBad {
   protected override prefix(): void {
     if (this.isReady()) {
       const threshold = this.fl_playerClose ? AnanasBad.CHANCE_DASH * 2 : AnanasBad.CHANCE_DASH;
-      if (Math.random() * 1000 <= threshold) {
+      if (this.game.rand.next() * 1000 <= threshold) {
         this.startAttack();
       }
     }
@@ -1782,12 +1778,12 @@ class BombeBad extends JumperBad {
       e.killHit(0);
       this.shockWave(e, this.radius, this.power);
       if (!e.fl_shield) {
-        e.dy = -10 - Math.floor(Math.random() * 20);
+        e.dy = -10 - this.game.rand.random(20);
       }
     }
     this.game.audio.playSound('sound_bomb_black', Data.CHAN_BOMB);
     this.dropReward();
-    this.game.fxMan.inGameParticles(0, this.x, this.y, Math.floor(Math.random() * 4) + 5);
+    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(4) + 5);
     this.onKill();
     this.destroy();
   }
@@ -1882,7 +1878,7 @@ class FraiseBad extends ShooterBad {
       (b) => b !== this && b.isReady(),
     );
     if (catchers.length > 0) {
-      this.ballTarget = catchers[Math.floor(Math.random() * catchers.length)];
+      this.ballTarget = catchers[this.game.rand.random(catchers.length)];
     } else if (this.game.countList(Data.CATCHER) === 1) {
       this.ballTarget = this.game.getOne(Data.PLAYER);
       if (!this.ballTarget) return;
@@ -2054,7 +2050,7 @@ class CrawlerBad extends WallWalkerBad {
       this.isReady() &&
       this.isHealthy() &&
       this.attackCD <= 0 &&
-      Math.random() * 1000 < CrawlerBad.CHANCE_ATTACK * factor
+      this.game.rand.next() * 1000 < CrawlerBad.CHANCE_ATTACK * factor
     );
   }
 
@@ -2087,10 +2083,10 @@ class CrawlerBad extends WallWalkerBad {
     let yscale = this.scaleFactor * 100;
 
     if (this.fl_attack) {
-      this.mc._x += ((Math.random() * 15) / 10) * (Math.random() < 0.5 ? -1 : 1);
-      this.mc._y += ((Math.random() * 15) / 10) * (Math.random() < 0.5 ? -1 : 1);
-      xscale += Math.random() * 20 * (Math.random() < 0.5 ? -1 : 1);
-      yscale += Math.random() * 20 * (Math.random() < 0.5 ? -1 : 1);
+      this.mc._x += ((this.game.rand.next() * 15) / 10) * (this.game.rand.next() < 0.5 ? -1 : 1);
+      this.mc._y += ((this.game.rand.next() * 15) / 10) * (this.game.rand.next() < 0.5 ? -1 : 1);
+      xscale += this.game.rand.next() * 20 * (this.game.rand.next() < 0.5 ? -1 : 1);
+      yscale += this.game.rand.next() * 20 * (this.game.rand.next() < 0.5 ? -1 : 1);
     }
 
     if (this.fl_wallWalk) {
@@ -2222,8 +2218,10 @@ class SawBad extends WallWalkerBad {
     super.endUpdate();
     if (this.fl_stun) {
       const f = 1 - this.stunTimer / SawBad.STUN_DURATION;
-      this.mc._x = this.x + f * ((Math.random() * 20) / 10) * (Math.random() < 0.5 ? -1 : 1);
-      this.mc._y = this.y + f * ((Math.random() * 20) / 10) * (Math.random() < 0.5 ? -1 : 1);
+      this.mc._x =
+        this.x + f * ((this.game.rand.next() * 20) / 10) * (this.game.rand.next() < 0.5 ? -1 : 1);
+      this.mc._y =
+        this.y + f * ((this.game.rand.next() * 20) / 10) * (this.game.rand.next() < 0.5 ? -1 : 1);
     }
     const s = this.sub;
     if (s) {
@@ -2409,8 +2407,8 @@ class FramboiseBad extends ShooterBad {
     let invalid = true;
     while (tries < 600 && invalid) {
       invalid = false;
-      ctx = Math.floor(Math.random() * Data.LEVEL_WIDTH);
-      cty = Math.floor(Math.random() * Data.LEVEL_HEIGHT);
+      ctx = this.game.rand.random(Data.LEVEL_WIDTH);
+      cty = this.game.rand.random(Data.LEVEL_HEIGHT);
       tries++;
       if (this.distanceCase(ctx, cty) <= 7) invalid = true;
       if (!this.world.checkFlag(ctx, cty, Data.IA_TILE_TOP)) invalid = true;
