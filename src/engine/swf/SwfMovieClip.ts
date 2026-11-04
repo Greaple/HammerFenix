@@ -1,5 +1,6 @@
 import type { BLEND_MODES } from 'pixi.js';
 import {
+  AlphaFilter,
   BlurFilter,
   ColorMatrixFilter,
   Container,
@@ -344,6 +345,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   private depthSlots = new Map<number, DepthSlot>();
   private namedChildren = new Map<string, Container>();
   private tintFilter: ColorMatrixFilter | null = null;
+  /** Set by `setLayerBlend`: carries `_alpha`, applied to the composited layer. */
+  private layerFilter: AlphaFilter | null = null;
   mcDepth = 0;
   mcName = '';
 
@@ -399,10 +402,27 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   }
 
   get _alpha(): number {
-    return this.alpha * 100;
+    return (this.layerFilter ? this.layerFilter.alpha : this.alpha) * 100;
   }
   set _alpha(v: number) {
-    this.alpha = Math.max(0, Math.min(1, v / 100));
+    const a = Math.max(0, Math.min(1, v / 100));
+    if (this.layerFilter) {
+      this.layerFilter.alpha = a;
+    } else {
+      this.alpha = a;
+    }
+  }
+
+  /**
+   * Flash `blendMode = BlendMode.LAYER`: the children are drawn offscreen first, so a child in
+   * `erase` blend mode only erases this clip, and `_alpha` applies to the result instead of to
+   * each child. Replaces the clip's filters; skipped when headless.
+   */
+  setLayerBlend(): void {
+    if (this.lib.headless || this.layerFilter) return;
+    this.layerFilter = new AlphaFilter({ alpha: this.alpha });
+    this.alpha = 1;
+    this.filters = [this.layerFilter];
   }
 
   get _visible(): boolean {

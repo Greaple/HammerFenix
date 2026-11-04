@@ -1,4 +1,4 @@
-import type { Container } from 'pixi.js';
+import { type Container, type Renderer, Sprite, type Texture } from 'pixi.js';
 import { AudioEngine } from '../engine/Audio';
 import { DepthManager } from '../engine/DepthManager';
 import { FixedGameLoop } from '../engine/GameLoop';
@@ -43,6 +43,8 @@ export interface GameSaveData {
 /** What the session needs from the PixiJS app: a stage to put the game on. */
 export interface GameHost {
   readonly stage: Container;
+  /** Draws the level snapshots of the transitions; absent when headless. */
+  readonly renderer?: Renderer;
 }
 
 /** `GameManager.musics`: the in-game, boss and hurry-up tracks. */
@@ -111,15 +113,20 @@ export class GameSession implements IGameContext {
   perfectOrder: number[] = [];
   perfectCount = 0;
   private fl_badsCallback = false;
-  /** Set while forcedGoto / portals place the players before the level becomes ready. */
-  private fl_deferLevelReady = false;
-  /**
-   * End of the level transition, run at the start of the next `updateWorld`: where the
-   * original's scroll or fade ends (`ViewManager.update` -> `onViewReady`), just before the level
-   * script's update. The script then adds the level's enemies before the frame's level-clear
-   * check. The scroll itself is task 2.7.
-   */
-  private pendingLevelReady: (() => void) | null = null;
+  /** `GameMode.usePortal`: the portal taken was on the right half (the side scroll goes left). */
+  private fl_rightPortal = false;
+
+  // `ViewManager` (one per world in the original; only the current world's is ever active)
+  /** Snapshot of the previous view, scrolled or faded out over the new one. */
+  private fake: SwfMovieClip | null = null;
+  private fakeTexture: Texture | null = null;
+  private scrollCpt = 0;
+  private scrollDir = 1;
+  private fl_scrolling = false;
+  private fl_hscrolling = false;
+  private fl_fading = false;
+  private fl_restoring = false;
+  private fl_fadeNextTransition = false;
   /** Players that were not on the portal when the dimension changed (`latePlayers`). */
   private latePlayers: PlayerEntity[] = [];
   /** Arrival portal of the last dimension change. */
@@ -164,7 +171,9 @@ export class GameSession implements IGameContext {
   private pauseMC: SwfMovieClip | null = null;
   private gameOverMC: SwfMovieClip | null = null;
   private darknessMC: SwfMovieClip | null = null;
-  private extraHoles: { x: number; y: number; d: number }[] = [];
+  /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
+  private darknessHoles: SwfMovieClip[] = [];
+  private extraHoles: { x: number; y: number; d: number; mc: SwfMovieClip | null }[] = [];
   private dfactor = 0;
   private targetDark = 0;
 
@@ -299,7 +308,7 @@ export class GameSession implements IGameContext {
     this.resetGameState();
     this.backToMainWorld(); // a new GameMode starts in dimensions[0]
     this.fakeLevelId = null;
-    this.pendingLevelReady = null; // a level transition of the previous game
+    this.resetView(); // a new GameMode has no view yet
     this.seed = seed;
     this.rand.reseed(seed);
     this.animRand.reseed(seed ^ 0x5eed);
@@ -308,7 +317,7 @@ export class GameSession implements IGameContext {
 
     this.fl_gameOver = false;
     this.fl_clear = false;
-    this.fl_lock = false;
+    this.fl_lock = true; // Mode constructor; onLevelReady unlocks
     this.fl_pause = false;
     this.cycle = 0;
     this.gameOverMC?.removeMovieClip();
@@ -331,9 +340,7 @@ export class GameSession implements IGameContext {
     this.hud.setScore(this.player.score, true);
     this.hud.setLives(this.player.lives);
     this.hud.clearExtends();
-
-    // The first level has no scroll: it is ready at once, before its script compiles
-    this.onDataReady(true);
+    // The first level shows once its IA map is parsed (updateWorld), without a scroll
   }
 
   /**
@@ -354,6 +361,11 @@ export class GameSession implements IGameContext {
     this.fakeLevelId = null;
     this.forcedDarkness = null;
     this.extraHoles = [];
+    this.darknessMC?.removeMovieClip();
+    this.darknessMC = null;
+    this.darknessHoles = [];
+    this.dfactor = 0;
+    this.targetDark = 0;
     this.killPortals();
     this.nextLink = null;
     this.keyLock = null;
@@ -397,20 +409,36 @@ export class GameSession implements IGameContext {
     this.scriptRunner = new ScriptRunner(this, this.world.current);
   }
 
+  // ------------------------------------------------------------ ViewManager
+
   /**
-   * `ViewManager.onDataReady` + `GameMechanics.onDataReady`: the level's view is created, then
-   * its script compiles and runs its first cycle. A level shown without a transition (`fl_direct`:
-   * new game, level picker) is ready before the compile, so its bads and items join the script
-   * before the first cycle. Otherwise the level scrolls in first (task 2.7; the port has no
-   * scroll yet and the caller calls `onLevelReady`). The original also parses the IA map over
-   * several frames before this.
+   * `ViewManager.onDataReady` + `GameMechanics.onDataReady`: the level is read and its IA map
+   * parsed. A view still attached (the previous level's) is replaced by a snapshot that scrolls up
+   * with the new view; otherwise the new view shows at once (new game, warp) or waits for the
+   * portal transition (`fl_restoring`). Then the level script compiles.
    */
-  private onDataReady(fl_direct: boolean): void {
-    this.view.destroy();
-    this.view = this.createView(this.world.currentId);
-    this.view.moveTo(0, 0);
-    if (fl_direct) {
-      this.onLevelReady();
+  private onDataReady(): void {
+    if (!this.view.fl_attach) {
+      this.view.destroy();
+      this.view = this.createView(this.world.currentId);
+      if (this.fl_restoring) {
+        this.view.moveTo(Data.GAME_WIDTH, 0);
+        this.onRestoreReady();
+      } else {
+        this.view.moveTo(0, 0);
+        this.onViewReady();
+      }
+    } else {
+      this.cloneView(this.view);
+
+      this.world.teleporterList = [];
+
+      this.view.destroy();
+      this.view = this.createView(this.world.currentId);
+      this.view.moveTo(0, Data.GAME_HEIGHT);
+      this.scrollCpt = 0;
+
+      this.fl_scrolling = true;
     }
     this.scriptRunner?.compile();
   }
@@ -429,13 +457,167 @@ export class GameSession implements IGameContext {
     return v;
   }
 
-  /** `GameMechanics.update`. The IA map is parsed at once in `LevelWorld.goto`. */
-  private updateWorld(): void {
-    if (this.pendingLevelReady) {
-      const ready = this.pendingLevelReady;
-      this.pendingLevelReady = null;
-      ready();
+  /** `ViewManager.cloneView` */
+  private cloneView(v: LevelView): void {
+    this.createFake(v.getSnapShot(this.app.renderer ?? null));
+  }
+
+  /** `ViewManager.createFake`: shows a snapshot above the level (`DP_SCROLLER`). */
+  private createFake(snap: Texture | null): void {
+    this.removeFake();
+    this.fake = this.depthMan.empty(Data.DP_SCROLLER);
+    // blendMode LAYER: no effect on a single bitmap
+    if (snap) {
+      const bmp = new Sprite(snap);
+      bmp.x = -10;
+      this.fake.addChild(bmp);
     }
+    this.fakeTexture = snap;
+    this.fake._alpha = Math.max(0, 100 - this.world.darknessFactor);
+  }
+
+  private removeFake(): void {
+    this.fake?.removeMovieClip();
+    this.fake = null;
+    this.fakeTexture?.destroy(true);
+    this.fakeTexture = null;
+  }
+
+  /** A new game: no transition running, and no view attached (the first level shows at once). */
+  private resetView(): void {
+    this.removeFake();
+    this.fl_scrolling = false;
+    this.fl_hscrolling = false;
+    this.fl_fading = false;
+    this.fl_restoring = false;
+    this.fl_fadeNextTransition = false;
+    this.view.detach();
+  }
+
+  /** `ViewManager.onTransitionDone`. The mirror mode's `flipPortals` is task 3.3. */
+  private onTransitionDone(): void {
+    this.view.moveTo(0, 0);
+    this.removeFake();
+  }
+
+  /** `ViewManager.onScrollDone` */
+  private onScrollDone(): void {
+    this.fl_scrolling = false;
+    this.onViewReady();
+  }
+
+  /** `ViewManager.onHScrollDone` + `GameMechanics.onHScrollDone` */
+  private onHScrollDone(): void {
+    this.fl_hscrolling = false;
+    this.onRestore();
+    this.onViewReady();
+  }
+
+  /** `ViewManager.onFadeDone` + `GameMechanics.onFadeDone` */
+  private onFadeDone(): void {
+    this.fl_fading = false;
+    this.onRestore();
+    this.onViewReady();
+  }
+
+  /** `GameMechanics.onViewReady`: the level can be played. */
+  private onViewReady(): void {
+    this.onLevelReady();
+  }
+
+  /** `ViewManager.onRestoreReady` + `GameMechanics.onRestoreReady` */
+  private onRestoreReady(): void {
+    this.fl_restoring = false;
+    if (this.fl_fadeNextTransition) {
+      this.fl_fadeNextTransition = false;
+      this.fl_fading = true;
+      this.view.moveTo(0, 0);
+    } else {
+      this.fl_hscrolling = true;
+      this.scrollCpt = 0;
+    }
+    this.scrollDir = this.fl_rightPortal ? 1 : -1;
+  }
+
+  /**
+   * `ViewManager.restoreFrom` + `ViewManager.restore` + `GameMechanics.goto`: the world comes
+   * back from suspension, with the previous world's snapshot to scroll or fade out.
+   */
+  private restoreFrom(snap: Texture | null, lid: number): void {
+    this.createFake(snap);
+    this.view.moveTo(Data.GAME_WIDTH, 0);
+    this.fl_restoring = true;
+    // GameMechanics.goto marks this world's previous level as visited
+    if (this.world.fl_entered) this.world.markVisited();
+    this.world.goto(lid);
+    this.world.fl_entered = true;
+    this.onWorldRead();
+  }
+
+  /** `ViewManager.update`: level scroll, portal side scroll and portal fade. */
+  private updateView(): void {
+    if (this.fl_scrolling) {
+      this.scrollCpt += Data.SCROLL_SPEED;
+      this.view.moveTo(0, Data.GAME_HEIGHT + Math.sin(this.scrollCpt) * (0 - Data.GAME_HEIGHT));
+      if (this.fake) {
+        this.fake._x = 0;
+        this.fake._y = -Math.sin(this.scrollCpt) * Data.GAME_HEIGHT;
+      }
+
+      if (this.scrollCpt >= Math.PI / 2) {
+        this.onTransitionDone();
+        this.onScrollDone();
+      }
+    }
+
+    if (this.fl_hscrolling) {
+      this.scrollCpt += this.scrollDir * Data.SCROLL_SPEED;
+      if (this.scrollDir > 0) {
+        this.view.moveTo(
+          20 + Data.GAME_WIDTH + Math.sin(this.scrollCpt) * (0 - Data.GAME_WIDTH - 20),
+          0,
+        );
+      } else {
+        this.view.moveTo(
+          -Data.GAME_WIDTH - 20 - Math.sin(this.scrollCpt) * (Data.GAME_WIDTH + 20),
+          0,
+        );
+      }
+      if (this.fake) {
+        this.fake._x = -Math.sin(this.scrollCpt) * (Data.GAME_WIDTH + 20);
+        this.fake._y = 0;
+      }
+
+      if (this.scrollCpt >= Math.PI / 2 || this.scrollCpt <= -Math.PI / 2) {
+        this.onTransitionDone();
+        this.onHScrollDone();
+      }
+    }
+
+    if (this.fl_fading && this.fake) {
+      this.fake._alpha -= Data.FADE_SPEED;
+
+      const blur = 100 - this.fake._alpha;
+      this.fake.setBlur(blur, blur * 0.3);
+
+      if (this.fake._alpha <= 0) {
+        this.onTransitionDone();
+        this.onFadeDone();
+      }
+    }
+  }
+
+  /** `GameMechanics.update` (with `ViewManager.update` first). */
+  private updateWorld(): void {
+    this.updateView();
+
+    // IA map of the level just read, MAX_ITERATION cases per frame
+    if (this.world.fl_parsing) {
+      if (this.world.parseCurrentIA() && this.world.isDataReady()) {
+        this.onDataReady();
+      }
+    }
+
     if (!this.world.fl_lock) {
       this.scriptRunner?.update();
     }
@@ -600,6 +782,7 @@ export class GameSession implements IGameContext {
     if (this.fl_warpStart) {
       this.world.currentId = 0;
       this.fl_lock = false;
+      this.view.detach(); // level 10 shows at once, without a scroll
       this.forcedGoto(10);
     }
   }
@@ -609,9 +792,7 @@ export class GameSession implements IGameContext {
     this.fakeLevelId = (this.fakeLevelId ?? 0) + id - this.world.currentId;
     this.world.fl_hideBorders = false;
     this.world.fl_hideTiles = false;
-    this.fl_deferLevelReady = true;
     this.goto(id);
-    this.fl_deferLevelReady = false;
     for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
       p.moveTo(
         BaseEntity.x_ctr(this.world.current.playerX),
@@ -620,9 +801,6 @@ export class GameSession implements IGameContext {
       p.shield(Data.SHIELD_DURATION * 1.3);
       p.hide();
     }
-    // No scroll yet (task 2.7): the level is ready at the start of the next world update
-    this.onDataReady(false);
-    this.pendingLevelReady = () => this.onLevelReady();
   }
 
   /** `Adventure.goto` + `GameMode.goto` */
@@ -665,13 +843,6 @@ export class GameSession implements IGameContext {
     }
     this.fxMan.onNextLevel();
     this.audio.playSound('sound_level_clear', Data.CHAN_INTERF);
-
-    // No scroll yet (task 2.7): the level is ready at the start of the next world update.
-    // forcedGoto does this itself after placing the players.
-    if (!this.fl_deferLevelReady) {
-      this.onDataReady(false);
-      this.pendingLevelReady = () => this.onLevelReady();
-    }
   }
 
   /** `Adventure.onEndOfSet`: the original leaves the game (`exitGame`). */
@@ -1131,6 +1302,10 @@ export class GameSession implements IGameContext {
     );
     if (!link) return false;
 
+    // The original reads e.x even when e is null (a floating portal): NaN, so a left portal.
+    // Its map events (EVENT_EXIT_*) are not ported.
+    this.fl_rightPortal = e !== null && this.flipCoordReal(e.x) >= Data.GAME_WIDTH * 0.5;
+
     if (e === null) {
       // Floating portal: players are pulled in, then shrink (see update)
       const portal = this.portalMcList[pid];
@@ -1172,7 +1347,10 @@ export class GameSession implements IGameContext {
     return true;
   }
 
-  /** `GameMode.switchDimensionById`. The fade / side scroll transition is task 2.7. */
+  /**
+   * `GameMode.switchDimensionById`. The new world shows once its IA map is parsed, with a side
+   * scroll (a fade when arriving at no portal, `pid < 0`); `onRestore` then places the players.
+   */
   switchDimensionById(id: number, lid: number, pid: number): void {
     if (!this.fl_clear) return;
     if (id < 0 || id >= this.dimensions.length) return;
@@ -1205,31 +1383,24 @@ export class GameSession implements IGameContext {
     this.fxMan.clear();
     this.cleanKills();
     this.currentDim = id;
-
+    const ss = this.view.getSnapShot(this.app.renderer ?? null);
     // world.suspend(): the script left is saved and the level counts as visited
     this.world.suspend(this.scriptRunner?.scriptToString() ?? null);
+    this.view.detach(); // ViewManager.suspend
+    this.removeFake();
     this.world = this.dimensions[id];
+    this.world.darknessFactor = this.dfactor;
     this.fl_lock = true;
     this.fl_clear = false;
-
-    // world.restoreFrom(): GameMechanics.goto marks this world's previous level as visited
-    if (this.world.fl_entered) this.world.markVisited();
-    this.world.goto(lid);
-    this.world.fl_entered = true;
-    this.onWorldRead();
-    this.onDataReady(false);
+    if (pid < 0) {
+      this.fl_fadeNextTransition = true;
+    }
+    this.restoreFrom(ss, lid);
     for (const e of this.getList(Data.ENTITY)) e.world = this.world;
 
     this.fakeLevelId = this.world.fl_mainWorld ? null : 0;
     this.portalId = pid;
     this.nextLink = null;
-
-    // End of the transition (GameMechanics.onFadeDone / onHScrollDone), at the start of the
-    // next world update
-    this.pendingLevelReady = () => {
-      this.onRestore();
-      this.onLevelReady();
-    };
   }
 
   /** `GameMode.getPortalEntrance`: arrival case after a dimension change. */
@@ -1282,46 +1453,146 @@ export class GameSession implements IGameContext {
 
   // ------------------------------------------------------------- Darkness
 
-  clearExtraHoles(): void {
-    this.extraHoles = [];
-    this.updateDarkness();
-  }
-
-  addHole(x: number, y: number, diameter: number): void {
-    this.extraHoles.push({ x, y, d: diameter });
-    this.updateDarkness();
-  }
-
+  /** `GameMode.updateDarkness`: darkness of the level, light spots of the players and the extra ones. */
   updateDarkness(): void {
+    // Darkness target
     if (this.forcedDarkness !== null) {
       this.targetDark = this.forcedDarkness;
-    } else if (
-      this.world.fl_mainWorld &&
-      (this.world.currentId < Data.MIN_DARKNESS_LEVEL || this.world.currentId > 101)
-    ) {
-      this.darknessMC?.removeMovieClip();
-      this.darknessMC = null;
-      this.dfactor = 0;
-      return;
-    } else {
+    } else if (this.world.fl_mainWorld) {
+      if (this.world.currentId < Data.MIN_DARKNESS_LEVEL || this.world.currentId > 101) {
+        this.darknessMC?.removeMovieClip();
+        this.darknessMC = null;
+        this.darknessHoles = [];
+        this.world.darknessFactor = 0;
+        this.dfactor = 0;
+        return;
+      }
       this.targetDark = this.world.currentId;
+    } else {
+      this.targetDark = this.world.darknessFactor;
     }
 
+    // Attach: a black veil the holes erase (blendMode LAYER, holes ERASE)
     if (!this.darknessMC) {
-      this.darknessMC = this.depthMan.attach('hammer_fx_darkness', Data.DP_BORDERS);
-      this.darknessMC._x = -this.xOffset;
+      const mc = this.depthMan.attach('hammer_fx_darkness', Data.DP_BORDERS);
+      mc._x -= this.xOffset;
+      mc.setLayerBlend();
+      this.darknessMC = mc;
+      this.darknessHoles = [];
+      for (const name of ['hole1', 'hole2']) {
+        const hole = mc.getClip(name);
+        if (!hole) continue;
+        hole.blendMode = 'erase';
+        hole._y = -500;
+        this.darknessHoles.push(hole);
+      }
     }
+
+    // Base size
+    for (let i = 0; i < 2; i++) {
+      const hole = this.darknessHoles[i];
+      if (!hole) continue;
+      hole._xscale = 100;
+      hole._yscale = hole._xscale;
+    }
+
+    // Extra light spots
+    this.detachExtraHoles();
+    for (const eh of this.extraHoles) {
+      const hole = this.lib.attach('hammer_fx_darknessHole');
+      const depth = this.uniqIdCounter++;
+      hole.mcDepth = depth;
+      hole.zIndex = depth;
+      this.darknessMC.addChild(hole);
+      hole._x = eh.x;
+      hole._y = eh.y;
+      hole._width = eh.d;
+      hole._height = eh.d;
+      hole.blendMode = 'erase';
+      this.darknessHoles.push(hole);
+      eh.mc = hole;
+    }
+
+    // Player items: candle (bigger spot), light bulb (less darkness)
+    const l = this.getList(Data.PLAYER) as PlayerEntity[];
+    for (let i = 0; i < l.length; i++) {
+      if (l[i].fl_candle || l[i].actives[68]) {
+        const hole = this.darknessHoles[i];
+        if (hole) {
+          hole._xscale = 150;
+          hole._yscale = hole._xscale;
+        }
+      }
+      if (l[i].fl_torch || l[i].actives[26]) {
+        if (this.forcedDarkness === null) {
+          this.targetDark *= 0.5;
+        } else {
+          this.targetDark *= 0.75; // forced darkness is more "opaque"
+        }
+      }
+    }
+
+    this.holeUpdate();
   }
 
+  /** `GameMode.addHole`: an extra light spot, shown by the next `updateDarkness`. */
+  addHole(x: number, y: number, diameter: number): void {
+    this.extraHoles.push({ x, y, d: diameter, mc: null });
+  }
+
+  private detachExtraHoles(): void {
+    for (const eh of this.extraHoles) {
+      eh.mc?.removeMovieClip();
+      eh.mc = null;
+    }
+    this.darknessHoles.splice(2);
+  }
+
+  clearExtraHoles(): void {
+    this.detachExtraHoles();
+    this.extraHoles = [];
+  }
+
+  /** `GameMode.holeUpdate`: the light spots follow the players, the darkness eases to its target. */
   private holeUpdate(): void {
     if (!this.darknessMC) return;
 
-    if (this.dfactor < this.targetDark) {
-      this.dfactor = Math.min(this.targetDark, this.dfactor + 2);
-    } else if (this.dfactor > this.targetDark) {
-      this.dfactor = Math.max(this.targetDark, this.dfactor - 2);
+    // Holes
+    const l = this.getList(Data.PLAYER) as PlayerEntity[];
+    for (let i = 0; i < l.length; i++) {
+      const p = l[i];
+      const tx = p.x + Data.CASE_WIDTH * 0.5;
+      const ty = p.y - Data.CASE_HEIGHT;
+      const hole = this.darknessHoles[i];
+      if (!hole) continue;
+      if (p.mc._visible) {
+        hole._visible = true;
+        hole._x += (tx - hole._x) * 0.5;
+        hole._y += (ty - hole._y) * 0.5;
+      } else {
+        hole._visible = false;
+        hole._x = tx;
+        hole._y = ty;
+      }
     }
 
+    // Brightness tween
+    this.dfactor = Math.round(this.dfactor);
+    this.targetDark = Math.round(this.targetDark);
+    if (this.dfactor < this.targetDark) {
+      this.dfactor += 2;
+      if (this.dfactor > this.targetDark) {
+        this.dfactor = this.targetDark;
+      }
+    }
+    if (this.dfactor > this.targetDark) {
+      this.dfactor -= 2;
+      if (this.dfactor < this.targetDark) {
+        this.dfactor = this.targetDark;
+      }
+    }
+
+    this.world.darknessFactor = this.dfactor;
     this.darknessMC._alpha = this.dfactor;
   }
 

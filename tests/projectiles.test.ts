@@ -182,7 +182,8 @@ describe('level script code trigger 6 (soccer balls on special slots)', () => {
   it('soccer level 7 throws its balls', async () => {
     const soccer = await createHeadlessSession('soccer');
     soccer.initGame(7, 1234);
-    for (let i = 0; i < 40; i++) soccer.gameLoop.stepSingleFrame();
+    // The level starts after its IA parse (17 frames)
+    for (let i = 0; i < 17 + 40; i++) soccer.gameLoop.stepSingleFrame();
     // Timers at 10, 20, 30 and "4²0", which parseInt reads as 4
     expect(soccer.getList(Data.SOCCERBALL).length).toBe(4);
   });

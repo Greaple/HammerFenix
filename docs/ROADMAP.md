@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1 is done. Phase 2: 2.1 to 2.4 and 2.6 are done; next is the particle system (2.5). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phase 1 is done. Phase 2: 2.1 to 2.4, 2.6 and 2.7 are done; next is the particle system (2.5). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -18,7 +18,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 1.5 Line-by-line audit of `Player.ts` and `Bad.ts` against the original, logging deviations in PORT_STATUS.md. About 30 deviations fixed; the open ones are listed under "Audit 1.5" there.
 - [x] 1.6 Same audit for `GameSession.ts` (against `mode/GameMode.mt`, `mode/Adventure.mt`), `Bomb.ts`, `Shoot.ts` and `Item.ts`. Shots were rewritten; the level flow, hurry-up and portals now follow the original.
 - [x] 1.7 Same audit for `levels/ScriptRunner.ts` (against `levels/ScriptEngine.mt`), `levels/LevelWorld.ts` (`SetManager.mt`, `GameMechanics.mt`) and `levels/LevelView.ts` (`View.mt`). The script engine now follows Flash's XML behavior (a removed trigger ends the cycle's scan, nested triggers move to the script end), tile changes and the enemy fall map follow the original, and the script is saved when a dimension is left. `tools/scan-scripts.ts` and `tests/scripts.test.ts` check every level script of every set.
-- [ ] Bug (found in 1.7): on level 86 (torches) and other dark levels, the darkness shows two large red discs near the top of the screen instead of light around the torches. Already on `main` before 1.7; belongs with the lighting (2.7).
+- [x] Bug (found in 1.7): on level 86 (torches) and other dark levels, the darkness shows two large red discs near the top of the screen instead of light around the torches. Fixed in 2.7: the discs are the light holes, which erase the darkness (Flash `LAYER` + `ERASE`) and now follow the players.
 
 ## Phase 2: Finish the Adventure (critical path)
 
@@ -29,7 +29,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 2.4 Zodiac items 40-63: add the constellation background (`fxMan.attachBg(BG_CONSTEL)`). Each sign shows its constellation (`sub` frame) for 4 seconds.
 - [ ] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants). `FxManager.inGameParticles` currently renders every type as ice.
 - [x] 2.6 Special backgrounds: `FxManager.attachBg/detachBg/clearBg` and the `BG_*` effects. `View.attachSpecialBg` hides the level background under `hammer_special_bg`; items 19, 21, 28, 83, 84, 86 and 100 use it. Tested in `tests/specials.test.ts`.
-- [ ] 2.7 Level transition scroll (`levels/ViewManager.mt`) and lighting (`levels/ViewLight.mt`). `goto()` currently cuts instantly.
+- [x] 2.7 Level transition scroll (`levels/ViewManager.mt`) and lighting. The IA map is parsed 30 cases per frame (17 frames), then the level scrolls up over a snapshot of the old one (40 frames); portals scroll sideways, or fade when arriving at no portal. Darkness (`GameMode.updateDarkness`) fully ported: light holes on the players and torches, candle and light bulb. `ViewLight.mt` turned out to be a wireframe preview for the `Browser` dev tool, out of scope. Replay snapshots re-recorded. Tested in `tests/transitions.test.ts`.
 - [ ] 2.8 Boss: Bat (`entity/boss/Bat.mt`, level 100) and `isBossLevel` logic, boss music.
 - [ ] 2.9 Boss: Tuberculoz (`entity/boss/Tuberculoz.mt`, level 101) and the ending.
 - [ ] 2.10 `StatsManager.mt` (extend and perfect rules) and `Chrono.mt`.

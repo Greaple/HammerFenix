@@ -273,6 +273,7 @@ export const Data = {
   ANIM_BOMB_EXPLODE: { id: 2, loop: false } as AnimDef,
 
   // IA grid flags
+  MAX_ITERATION: 30,
   IA_TILE_TOP: 1 << 0,
   IA_ALLOW_FALL: 1 << 1,
   IA_BORDER: 1 << 2,

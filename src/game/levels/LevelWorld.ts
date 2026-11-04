@@ -92,9 +92,8 @@ function cloneLevel(src: LevelData): LevelData {
  * the views are built from. The level script engine and the view are kept on `GameSession`
  * (`scriptRunner`, `view`); `GameSession.updateWorld()` is `GameMechanics.update`.
  *
- * Not ported: the mirror mode (`flip`, `flipPortals`, option, task 3.3), the editor functions
- * (`overwrite`, `rollback`, `insert`, `delete`, cookies), and the IA parse spread over frames
- * (`parseCurrentIA` runs 30 cells per frame; the port parses the whole level at once, task 2.7).
+ * Not ported: the mirror mode (`flip`, `flipPortals`, option, task 3.3) and the editor functions
+ * (`overwrite`, `rollback`, `insert`, `delete`, cookies).
  */
 export class LevelWorld {
   set: LevelSet;
@@ -106,6 +105,11 @@ export class LevelWorld {
 
   flagMap: number[][] = [];
   fallMap: number[][] = [];
+  /** The IA map of the current level is being parsed, `MAX_ITERATION` cases per frame. */
+  fl_parsing = false;
+  /** The IA map of the current level is ready (`flcurrentIA`). */
+  flcurrentIA = false;
+  private iteration = { cx: 0, cy: 0 };
   triggers: unknown[][][] = [];
   teleporterList: TeleporterData[] = [];
   portalList: PortalData[] = [];
@@ -187,15 +191,29 @@ export class LevelWorld {
     return (this.levels[id] ??= this.unserialize(id));
   }
 
-  /** `GameMechanics.goto` + `SetManager.goto`. Visits are marked by `GameSession`. */
+  /**
+   * `GameMechanics.goto` + `SetManager.goto`. Visits are marked by `GameSession`. The IA map is
+   * then parsed over the next frames (`GameSession.updateWorld`), and the level is shown when it
+   * is done (`onDataReady`).
+   */
   goto(id: number): boolean {
     this.teleporterList = [];
     if (id < 0 || id >= this.set.levels.length) return false;
     this.resetIA();
     this.current = this.getLevel(id);
     this.currentId = id;
-    this.rebuildIA();
+    this.onReadComplete();
     return true;
+  }
+
+  /** `GameMechanics.onReadComplete`: the IA parse starts (the script engine is `GameSession`'s). */
+  private onReadComplete(): void {
+    this.fl_parsing = true;
+  }
+
+  /** `SetManager.isDataReady` + `GameMechanics.isDataReady` */
+  isDataReady(): boolean {
+    return this.flcurrentIA;
   }
 
   /** Reads a level: `SetManager.unserialize` (walls converted) + `GameMechanics.parseWalls`. */
@@ -328,6 +346,8 @@ export class LevelWorld {
 
   /** `GameMechanics.resetIA` */
   resetIA(): void {
+    this.flcurrentIA = false;
+    this.iteration = { cx: 0, cy: 0 };
     this.flagMap = Array.from({ length: Data.LEVEL_WIDTH }, () =>
       new Array<number>(Data.LEVEL_HEIGHT).fill(0),
     );
@@ -336,125 +356,154 @@ export class LevelWorld {
     );
   }
 
-  /** `GameMechanics.parseCurrentIA`, run on the whole level at once. */
-  rebuildIA(): void {
-    for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
-      for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
-        let flags = 0;
+  /**
+   * `GameMechanics.parseCurrentIA`: parses the next `MAX_ITERATION` cases of the IA map. Returns
+   * true when the map is done (`onParseIAComplete`); the caller then checks `onDataReady`.
+   */
+  parseCurrentIA(): boolean {
+    let n = 0;
+    let cx = this.iteration.cx;
+    let cy = this.iteration.cy;
+    while (n < Data.MAX_ITERATION && cy < Data.LEVEL_HEIGHT) {
+      this.parseCase(cx, cy);
+      cx++;
+      if (cx >= Data.LEVEL_WIDTH) {
+        cx = 0;
+        cy++;
+      }
+      n++;
+    }
+    this.iteration = { cx, cy };
+    if (n !== Data.MAX_ITERATION) {
+      this.fl_parsing = false;
+      this.flcurrentIA = true;
+      return true;
+    }
+    return false;
+  }
 
-        if (this.getCase(cx, cy + 1) === Data.GROUND) {
-          flags |= Data.IA_TILE_TOP;
-          if (
-            this.getCase(cx, cy - Data.IA_VJUMP) === Data.GROUND &&
-            this.getCase(cx, cy - Data.IA_VJUMP - 1) <= 0
-          ) {
-            flags |= Data.IA_JUMP_UP;
-          }
-        }
+  /** Parses the whole IA map at once (tools and tests). */
+  parseAllIA(): void {
+    this.resetIA();
+    while (!this.parseCurrentIA()) {
+      // next cases
+    }
+  }
 
-        if (this.getCase(cx, cy) === Data.GROUND && this.getCase(cx, cy - 1) <= 0) {
-          flags |= Data.IA_TILE;
-        }
+  /** One case of `parseCurrentIA`. */
+  private parseCase(cx: number, cy: number): void {
+    let flags = 0;
 
-        const fallH = this.checkSecureFall(cx, cy);
-        this.fallMap[cx][cy] = fallH;
-        if (fallH >= 0) flags |= Data.IA_ALLOW_FALL;
-
-        if (this.getCase(cx, cy) === 0 && this.getCase(cx, cy + 1) === Data.GROUND) {
-          if (this.checkSecureFall(cx, cy + 2) >= 0) {
-            flags |= Data.IA_JUMP_DOWN;
-          }
-        }
-
-        if (
-          this.getCase(cx, cy + 1) === Data.GROUND &&
-          (this.getCase(cx - 1, cy + 1) <= 0 || this.getCase(cx + 1, cy + 1) <= 0)
-        ) {
-          flags |= Data.IA_BORDER;
-          if (
-            this.getCase(cx - 1, cy + 1) !== Data.GROUND &&
-            this.getCase(cx + 1, cy + 1) !== Data.GROUND
-          ) {
-            flags |= Data.IA_SMALL_SPOT;
-          }
-        }
-
-        if (
-          this.getCase(cx, cy + 1) <= 0 &&
-          (this.getCase(cx - 1, cy + 1) === Data.GROUND ||
-            this.getCase(cx + 1, cy + 1) === Data.GROUND)
-        ) {
-          flags |= Data.IA_FALL_SPOT;
-        }
-
-        // Climbable walls & steps left / right
-        if ((flags & Data.IA_TILE_TOP) !== 0) {
-          let maxHeight = 1;
-          for (let d = 1; d <= 5; d++) {
-            if (this.getCase(cx, cy - d) <= 0) maxHeight++;
-            else break;
-          }
-          if (this.getCase(cx - 1, cy) > 0) {
-            const h = this.getWallHeight(cx - 1, cy, Data.IA_CLIMB);
-            if (h !== null && h < maxHeight && cy - h >= 0) flags |= Data.IA_CLIMB_LEFT;
-          }
-          if (this.getCase(cx + 1, cy) > 0) {
-            const h = this.getWallHeight(cx + 1, cy, Data.IA_CLIMB);
-            if (h !== null && h < maxHeight && cy - h >= 0) flags |= Data.IA_CLIMB_RIGHT;
-          }
-        }
-
-        if ((flags & Data.IA_FALL_SPOT) !== 0) {
-          let maxHeight = 1;
-          for (let d = 1; d <= 5; d++) {
-            if (this.getCase(cx, cy - d) <= 0) maxHeight++;
-            else {
-              maxHeight += 2;
-              break;
-            }
-          }
-          if (this.getCase(cx + 1, cy + 1) === Data.GROUND) {
-            const h = this.getStepHeight(cx, cy, Data.IA_CLIMB);
-            if (
-              h !== null &&
-              h < maxHeight &&
-              this.checkFlag(cx, cy - h, Data.IA_BORDER) &&
-              this.checkFlag(cx + 1, cy - h, Data.IA_FALL_SPOT)
-            ) {
-              flags |= Data.IA_CLIMB_LEFT;
-            }
-          }
-          if (this.getCase(cx - 1, cy + 1) === Data.GROUND) {
-            const h = this.getStepHeight(cx, cy, Data.IA_CLIMB);
-            if (
-              h !== null &&
-              h < maxHeight &&
-              this.checkFlag(cx, cy - h, Data.IA_BORDER) &&
-              this.checkFlag(cx - 1, cy - h, Data.IA_FALL_SPOT)
-            ) {
-              flags |= Data.IA_CLIMB_RIGHT;
-            }
-          }
-
-          if (
-            this.getCase(cx + 1, cy + 1) === Data.GROUND &&
-            this.getCase(cx - Data.IA_HJUMP, cy + 1) === Data.GROUND &&
-            this.getCase(cx - 1, cy) <= 0
-          ) {
-            flags |= Data.IA_JUMP_LEFT;
-          }
-          if (
-            this.getCase(cx - 1, cy + 1) === Data.GROUND &&
-            this.getCase(cx + Data.IA_HJUMP, cy + 1) === Data.GROUND &&
-            this.getCase(cx + 1, cy) <= 0
-          ) {
-            flags |= Data.IA_JUMP_RIGHT;
-          }
-        }
-
-        this.flagMap[cx][cy] = flags;
+    if (this.getCase(cx, cy + 1) === Data.GROUND) {
+      flags |= Data.IA_TILE_TOP;
+      if (
+        this.getCase(cx, cy - Data.IA_VJUMP) === Data.GROUND &&
+        this.getCase(cx, cy - Data.IA_VJUMP - 1) <= 0
+      ) {
+        flags |= Data.IA_JUMP_UP;
       }
     }
+
+    if (this.getCase(cx, cy) === Data.GROUND && this.getCase(cx, cy - 1) <= 0) {
+      flags |= Data.IA_TILE;
+    }
+
+    const fallH = this.checkSecureFall(cx, cy);
+    this.fallMap[cx][cy] = fallH;
+    if (fallH >= 0) flags |= Data.IA_ALLOW_FALL;
+
+    if (this.getCase(cx, cy) === 0 && this.getCase(cx, cy + 1) === Data.GROUND) {
+      if (this.checkSecureFall(cx, cy + 2) >= 0) {
+        flags |= Data.IA_JUMP_DOWN;
+      }
+    }
+
+    if (
+      this.getCase(cx, cy + 1) === Data.GROUND &&
+      (this.getCase(cx - 1, cy + 1) <= 0 || this.getCase(cx + 1, cy + 1) <= 0)
+    ) {
+      flags |= Data.IA_BORDER;
+      if (
+        this.getCase(cx - 1, cy + 1) !== Data.GROUND &&
+        this.getCase(cx + 1, cy + 1) !== Data.GROUND
+      ) {
+        flags |= Data.IA_SMALL_SPOT;
+      }
+    }
+
+    if (
+      this.getCase(cx, cy + 1) <= 0 &&
+      (this.getCase(cx - 1, cy + 1) === Data.GROUND || this.getCase(cx + 1, cy + 1) === Data.GROUND)
+    ) {
+      flags |= Data.IA_FALL_SPOT;
+    }
+
+    // Climbable walls & steps left / right
+    if ((flags & Data.IA_TILE_TOP) !== 0) {
+      let maxHeight = 1;
+      for (let d = 1; d <= 5; d++) {
+        if (this.getCase(cx, cy - d) <= 0) maxHeight++;
+        else break;
+      }
+      if (this.getCase(cx - 1, cy) > 0) {
+        const h = this.getWallHeight(cx - 1, cy, Data.IA_CLIMB);
+        if (h !== null && h < maxHeight && cy - h >= 0) flags |= Data.IA_CLIMB_LEFT;
+      }
+      if (this.getCase(cx + 1, cy) > 0) {
+        const h = this.getWallHeight(cx + 1, cy, Data.IA_CLIMB);
+        if (h !== null && h < maxHeight && cy - h >= 0) flags |= Data.IA_CLIMB_RIGHT;
+      }
+    }
+
+    if ((flags & Data.IA_FALL_SPOT) !== 0) {
+      let maxHeight = 1;
+      for (let d = 1; d <= 5; d++) {
+        if (this.getCase(cx, cy - d) <= 0) maxHeight++;
+        else {
+          maxHeight += 2;
+          break;
+        }
+      }
+      if (this.getCase(cx + 1, cy + 1) === Data.GROUND) {
+        const h = this.getStepHeight(cx, cy, Data.IA_CLIMB);
+        if (
+          h !== null &&
+          h < maxHeight &&
+          this.checkFlag(cx, cy - h, Data.IA_BORDER) &&
+          this.checkFlag(cx + 1, cy - h, Data.IA_FALL_SPOT)
+        ) {
+          flags |= Data.IA_CLIMB_LEFT;
+        }
+      }
+      if (this.getCase(cx - 1, cy + 1) === Data.GROUND) {
+        const h = this.getStepHeight(cx, cy, Data.IA_CLIMB);
+        if (
+          h !== null &&
+          h < maxHeight &&
+          this.checkFlag(cx, cy - h, Data.IA_BORDER) &&
+          this.checkFlag(cx - 1, cy - h, Data.IA_FALL_SPOT)
+        ) {
+          flags |= Data.IA_CLIMB_RIGHT;
+        }
+      }
+
+      if (
+        this.getCase(cx + 1, cy + 1) === Data.GROUND &&
+        this.getCase(cx - Data.IA_HJUMP, cy + 1) === Data.GROUND &&
+        this.getCase(cx - 1, cy) <= 0
+      ) {
+        flags |= Data.IA_JUMP_LEFT;
+      }
+      if (
+        this.getCase(cx - 1, cy + 1) === Data.GROUND &&
+        this.getCase(cx + Data.IA_HJUMP, cy + 1) === Data.GROUND &&
+        this.getCase(cx + 1, cy) <= 0
+      ) {
+        flags |= Data.IA_JUMP_RIGHT;
+      }
+    }
+
+    this.flagMap[cx][cy] = flags;
   }
 
   getWallHeight(cx: number, cy: number, max: number): number | null {

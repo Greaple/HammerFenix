@@ -25,6 +25,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Engine
 
+- Blend modes: Flash `LAYER` is `SwfMovieClip.setLayerBlend` (an `AlphaFilter` that also carries `_alpha`), `ERASE` is Pixi's `erase`. Only set from code (the darkness); timeline blend modes other than multiply, screen and add still draw as normal.
 - SWF frame scripts: 86 of 89 run in `src/engine/swf/Avm1.ts`. Not run: 2 particle emitters (`_gfx` #234, `_anims` #150) and a ghost effect (`_anims` #3200), which define functions.
 - Backward timeline seeks keep children that stay on the same depth, as Flash does.
 - `_width` / `_height` are the exact vector bounds, hidden children included, as in Flash. Hit boxes no longer include the 1 px rasterization margin.
@@ -33,21 +34,21 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Modes
 
-| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                    |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Missing: bosses, map, StatsManager, options, score saving; game over is placeholder text |
-| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                             |
+| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Missing: bosses, map, StatsManager, options, score saving; game over is placeholder text |
+| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                              |
 
 ## Levels
 
-| Original                                                     | TypeScript                               | Status  | Notes                                                                                                                                 |
-| ------------------------------------------------------------ | ---------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). No mirror mode (3.3); IA map parsed at once, not over frames. Editor and serialization skipped on purpose              |
-| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). `tools/scan-scripts.ts` checks every level script                                                                      |
-| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | Audited (1.7). Special backgrounds hide `_bg` (same picture as the Flash 8 cache path). No snapshots (2.7), bitmap cache, editor grid |
-| `levels/ViewManager.mt`                                      |                                          | missing | Level change is an instant cut, not a scroll; `GameSession.onLevelReady` runs at once                                                 |
-| `levels/ViewLight.mt`                                        |                                          | missing | Darkness partly handled in `GameSession.updateDarkness`                                                                               |
-| `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in); no fade / side-scroll transition (2.7)           |
+| Original                                                     | TypeScript                               | Status  | Notes                                                                                                                                                            |
+| ------------------------------------------------------------ | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). No mirror mode (3.3). IA map parsed 30 cases per frame (2.7). Editor and serialization skipped on purpose                                         |
+| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). `tools/scan-scripts.ts` checks every level script                                                                                                 |
+| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | Audited (1.7). Special backgrounds hide `_bg` (same picture as the Flash 8 cache path). Snapshots via Pixi `generateTexture` (2.7). No bitmap cache, editor grid |
+| `levels/ViewManager.mt`                                      | `GameSession.ts` ("ViewManager")         | done    | Level scroll, portal side scroll and fade (2.7), with the old view as a snapshot (`fake`); no snapshot when headless. No `flipPortals` (3.3)                     |
+| `levels/ViewLight.mt`                                        |                                          | skipped | Wireframe level preview used only by the `Browser` dev tool (out of scope). The darkness is `GameMode.updateDarkness`, ported in 2.7                             |
+| `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in, side scroll or fade). Map events (`EVENT_EXIT_*`) not ported                 |
 
 ## Enemies (`entity/Bad.ts`)
 
@@ -131,7 +132,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Fixed
 
-- Level flow follows the original chain: `goto` (players keep their x and fall from above) → `onLevelReady` → `initLevel` → `startLevel`. The scroll between them is not ported (2.7): the level becomes ready at the start of the next world update, where the scroll would end, just before the level script runs. (It used to become ready mid-frame, so that frame's level-clear check found no enemies yet and removed the level's item timers: a level reached from the previous one got no items.)
+- Level flow follows the original chain: `goto` (players keep their x and fall from above) → IA parse (17 frames) → `onDataReady` (scroll starts, script compiles) → scroll (40 frames) → `onLevelReady` → `initLevel` → `startLevel`, all inside the world update, before the level script runs. A new game is locked until its first level is parsed (17 frames), as the original's `Mode` constructor locks it.
 - The level script compiles and runs its first cycle when the level is read; enemies and items inserted at level start run on the next script update.
 - Levels are marked visited when left, not when entered; level data (tiles changed by scripts) persists for the whole game.
 - Hurry-up is reset only on unvisited levels, recomputes `diffFactor` from spare lives and nightmare mode, and switches the music to the hurry track and back.
@@ -161,7 +162,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 - Script tree: Flash's `removeNode()` leaves `nextSibling` null, so `runScript` stops at the first trigger removed in a cycle; the triggers after it run on the next cycle. The port ran them all at once (checked in Ruffle's XML code).
 - A trigger nested in another one is moved to the end of the script (`appendChild`): the events after it in its parent are skipped (deepnight 141 in ninja mode never shows message 163), and a repeating parent adds it only once (deepnight 184).
-- Level start order (`ViewManager.onDataReady`): the view is created and `$attach` set before the compile. A level shown without a transition (new game, level picker) is ready before its script compiles, so its enemies appear on the first cycle; after a level change they appear on the next cycle. Players are placed before the compile.
+- Level start order (`ViewManager.onDataReady`): the view is created and `$attach` set before the compile. A level shown without a transition (new game, level picker, warp start) is ready before its script compiles, so its enemies appear on the first cycle; after a level change the script compiles when the scroll starts and the enemies appear when it ends. Players are placed before the compile.
 - The script only runs while the world is unlocked (`world.lock` in `goto`, pause and `suspend`; `unlock` in `startLevel`); the level clear is only checked then.
 - `GameMechanics.suspend`: the script left is saved into the level data when a dimension is left, so coming back runs what was left of it.
 - `$e_bad` with `$sys` on a visited level now decrements `badCount`; `$e_hide` removes the script's decor sprites (`View.detach`); `$e_setVar` accepts an empty value; `$e_msg` with a text the language lacks shows nothing (`Lang.get` is null; the English file lacks texts 158-163); code trigger 4 gives the elevator the player's head and starts `endModeTimer`, which ends the game; code trigger 5 (exit after Tuberculoz) ported; code triggers 7 and 8 use `setBaseAnims`.
@@ -176,7 +177,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- The IA map is parsed at once on `goto`; the original parses 30 cells per frame, so the level's script compiles about 17 frames later (2.7, with the scroll).
 - `$e_ext` calls `GameSession.spawnExtend`, which draws the letter directly; the original picks from `StatsManager.extendList` (2.10).
 - When a trigger repeats after its nested trigger moved out, Ruffle still follows the old sibling link and adds the nested trigger again; the port adds it once. Only deepnight 184 has this.
 - Mirror mode (`SetManager.flip`, `flipPortals`) is not ported (3.3).

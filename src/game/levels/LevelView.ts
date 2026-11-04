@@ -1,3 +1,4 @@
+import { Container, Rectangle, type Renderer, type Texture } from 'pixi.js';
 import { DepthManager } from '../../engine/DepthManager';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
@@ -405,6 +406,34 @@ export class LevelView {
     } else {
       this.moveTo(0, 0);
     }
+  }
+
+  /**
+   * `View.getSnapShot(0, 0)`: a `DOC_WIDTH` x `DOC_HEIGHT` picture of the back, sprite and top
+   * layers (not the fields), each drawn in its own space as `BitmapData.drawMC` does. `null`
+   * without a renderer (headless) or when the view is not attached.
+   */
+  getSnapShot(renderer: Renderer | null): Texture | null {
+    if (!renderer || !this.back || !this.top) return null;
+    const layers = [this.back, this.spriteBack, this.top, this.spriteTop];
+    const saved = layers.map((l) => ({ l, parent: l.parent, x: l.x, y: l.y }));
+    const snap = new Container();
+    for (const l of layers) {
+      snap.addChild(l);
+      l.x = 0;
+      l.y = 0;
+    }
+    const tex = renderer.generateTexture({
+      target: snap,
+      frame: new Rectangle(0, 0, Data.DOC_WIDTH, Data.DOC_HEIGHT),
+    });
+    for (const s of saved) {
+      s.l.x = s.x;
+      s.l.y = s.y;
+      s.parent?.addChild(s.l);
+    }
+    snap.destroy();
+    return tex;
   }
 
   destroy(): void {
