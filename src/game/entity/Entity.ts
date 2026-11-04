@@ -50,7 +50,7 @@ export class BaseEntity {
   fl_destroy = false;
   fl_largeTrigger = false;
 
-  private sticker: SwfMovieClip | null = null;
+  sticker: SwfMovieClip | null = null;
   private stickerX = 0;
   private stickerY = 0;
   private elaStickFactor = 1;
@@ -118,8 +118,9 @@ export class BaseEntity {
     this.parent = e;
   }
 
-  setLifeTimer(t: number): void {
-    this.lifeTimer = t;
+  /** A null timer never runs out (`null > 0` is false in the original's update). */
+  setLifeTimer(t: number | null): void {
+    this.lifeTimer = t ?? -1;
     this.totalLife = t;
   }
 

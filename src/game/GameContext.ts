@@ -58,6 +58,10 @@ export interface IGameContext {
   huState: number;
 
   readonly globalActives: boolean[];
+  fl_flipX: boolean;
+  fl_flipY: boolean;
+  endLevelStack: (() => void)[];
+  perfectItemCpt: number;
 
   /** `GameManager.CONFIG.hasFamily`: whether the player has unlocked this item family. */
   hasFamily(id: number): boolean;
@@ -81,6 +85,9 @@ export interface IGameContext {
   nextLevel(): void;
   forcedGoto(id: number): void;
   shake(duration: number | null, power: number | null): void;
+  flipX(fl: boolean): void;
+  flipY(fl: boolean): void;
+  isBossLevel(id: number): boolean;
 
   onExplode(x: number, y: number, radius: number): void;
   onKillBad(b: BaseEntity): void;

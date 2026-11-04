@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1 is done. Phase 2: 2.1 and 2.2 are done; next are the 24 missing item effects (2.3). Item 84 can use `FireRainShoot` from 2.2. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phase 1 is done. Phase 2: 2.1 to 2.3 are done; next is the zodiac constellation background (2.4), which needs `FxManager.attachBg` from 2.6, so doing 2.6 first (or both together) makes sense. The `attachBg` / `clearBg` calls are left as comments in `SpecialManager` (`Player.ts`). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -25,7 +25,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 2.1 Super-item entities (`entity/supa/*`: Ball, Bubble, Tons, IceMeteor, Arrow, Smoke, SupaItem), in `entity/Supa.ts`. Item effects 3, 8, 9, 24, 38 and the smoke of 19 use them, and the super item falls after a perfect-order clear (`Adventure.onLevelClear`). Tested in `tests/supa.test.ts`.
 - [x] 2.2 Missing projectiles and bombs: FireRain, Hammer, BossFireBall, FramBall (`Shoot.ts`); BossBomb, SoccerBall (`Bomb.ts`). Item 85 (hammer), code trigger 6 (soccer balls) and the repel bomb's push on balls use them; BossFireBall, FramBall and BossBomb wait for their owners (2.8, 2.12, 2.9). MineFrozen and PoireBombFrozen are not ported: the original never creates them (`Mine.getFrozen` and `PoireBomb.getFrozen` are commented out). Tested in `tests/projectiles.test.ts`.
 - [x] Bug (found in 2.2): SWF clip masks (`clipDepth`) are drawn as plain rectangles (`SwfMaskClip`), not the mask shape. The soccer ball shows a strip of its pattern instead of a round ball; 30 exported symbols use masks (player, bombs, items, portals, the boss bar). Fixed: masks are vector `Graphics` built from the mask character's paths (`SwfLibrary.getMaskContext`, holes kept); `_width` / `_height` scale them. Limit: a sprite mask uses its first frame only.
-- [ ] 2.3 The 24 missing item effects (list in PORT_STATUS.md). Remove the generic "+2500 points" fallback in `Player.ts`.
+- [x] 2.3 The 24 missing item effects. All 118 effects of `SpecialManager.execute` are now a faithful port (no more "+2500 points" fallback), with screen flips (`GameMode.flipX/flipY`), the end-of-level stack, level conversion into pearls and the perfect bonus, and warps that stop at boss and empty levels. Several existing effects were fixed on the way (wrong curse icons, missing global flag, darkness). Special backgrounds stay for 2.6. Tested in `tests/specials.test.ts`.
 - [ ] 2.4 Zodiac items 40-63: add the constellation background (`fxMan.attachBg(BG_CONSTEL)`).
 - [ ] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants). `FxManager.inGameParticles` currently renders every type as ice.
 - [ ] 2.6 Special backgrounds: `FxManager.attachBg/detachBg/clearBg` and the `BG_*` effects.

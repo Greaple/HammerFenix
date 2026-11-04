@@ -17,6 +17,7 @@ import {
 import { BaseEntity, PhysicsEntity } from './Entity';
 import { type ItemEntity, ScoreItem, SpecialItem } from './Item';
 import {
+  FireRainShoot,
   HammerShoot,
   PlayerArrowShoot,
   PlayerFireBallShoot,
@@ -94,6 +95,9 @@ export class PlayerEntity extends PhysicsEntity {
     func: () => void;
   }[] = [];
 
+  /** Storm clouds of the fire rain talisman (item 84). */
+  private clouds: SwfMovieClip[] = [];
+
   private recentKicks: { t: number; bid: number }[] = [];
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
@@ -142,6 +146,10 @@ export class PlayerEntity extends PhysicsEntity {
     if (e.isType(Data.ITEM)) {
       const it = e as ItemEntity;
       it.execute(this);
+      if (it.id === Data.CONVERT_DIAMANT) {
+        // pearl
+        this.onPickPerfectItem();
+      }
     }
   }
 
@@ -908,6 +916,8 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   // --------------------------------------------------- Special Item Execution
+  // Port of `SpecialManager` (`class/hammer/SpecialManager.mt`). Special backgrounds
+  // (`fxMan.attachBg` / `clearBg`, `BG_*`) are task 2.6 and left as comments.
 
   private permanent(id: number): void {
     if (!this.actives[id]) {
@@ -917,6 +927,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   private temporary(id: number, duration: number | null): void {
+    // null lasts until the end of the current level
     const dur = duration ?? 99999;
     if (!this.actives[id]) {
       this.actives[id] = true;
@@ -924,79 +935,152 @@ export class PlayerEntity extends PhysicsEntity {
     }
   }
 
+  /** `SpecialManager.global`: a game-wide effect, read by the enemies and the session. */
+  private global(id: number): void {
+    this.game.globalActives[id] = true;
+  }
+
   /** `SpecialManager.interrupt` */
   interruptSpecial(id: number): void {
     if (!this.actives[id]) return;
     this.actives[id] = false;
+    // game.fxMan.clearBg(): special backgrounds, task 2.6
 
     switch (id) {
+      // *** 4. gold and black lamps
       case 4:
       case 5:
         this.maxBombs = this.initialMaxBombs;
         break;
+      // *** 7. shoe
       case 7:
-      case 22:
-        this.speedFactor = this.game.fl_nightmare ? 1.3 : 1.0;
-        this.unstick();
+        this.speedFactor = 1.0;
         break;
+      // *** 10. phone: its clip is never attached (the effect is commented out in the original)
+      case 10:
+        break;
+      // *** 18. dandelion
       case 18:
-      case 39:
         this.fallFactor = 1.1;
         break;
+      // *** 22. rotten shoe
+      case 22:
+        this.speedFactor = 1.0;
+        this.unstick();
+        break;
+      // *** 29. gold ring
       case 29:
         if (this.currentWeapon === Data.WEAPON_S_FIRE) this.changeWeapon(null);
         break;
+      // *** 30. blue glasses
+      case 30:
+        this.game.flipX(false);
+        break;
+      // *** 31. red glasses
+      case 31:
+        this.game.flipY(false);
+        break;
+      // *** 37. crystal necklace
       case 37:
         if (this.currentWeapon === Data.WEAPON_S_ICE) this.changeWeapon(null);
         break;
+      case 39:
+        this.fallFactor = 1.1;
+        break;
+      // *** 67. emerald ring
       case 67:
         if (this.currentWeapon === Data.WEAPON_S_ARROW) this.changeWeapon(null);
         break;
+      // *** 69. turtle
       case 69:
         this.game.globalActives[id] = false;
         for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.updateSpeed();
-          b.animFactor /= 0.6;
+          b.animFactor *= 1 / 0.6;
         }
         break;
+      // *** 80. snail
       case 80:
         this.game.globalActives[id] = false;
         for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.updateSpeed();
-          b.animFactor /= 0.3;
+          b.animFactor *= 1 / 0.3;
         }
         break;
+      // *** 81. blue pearl
+      case 81:
+        this.game.destroyList(Data.PERFECT_ITEM);
+        break;
+      // *** 84. fire rain talisman
+      case 84:
+        this.clearRec();
+        for (const c of this.clouds) {
+          c.removeMovieClip();
+        }
+        this.clouds = [];
+        break;
+      // *** 86. ghost candy: the glow filters are not ported
+      case 86:
+        break;
+      // *** 88. pokute
       case 88:
         this.unstick();
         this.scale(100);
         break;
+      // *** 90. Goldorak curse
       case 90:
-      case 91:
-      case 95:
-      case 114:
         this.unstick();
         break;
+      // *** 91. Luffy hat
+      case 91:
+        this.unstick();
+        break;
+      // *** 94. Antok ring
+      case 94:
+        this.game.globalActives[id] = false;
+        break;
+      // *** 95. money bag
+      case 95:
+        this.unstick();
+        break;
+      // *** 96/97/98. pearls (see 81)
+      case 96:
+      case 97:
+      case 98:
+        this.game.destroyList(Data.PERFECT_ITEM);
+        break;
+      // *** 99. Chourou tuft
       case 99:
         this.fl_chourou = false;
         this.replayAnim();
         this.clearRec();
         break;
-      default:
+      // *** 100. Guu doll
+      case 100:
+        if (this.sticker) {
+          this.game.fxMan.attachFx(this.sticker._x, this.sticker._y, 'hammer_fx_pop');
+        }
+        this.unstick();
+        this.scale(100);
+        break;
+      // *** 114. Mario mode
+      case 114:
+        this.unstick();
         break;
     }
   }
 
   clearTemp(): void {
     while (this.tempList.length > 0) {
-      const entry = this.tempList.shift()!;
-      this.interruptSpecial(entry.id);
+      this.interruptSpecial(this.tempList[0].id);
+      this.tempList.splice(0, 1);
     }
   }
 
   clearPerm(): void {
     while (this.permList.length > 0) {
-      const id = this.permList.shift()!;
-      this.interruptSpecial(id);
+      this.interruptSpecial(this.permList[0]);
+      this.permList.splice(0, 1);
     }
   }
 
@@ -1004,21 +1088,28 @@ export class PlayerEntity extends PhysicsEntity {
     this.recurring = [];
   }
 
+  private registerRecurring(func: () => void, t: number, fl_repeat: boolean): void {
+    this.recurring.push({ timer: t * 1.0, baseTimer: t, func, fl_repeat });
+  }
+
+  /** `SpecialManager.main` (the phone screen clock is not needed: the phone is never shown). */
   private updateSpecials(): void {
-    for (let i = 0; i < this.recurring.length; i++) {
-      const r = this.recurring[i];
-      r.timer -= 1;
-      if (r.timer <= 0) {
-        r.func();
-        if (r.fl_repeat) {
-          r.timer += r.baseTimer;
+    // Recurring special events of the level
+    for (let n = 0; n < this.recurring.length; n++) {
+      const e = this.recurring[n];
+      e.timer -= 1;
+      if (e.timer <= 0) {
+        e.func();
+        if (e.fl_repeat) {
+          e.timer = e.baseTimer + e.timer;
         } else {
-          this.recurring.splice(i, 1);
-          i--;
+          this.recurring.splice(n, 1);
+          n--;
         }
       }
     }
 
+    // Lifetime of the temporary effects
     for (let i = 0; i < this.tempList.length; i++) {
       if (this.game.cycle >= this.tempList[i].end) {
         this.interruptSpecial(this.tempList[i].id);
@@ -1028,369 +1119,821 @@ export class PlayerEntity extends PhysicsEntity {
     }
   }
 
+  /** `SpecialManager.levelConversion`: a pearl of the given kind above each floor tile. */
+  private levelConversion(id: number, sid: number): void {
+    const game = this.game;
+    game.scriptRunner?.safeMode();
+    game.killPop();
+    let n = 0;
+    for (let y = 0; y < Data.LEVEL_HEIGHT; y++) {
+      for (let x = 0; x < Data.LEVEL_WIDTH; x++) {
+        if (this.world.checkFlag(x, y, Data.IA_TILE_TOP)) {
+          let t = n * 2;
+          if (n < 4) t = 1;
+          game.scriptRunner?.insertScoreItem(
+            id,
+            sid,
+            game.flipCoordCase(x),
+            y,
+            t,
+            null,
+            true,
+            false,
+          );
+          n++;
+        }
+      }
+    }
+    game.perfectItemCpt = n;
+  }
+
+  /** `SpecialManager.getZodiac`: a score item above each enemy. */
+  private getZodiac(_id: number): void {
+    // game.fxMan.attachBg(Data.BG_CONSTEL, id, Data.SECOND * 4): task 2.4
+    for (const b of this.game.getList(Data.BAD_CLEAR)) {
+      ScoreItem.attach(this.game, b.x, b.y - Data.CASE_HEIGHT * 2, 169, 0);
+    }
+  }
+
+  /** `SpecialManager.getZodiacPotion` */
+  private getZodiacPotion(_id: number): void {
+    for (const b of this.game.getList(Data.BAD_CLEAR)) {
+      ScoreItem.attach(this.game, b.x, b.y - Data.CASE_HEIGHT * 2, 169, 0);
+    }
+  }
+
+  /** `SpecialManager.onPerfect`: every pearl of a conversion was picked. */
+  private onPerfect(): void {
+    this.interruptSpecial(81);
+    this.interruptSpecial(96);
+    this.interruptSpecial(97);
+    this.interruptSpecial(98);
+
+    const bonus = 50000;
+    const mc = this.game.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
+    mc._x = Data.GAME_WIDTH * 0.5;
+    mc._y = Data.GAME_HEIGHT * 0.5;
+    const lbl = mc.getText('label');
+    if (lbl) lbl.text = this.game.dataStore.getStatic(11) || 'PERFECT!';
+    const bon = mc.getText('bonus');
+    if (bon) bon.text = this.actives[95] ? String(bonus * 2) : String(bonus);
+    const pl = this.game.getList(Data.PLAYER) as PlayerEntity[];
+    for (const p of pl) {
+      p.getScoreHidden(Math.floor(bonus / pl.length));
+    }
+  }
+
+  /**
+   * `SpecialManager.onPickPerfectItem`. The original calls it for any item whose id is
+   * `CONVERT_DIAMANT` (17), so the gold mushroom counts too; the counter is unset (NaN) until
+   * the first conversion, which keeps that harmless before it.
+   */
+  onPickPerfectItem(): void {
+    this.game.perfectItemCpt--;
+    if (this.game.perfectItemCpt <= 0) {
+      this.onPerfect();
+    }
+  }
+
+  /** `SpecialManager.warpZone`: jumps `w` levels ahead, stopping at a boss or an empty level. */
+  private warpZone(w: number): void {
+    const game = this.game;
+    let arrival = this.world.currentId + w;
+    let i = this.world.currentId + 1;
+    while (i <= arrival) {
+      if (game.isBossLevel(i)) {
+        arrival = i;
+      }
+      if (this.world.isEmptyLevel(i, (cx) => game.flipCoordCase(cx))) {
+        arrival = i - 1;
+      }
+      i++;
+    }
+
+    // Warp impossible
+    if (arrival === this.world.currentId) {
+      game.fxMan.attachAlert(game.dataStore.getStatic(34));
+      return;
+    }
+
+    game.view.detach();
+    game.forcedGoto(arrival);
+  }
+
   private onStrike(): void {
-    const blist = (this.game.getList(Data.BAD_CLEAR) as BadEntity[]).filter((b) => !b.fl_kill);
+    const blist = this.game.getList(Data.BAD_CLEAR) as BadEntity[];
     if (blist.length === 0) return;
-    const bad = blist[0];
+    const bad = blist.find((b) => !b.fl_kill);
+    if (!bad) return;
     const s = this.game.fxMan.attachFx(
       Data.DOC_WIDTH * 0.5,
       bad.y - Data.CASE_HEIGHT * 0.5,
       'hammer_fx_strike',
     );
-    const dir = this.game.rand.next() < 0.5 ? -1 : 1;
+    const dir = this.game.rand.random(2) * 2 - 1;
+    const yscale = this.game.rand.random(50) + 50;
     if (s) {
       s.mc._xscale *= dir;
-      s.mc._yscale = this.game.rand.random(50) + 50;
+      s.mc._yscale = yscale;
     }
     this.game.fxMan.attachShine(bad.x, bad.y);
     bad.forceKill(dir * (this.game.rand.random(10) + 15));
   }
 
+  /** `SpecialManager.onFireRain`: one drop of the fire rain (item 84). */
+  private onFireRain(): void {
+    const x = this.game.rand.random(Math.round(Data.GAME_WIDTH)) + 50;
+    const s = FireRainShoot.attach(this.game, x, -this.game.rand.random(50));
+    s.moveToAng(95 + this.game.rand.random(30), s.shootSpeed);
+  }
+
+  /** `SpecialManager.onPoT`: points over time (item 99). */
+  private onPoT(): void {
+    this.getScore(this, 250);
+  }
+
+  /** `SpecialManager.execute` */
   executeSpecialItem(item: SpecialItem): void {
+    const game = this.game;
     const id = item.id;
-    const subId = item.subId ?? 0;
+    const subId = item.subId;
 
     switch (id) {
+      // *** 0. extends
       case 0:
         if (this.actives[27]) this.getScore(item, 25);
         this.getScoreHidden(5);
-        this.getExtend(subId);
+        this.getExtend(subId ?? 0);
         break;
+
+      // *** 1. gold shield
       case 1:
         this.shield(Data.SECOND * 10);
         break;
+
+      // *** 2. silver shield
       case 2:
         this.shield(Data.SECOND * 60);
         break;
+
+      // *** 3. beach ball
       case 3:
-        BallSupa.attach(this.game);
+        BallSupa.attach(game);
         break;
+
+      // *** 4. gold lamp: multi bombs (2)
       case 4:
         if (!this.actives[5]) {
           this.maxBombs = this.initialMaxBombs + 1;
           this.permanent(id);
         }
         break;
+
+      // *** 5. black lamp: multi bombs (5)
       case 5:
         this.maxBombs = this.initialMaxBombs + 4;
         this.permanent(id);
         break;
+
+      // *** 6. yin yang: freeze all
       case 6:
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.freeze(Data.FREEZE_DURATION * 2);
         }
         break;
+
+      // *** 7. shoe: speed up player
       case 7:
         this.speedFactor = 1.5;
         this.permanent(id);
         break;
+
+      // *** 8. star: supa bubble
       case 8:
-        BubbleSupa.attach(this.game);
-        BubbleSupa.attach(this.game);
+        BubbleSupa.attach(game);
+        BubbleSupa.attach(game);
         break;
+
+      // *** 9. Sauron's eye: supa weight
       case 9:
-        TonsSupa.attach(this.game);
+        TonsSupa.attach(game);
         break;
+
+      // *** 10. phone: the Nokia effect is commented out in the original
+      case 10:
+        break;
+
+      // *** 11. red umbrella: next level
       case 11:
-        if (this.world.currentId + 1 < this.world.levelCount) {
-          this.game.forcedGoto(this.world.currentId + 1);
-        }
+        this.warpZone(1);
         break;
+
+      // *** 12. blue umbrella: next level x 2
       case 12:
-        if (this.world.currentId + 2 < this.world.levelCount) {
-          this.game.forcedGoto(this.world.currentId + 2);
-        }
+        this.warpZone(2);
         break;
+
+      // *** 13. motorbike helmet: kicks bombs further
       case 13:
-      case 26:
-      case 27:
-      case 66:
-      case 68:
-      case 70:
-      case 73:
-      case 92:
-      case 94:
         this.permanent(id);
         break;
+
+      // *** 14-17. blue, red, green and gold mushrooms
       case 14:
       case 15:
       case 16:
       case 17:
+        this.permanent(id);
         for (const other of [14, 15, 16, 17]) {
           if (other !== id) this.interruptSpecial(other);
         }
-        this.permanent(id);
         break;
+
+      // *** 18. dandelion: slow fall
       case 18:
         this.permanent(id);
         this.fallFactor = 0.55;
         break;
+
+      // *** 19. sunflower
       case 19:
-        SmokeSupa.attach(this.game);
-        // game.fxMan.attachBg(Data.BG_ORANGE, null, Data.SECOND * 3): special backgrounds, task 2.6
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+        SmokeSupa.attach(game);
+        // game.fxMan.attachBg(Data.BG_ORANGE, null, Data.SECOND * 3): task 2.6
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.forceKill(null);
         }
         break;
+
+      // *** 20. treasure chest
       case 20:
         for (let i = 0; i < 5; i++) {
-          const s = ScoreItem.attach(this.game, item.x, item.y, 0, this.game.rand.random(4));
+          const s = ScoreItem.attach(game, item.x, item.y, 0, game.rand.random(4));
           s.moveFrom(item, 8);
         }
         break;
+
+      // *** 21. speaker
       case 21: {
-        const b = this.game.getOne(Data.BAD_CLEAR) as BadEntity | null;
-        if (b) {
-          this.game.fxMan.attachFx(b.x, b.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
-          b.forceKill(null);
+        const bad = game.getOne(Data.BAD_CLEAR) as BadEntity | null;
+        if (bad) {
+          game.fxMan.attachFx(bad.x, bad.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
+          bad.forceKill(null);
+          // game.fxMan.attachBg(Data.BG_SINGER, null, Data.SECOND * 3): task 2.6
         }
         break;
       }
+
+      // *** 22. rotten shoe
       case 22:
         this.interruptSpecial(7);
-        this.curse(2);
+        this.curse(Data.CURSE_SLOW);
         this.speedFactor = 0.6;
         this.temporary(id, Data.SECOND * 40);
         break;
+
+      // *** 23. crystal ball
       case 23:
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
-          const s = PlayerPearlShoot.attach(this.game, this.x, this.y - Data.CASE_WIDTH);
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+          const s = PlayerPearlShoot.attach(game, this.x, this.y - Data.CASE_WIDTH);
           s.moveToTarget(b, s.shootSpeed);
           s.fl_borderBounce = true;
-          s.setLifeTimer(Data.SECOND * 3 + this.game.rand.random(40));
+          s.setLifeTimer(Data.SECOND * 3 + game.rand.random(400) / 10);
+          s._yOffset = 0;
           s.endUpdate();
         }
         break;
+
+      // *** 24. snow crystal
       case 24:
-        IceMeteorSupa.attach(this.game);
+        IceMeteorSupa.attach(game);
         break;
+
+      // *** 25. ice flame: curtain of fireballs
       case 25:
         for (let i = 0; i < 4; i++) {
-          const s1 = PlayerFireBallShoot.attach(
-            this.game,
+          const s = PlayerFireBallShoot.attach(
+            game,
             Data.GAME_WIDTH * 0.125 + Data.GAME_WIDTH * 0.25 * i,
             10,
           );
-          s1.moveDown(s1.shootSpeed);
-          const s2 = PlayerFireBallShoot.attach(
-            this.game,
+          s.moveDown(s.shootSpeed);
+        }
+        for (let i = 0; i < 4; i++) {
+          const s = PlayerFireBallShoot.attach(
+            game,
             Data.GAME_WIDTH * 0.25 + Data.GAME_WIDTH * 0.25 * i,
             Data.GAME_HEIGHT - 10,
           );
-          s2.moveUp(s2.shootSpeed);
+          s.moveUp(s.shootSpeed);
         }
         break;
+
+      // *** 26. light bulb
+      case 26:
+        this.permanent(id);
+        game.updateDarkness();
+        break;
+
+      // *** 27. water lily: points for the extends
+      case 27:
+        this.permanent(id);
+        break;
+
+      // *** 28. silver cup
       case 28:
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+        // game.fxMan.attachBg(Data.BG_STAR, null, Data.SECOND * 9): task 2.6
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.knock(Data.SECOND * 10);
         }
         break;
+
+      // *** 29. gold ring: fireball shots
       case 29:
         this.changeWeapon(Data.WEAPON_S_FIRE);
         this.temporary(id, WEAPON_DURATION);
         break;
+
+      // *** 30. blue glasses: the screen is mirrored
+      case 30:
+        game.flipX(true);
+        this.temporary(id, Data.SECOND * 30);
+        break;
+
+      // *** 31. red glasses: the screen is upside down
+      case 31:
+        game.flipY(true);
+        this.temporary(id, Data.SECOND * 30);
+        break;
+
+      // *** 32-34. ace of spades, clubs and diamonds: enemies turn into crystals
       case 32:
       case 33:
       case 34: {
-        const subMap: Record<number, number> = { 32: 0, 33: 2, 34: 5 };
-        for (const b of [...(this.game.getList(Data.BAD_CLEAR) as BadEntity[])]) {
+        const sid = id === 32 ? 0 : id === 33 ? 2 : 5;
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.destroy();
-          ScoreItem.attach(this.game, b.x, b.y - Data.CASE_HEIGHT, 0, subMap[id] ?? 0);
+          ScoreItem.attach(game, b.x, b.y - Data.CASE_HEIGHT, 0, sid);
         }
         break;
       }
+
+      // *** 35. ace of hearts
       case 35:
-        for (const b of [...(this.game.getList(Data.BAD_CLEAR) as BadEntity[])]) {
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.destroy();
-          ScoreItem.attach(this.game, b.x - Data.CASE_WIDTH, b.y - Data.CASE_HEIGHT, 0, 6);
-          ScoreItem.attach(this.game, b.x + Data.CASE_WIDTH, b.y - Data.CASE_HEIGHT, 0, 6);
+          ScoreItem.attach(game, b.x - Data.CASE_WIDTH, b.y - Data.CASE_HEIGHT, 0, 6);
+          ScoreItem.attach(game, b.x + Data.CASE_WIDTH, b.y - Data.CASE_HEIGHT, 0, 6);
         }
         break;
+
+      // *** 36. extra Igor
       case 36:
         this.lives++;
-        this.game.hud.setLives(this.lives);
-        this.game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        game.hud.setLives(this.lives);
+        game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
         break;
-      case 103:
-      case 104:
-      case 105:
-        this.lives++;
-        this.game.hud.setLives(this.lives);
-        this.game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
-        this.game.randMan.remove(Data.RAND_ITEMS_ID, id);
-        break;
+
+      // *** 37. crystal necklace: pearl shots
       case 37:
         this.changeWeapon(Data.WEAPON_S_ICE);
         this.temporary(id, WEAPON_DURATION);
         break;
+
+      // *** 38. totem
       case 38: {
-        const s = ArrowSupa.attach(this.game);
+        const s = ArrowSupa.attach(game);
         s.setLifeTimer(Data.SUPA_DURATION);
         break;
       }
+
+      // *** 39. stone head: Igor shakes the level when he lands
       case 39:
         this.fallFactor = 1.6;
         this.temporary(id, null);
         break;
+
+      // *** 40-51. zodiac signs
+      case 40:
+      case 41:
+      case 42:
+      case 43:
+      case 44:
+      case 45:
+      case 46:
+      case 47:
+      case 48:
+      case 49:
+      case 50:
+      case 51:
+        this.getZodiac(id - 40);
+        break;
+
+      // *** 52-63. zodiac potions
+      case 52:
+      case 53:
+      case 54:
+      case 55:
+      case 56:
+      case 57:
+      case 58:
+      case 59:
+      case 60:
+      case 61:
+      case 62:
+      case 63:
+        this.getZodiacPotion(id - 40);
+        break;
+
+      // *** 64. rainbow: extends spawn
       case 64:
         for (let i = 0; i < 5; i++) {
-          const pt = this.world.getGround(
-            this.game.rand.random(Data.LEVEL_WIDTH),
-            this.game.rand.random(Data.LEVEL_HEIGHT),
-          );
+          const px = game.rand.random(Data.LEVEL_WIDTH);
+          const py = game.rand.random(Data.LEVEL_HEIGHT);
+          const pt = this.world.getGround(px, py);
           SpecialItem.attach(
-            this.game,
+            game,
             pt.x * Data.CASE_WIDTH,
             pt.y * Data.CASE_HEIGHT,
             0,
-            this.game.rand.random(7),
+            game.rand.random(7),
           );
         }
         break;
+
+      // *** 65. duck float: points for each enemy
       case 65:
-        for (const b of this.game.getList(Data.BAD)) {
+        for (const b of game.getList(Data.BAD)) {
           this.getScore(b, b.isType(Data.BAD_CLEAR) ? 2500 : 600);
         }
         break;
+
+      // *** 66. cactus: jumps give points
+      case 66:
+        this.permanent(id);
+        break;
+
+      // *** 67. emerald ring: arrow shots
       case 67:
         this.changeWeapon(Data.WEAPON_S_ARROW);
         this.temporary(id, WEAPON_DURATION);
         break;
+
+      // *** 68. candle
+      case 68:
+        this.permanent(id);
+        game.updateDarkness();
+        break;
+
+      // *** 69. turtle: slows the enemies
       case 69:
-        this.game.globalActives[id] = true;
+        this.global(id);
         this.temporary(id, Data.SECOND * 30);
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.updateSpeed();
           b.animFactor *= 0.6;
         }
         break;
+
+      // *** 70. clover: bomb kicks give points
+      case 70:
+        this.permanent(id);
+        break;
+
+      // *** 71. dragon head: two horizontal fireballs
       case 71: {
-        const sL = PlayerFireBallShoot.attach(this.game, item.x, item.y);
+        const sL = PlayerFireBallShoot.attach(game, item.x, item.y);
         sL.moveLeft(sL.shootSpeed);
-        const sR = PlayerFireBallShoot.attach(this.game, item.x, item.y);
+        const sR = PlayerFireBallShoot.attach(game, item.x, item.y);
         sR.moveRight(sR.shootSpeed);
         break;
       }
+
+      // *** 72. magician hat: enemies turn into crystals of rising value
       case 72: {
-        this.game.destroyList(Data.ITEM);
-        this.game.destroyList(Data.BAD_BOMB);
+        game.destroyList(Data.ITEM);
+        game.destroyList(Data.BAD_BOMB);
         let n = 1;
-        for (const b of [...(this.game.getList(Data.BAD_CLEAR) as BadEntity[])]) {
-          ScoreItem.attach(this.game, b.x, b.y, 0, n);
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+          ScoreItem.attach(game, b.x, b.y, 0, n);
           b.destroy();
           n++;
         }
         break;
       }
+
+      // *** 73. tree leaf: points for walking
+      case 73:
+        this.permanent(id);
+        break;
+
+      // *** 74-76. orange, blue and green ghosts: candies spawn
       case 74:
       case 75:
       case 76: {
         const scoreId = id - 71;
         for (let i = 0; i < 7; i++) {
           const it = ScoreItem.attach(
-            this.game,
-            this.game.rand.random(Data.GAME_WIDTH),
+            game,
+            game.rand.random(Data.GAME_WIDTH),
             Data.GAME_HEIGHT,
             scoreId,
             null,
           );
-          it.moveToAng(-20 - this.game.rand.random(160), this.game.rand.random(15) + 10);
+          it.moveToAng(-20 - game.rand.random(160), game.rand.random(15) + 10);
         }
         break;
       }
+
+      // *** 77-79. blue, red and yellow fish: crystals fall when the level is cleared
+      case 77:
+      case 78:
+      case 79: {
+        const sid = id === 77 ? 0 : id === 78 ? 2 : 3;
+        game.endLevelStack.push(() => {
+          for (let i = 0; i < 5; i++) {
+            ScoreItem.attach(
+              game,
+              game.rand.random(Data.GAME_WIDTH),
+              -30 - game.rand.random(50),
+              0,
+              sid,
+            );
+          }
+        });
+        break;
+      }
+
+      // *** 80. snail: slows the enemies
       case 80:
-        this.game.globalActives[id] = true;
+        this.global(id);
         this.temporary(id, Data.SECOND * 30);
-        for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
+        for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.updateSpeed();
           b.animFactor *= 0.3;
         }
         break;
+
+      // *** 81. blue pearl
+      case 81:
+        game.destroyList(Data.BAD);
+        game.destroyList(Data.ITEM);
+        game.destroyList(Data.BAD_BOMB);
+        this.levelConversion(Data.CONVERT_DIAMANT, 0);
+        this.temporary(id, Data.SECOND * 19);
+        break;
+
+      // *** 82. gold pyramid: strike
       case 82:
         this.onStrike();
         break;
+
+      // *** 83. black pyramid: series of strikes
       case 83:
         this.temporary(id, null);
-        this.recurring.push({
-          timer: Data.SECOND,
-          baseTimer: Data.SECOND,
-          fl_repeat: true,
-          func: () => this.onStrike(),
-        });
+        this.registerRecurring(() => this.onStrike(), Data.SECOND, true);
         this.onStrike();
+        // game.fxMan.attachBg(Data.BG_PYRAMID, null, 9999): task 2.6
         break;
+
+      // *** 84. fire rain talisman
+      case 84: {
+        let c = game.depthMan.attach('hammer_fx_clouds', Data.DP_SPRITE_BACK_LAYER);
+        c.avmSet('speed', 0.5);
+        c._y += 9;
+        this.clouds.push(c);
+        c.setBlur(4, 4);
+        c = game.depthMan.attach('hammer_fx_clouds', Data.DP_SPRITE_TOP_LAYER);
+        c.avmSet('speed', 1);
+        this.clouds.push(c);
+        this.temporary(id, null);
+        this.registerRecurring(() => this.onFireRain(), Data.SECOND * 0.8, true);
+        this.onFireRain();
+        // game.fxMan.attachBg(Data.BG_STORM, null, 9999): task 2.6
+        break;
+      }
+
+      // *** 85. hammer
       case 85: {
-        const s = HammerShoot.attach(this.game, this.x, this.y);
+        const s = HammerShoot.attach(game, this.x, this.y);
         s.setOwner(this);
         this.temporary(id, null);
         break;
       }
+
+      // *** 86. ghost candy: ghostbuster mode. The glow filters and BG_GHOSTS are not ported.
       case 86:
         this.temporary(id, Data.SECOND * 60);
         break;
+
+      // *** 87. blue larva: turns a random enemy into a blue larva
+      case 87: {
+        const bad = game.getOne(Data.BAD_CLEAR);
+        if (bad) {
+          if (game.getList(Data.BAD_CLEAR).length === 1) {
+            ScoreItem.attach(game, bad.x, bad.y, Data.DIAMANT, null);
+          } else {
+            SpecialItem.attach(game, bad.x, bad.y, id, subId);
+          }
+          game.fxMan.attachShine(bad.x, bad.y - Data.CASE_HEIGHT * 0.5);
+          bad.destroy();
+        }
+        break;
+      }
+
+      // *** 88. pokute: shrink curse
       case 88:
-        this.curse(4);
-        this.game.fxMan.attachShine(this.x, this.y);
+        this.curse(Data.CURSE_SHRINK);
+        game.fxMan.attachShine(this.x, this.y);
         this.scale(50);
         this.temporary(id, Data.SECOND * 30);
         break;
+
+      // *** 89. mutant egg: turns an enemy into a Tzongre
       case 89: {
-        const e = this.game.getOne(Data.BAD_CLEAR);
+        const e = game.getOne(Data.BAD_CLEAR);
         if (e) {
-          this.game.attachBad(Data.BAD_TZONGRE, e.x, e.y - Data.CASE_HEIGHT);
+          game.attachBad(Data.BAD_TZONGRE, e.x, e.y - Data.CASE_HEIGHT);
           e.destroy();
         }
         break;
       }
+
+      // *** 90. Goldorak horns: trips on the slightest fall
       case 90:
         this.temporary(id, Data.SECOND * 40);
-        this.curse(6);
+        this.curse(Data.CURSE_FALL);
         break;
+
+      // *** 91. Luffy hat: no attack curse
       case 91:
-        this.curse(3);
-        this.game.fxMan.attachShine(this.x, this.y);
+        this.curse(Data.CURSE_PEACE);
+        game.fxMan.attachShine(this.x, this.y);
         this.temporary(id, Data.SECOND * 15);
         break;
-      case 95:
-        this.curse(5);
+
+      // *** 92. pink hat: bomb duplicator
+      case 92:
         this.permanent(id);
         break;
+
+      // *** 93. mailbox: parcels spawn
+      case 93: {
+        game.destroyList(Data.BAD);
+        game.destroyList(Data.ITEM);
+        game.destroyList(Data.BAD_BOMB);
+        let n = 6;
+        do {
+          const ptx = game.rand.random(Data.GAME_WIDTH);
+          const pty = game.rand.random(Data.GAME_HEIGHT);
+          if (this.distance(ptx, pty) >= 100) {
+            const e = SpecialItem.attach(game, ptx, pty, 101, null);
+            e?.setLifeTimer(null);
+            n--;
+          }
+        } while (n > 0);
+        break;
+      }
+
+      // *** 94. Antok ring: one more score item per level
+      case 94:
+        this.global(id);
+        this.permanent(id);
+        break;
+
+      // *** 95. money bag: multiplier
+      case 95:
+        this.curse(Data.CURSE_MULTIPLY);
+        this.permanent(id);
+        break;
+
+      // *** 96-98. orange, green and pink pearls: conversion
+      case 96:
+      case 97:
+      case 98:
+        game.destroyList(Data.BAD);
+        game.destroyList(Data.ITEM);
+        game.destroyList(Data.BAD_BOMB);
+        this.levelConversion(Data.CONVERT_DIAMANT, id - 95);
+        this.temporary(id, Data.SECOND * 19);
+        break;
+
+      // *** 99. Chourou tuft: regular points until the end of the level
       case 99:
-        this.recurring.push({
-          timer: Data.SECOND * 2,
-          baseTimer: Data.SECOND * 2,
-          fl_repeat: true,
-          func: () => this.getScore(this, 250),
-        });
+        this.registerRecurring(() => this.onPoT(), Data.SECOND * 2, true);
         this.fl_chourou = true;
         this.temporary(id, null);
         break;
+
+      // *** 100. Guu doll
+      case 100: {
+        this.temporary(id, Data.SECOND * 30);
+        // game.fxMan.attachBg(Data.BG_GUU, null, Data.SECOND * 30): task 2.6
+        const mc = game.depthMan.attach('hammer_fx_cloud', Data.DP_PLAYER);
+        this.stick(mc, 0, -80);
+        this.setElaStick(0.4);
+        break;
+      }
+
+      // *** 101. mystery parcel
       case 101:
-        if (this.game.rand.next() < 0.5) {
+        if (game.rand.random(2) === 0) {
           this.getScore(item, 5000);
         } else {
-          const b = PoireBomb.attach(this.game, item.x, item.y);
-          b.moveToAng(-90, 10);
+          const b = PoireBomb.attach(game, item.x, item.y);
+          b.moveUp(10);
         }
         break;
+
+      // *** 102. carrot!
       case 102:
-        this.game.huTimer = 0;
-        this.getScore(item, 100000);
+        game.scriptRunner?.playById(100);
+        game.huTimer = 0;
+        this.getScore(item, 4 * 25000);
         this.fl_carot = true;
         break;
+
+      // *** 103-105. hearts 1 to 3
+      case 103:
+      case 104:
+      case 105:
+        this.lives++;
+        game.hud.setLives(this.lives);
+        game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        game.randMan.remove(Data.RAND_ITEMS_ID, id);
+        break;
+
+      // *** 106. mushroom book
+      case 106:
+        for (let i = 0; i < 5; i++) {
+          const s = ScoreItem.attach(game, item.x, item.y, 1047 + game.rand.random(4), null);
+          s.moveFrom(item, 8);
+        }
+        break;
+
+      // *** 107. star book (original todo: "star with points")
+      case 107:
+        for (let i = 0; i < 5; i++) {
+          const s = ScoreItem.attach(game, item.x, item.y, 0, 0);
+          s.moveFrom(item, 8);
+        }
+        break;
+
+      // *** 108. green umbrella
+      case 108:
+        this.warpZone(3);
+        break;
+
+      // *** 109. snowflake 1
+      case 109:
+        game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        game.randMan.remove(Data.RAND_ITEMS_ID, id);
+        break;
+
+      // *** 110, 111. snowflakes 2 and 3
+      case 110:
+      case 111:
+        game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
+        break;
+
+      // *** 112. pioupiouz
+      case 112:
+        this.head = Data.HEAD_PIOU;
+        this.replayAnim();
+        break;
+
+      // *** 113. Tuberculoz cape
+      case 113:
+        this.getScore(item, 75000);
+        this.head = Data.HEAD_TUB;
+        this.replayAnim();
+        break;
+
+      // *** 114. Mario item
       case 114:
+        this.temporary(id, null);
+        this.curse(Data.CURSE_MARIO);
+        break;
+
+      // *** 115. volleyfest
       case 115:
         this.permanent(id);
         break;
+
+      // *** 116. Ankhel jewel
+      case 116:
+        this.lives++;
+        game.hud.setLives(this.lives);
+        this.getScore(item, 70000);
+        break;
+
+      // *** 117. Gordon's key
+      case 117:
+        game.giveKey(12);
+        this.getScore(item, 10000);
+        break;
+
       default:
-        if (id >= 40 && id <= 63) {
-          for (const b of this.game.getList(Data.BAD_CLEAR)) {
-            ScoreItem.attach(this.game, b.x, b.y - Data.CASE_HEIGHT * 2, 169, 0);
-          }
-        } else {
-          this.game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
-          this.getScore(item, 2500);
-        }
+        console.warn(`illegal item id=${id}`);
         break;
     }
   }

@@ -1,5 +1,6 @@
 import type { BLEND_MODES } from 'pixi.js';
 import {
+  BlurFilter,
   ColorMatrixFilter,
   Container,
   Graphics,
@@ -604,6 +605,18 @@ export class SwfMovieClip extends Container implements Avm1Clip {
       1,
       0,
     ];
+  }
+
+  /**
+   * Flash `BlurFilter` (default quality 1, a box blur `blurX` px wide). Approximated with Pixi's
+   * gaussian blur at half that strength. Replaces the clip's filters; skipped when headless.
+   */
+  setBlur(blurX: number, blurY: number): void {
+    if (this.lib.headless) return;
+    const f = new BlurFilter({ quality: 1 });
+    f.strengthX = blurX / 2;
+    f.strengthY = blurY / 2;
+    this.filters = [f];
   }
 
   resetColor(): void {

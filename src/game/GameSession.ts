@@ -80,6 +80,7 @@ export class GameSession implements IGameContext {
   lastRecording: Replay | null = null;
 
   readonly xOffset = 10;
+  readonly yOffset = 0;
   cycle = 0;
   xFriction = Data.FRICTION_X;
   yFriction = Data.FRICTION_Y;
@@ -148,6 +149,14 @@ export class GameSession implements IGameContext {
   private shakeTimer = 0;
   private shakeTotal = 0;
   private shakePower = 0;
+
+  /** Screen flips of the blue and red glasses (items 30, 31). */
+  fl_flipX = false;
+  fl_flipY = false;
+  /** Called once when the level is cleared (fish items 77-79). Not emptied on a level change. */
+  endLevelStack: (() => void)[] = [];
+  /** Pearls left after a level conversion (items 81, 96-98). Unset (NaN) until the first one. */
+  perfectItemCpt = NaN;
 
   private popMC: SwfMovieClip | null = null;
   private pointerMC: SwfMovieClip | null = null;
@@ -359,6 +368,10 @@ export class GameSession implements IGameContext {
     this.shakeTimer = 0;
     this.shakeTotal = 0;
     this.shakePower = 0;
+    this.endLevelStack = [];
+    this.perfectItemCpt = NaN;
+    this.flipX(false);
+    this.flipY(false);
   }
 
   hasFamily(id: number): boolean {
@@ -844,6 +857,36 @@ export class GameSession implements IGameContext {
     }
     this.fl_clear = true;
     this.fxMan.attachExit();
+
+    // Post-clear call stack
+    for (let i = 0; i < this.endLevelStack.length; i++) {
+      this.endLevelStack[i]();
+    }
+    this.endLevelStack = [];
+  }
+
+  /** `GameMode.flipX`: mirrors the whole game clip horizontally. */
+  flipX(fl: boolean): void {
+    this.fl_flipX = fl;
+    if (fl) {
+      this.gameRoot._xscale = -100;
+      this.gameRoot._x = Data.GAME_WIDTH + this.xOffset;
+    } else {
+      this.gameRoot._xscale = 100;
+      this.gameRoot._x = this.xOffset;
+    }
+  }
+
+  /** `GameMode.flipY`: turns the whole game clip upside down. */
+  flipY(fl: boolean): void {
+    this.fl_flipY = fl;
+    if (fl) {
+      this.gameRoot._yscale = -100;
+      this.gameRoot._y = Data.GAME_HEIGHT + this.yOffset + 20;
+    } else {
+      this.gameRoot._yscale = 100;
+      this.gameRoot._y = this.yOffset;
+    }
   }
 
   shake(duration: number | null, power: number | null): void {
@@ -1502,11 +1545,16 @@ export class GameSession implements IGameContext {
         (this.rand.random(2) * 2 - 1) *
         (this.rand.random(Math.round(this.shakePower * 10)) / 10) *
         (this.shakeTimer / this.shakeTotal);
-      this.gameRoot._x = Math.round(this.xOffset + amp());
-      this.gameRoot._y = Math.round(amp());
-    } else {
-      this.gameRoot._x = this.xOffset;
-      this.gameRoot._y = 0;
+      if (this.fl_flipX) {
+        this.gameRoot._x = Data.GAME_WIDTH + this.xOffset - Math.round(amp());
+      } else {
+        this.gameRoot._x = Math.round(this.xOffset + amp());
+      }
+      if (this.fl_flipY) {
+        this.gameRoot._y = Data.GAME_HEIGHT + 20 + Math.round(this.yOffset + amp());
+      } else {
+        this.gameRoot._y = Math.round(this.yOffset + amp());
+      }
     }
 
     // Item name banner fade

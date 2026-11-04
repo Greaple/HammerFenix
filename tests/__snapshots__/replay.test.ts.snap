@@ -35,7 +35,7 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "player": {
       "anim": 7,
       "lives": 1,
-      "score": 2500,
+      "score": 0,
       "weapon": 1,
       "x": 385.82,
       "y": 240,
@@ -51,14 +51,13 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:1 130,180",
       "23: 30,240",
     ],
     "level": 2,
     "player": {
       "anim": 0,
       "lives": 1,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 210.41,
       "y": 240,
@@ -74,13 +73,13 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:2 150,180",
+      "0:4 290,180",
     ],
     "level": 2,
     "player": {
       "anim": 2,
       "lives": 1,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 12.17,
       "y": 172.79,
@@ -100,7 +99,7 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "player": {
       "anim": 3,
       "lives": 1,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 41.97,
       "y": 188.61,
@@ -116,13 +115,13 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:5 130,180",
+      "0:2 350,240",
     ],
     "level": 2,
     "player": {
       "anim": 0,
       "lives": 1,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 158.81,
       "y": 300,
@@ -138,13 +137,13 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:2 70,180",
+      "0:6 330,180",
     ],
     "level": 2,
     "player": {
       "anim": 3,
       "lives": 1,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 26.75,
       "y": 326.13,
@@ -164,7 +163,7 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "player": {
       "anim": 0,
       "lives": 0,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 295.55,
       "y": 180,
@@ -184,7 +183,7 @@ exports[`replays > level-01.json matches its snapshot and replays identically 1`
     "player": {
       "anim": 0,
       "lives": 0,
-      "score": 2500,
+      "score": 5,
       "weapon": 1,
       "x": 295.55,
       "y": 180,
