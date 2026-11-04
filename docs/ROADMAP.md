@@ -36,15 +36,48 @@ Without reproducible runs you can't check whether the clone matches the original
 
 ## Phase 2B: Level-by-level comparison with the original
 
-Start once Phase 2 is done; before that, most differences are features already listed there. For each batch, play every level next to the original (Ruffle side-by-side, "Flash" button) and check: tile layout and background, enemy and item spawn points, script events, portals and secret passages, darkness, music, and the level clear. Record a short replay per level as a regression fixture. Fix differences or log them in PORT_STATUS.md.
+Start once Phase 2 is done; before that, most differences are features already listed there. 2B.0 runs first and checks the data of every level automatically, so the batches only cover what needs eyes. Progress is tracked per level in [LEVELS.md](LEVELS.md).
 
-- [ ] 2B.1 Adventure levels 0-20
-- [ ] 2B.2 Adventure levels 21-40
-- [ ] 2B.3 Adventure levels 41-60
-- [ ] 2B.4 Adventure levels 61-80
-- [ ] 2B.5 Adventure levels 81-101 (bosses included)
-- [ ] 2B.6 The other dimensions reached by portals (`xml/portalLinks.xml`): hof, deepnight, hiko, ayame, hk, bumdum
-- [ ] 2B.7 Sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer, fjv), done with their mode in Phase 4
+Checklist for every batch task (2B.1 onward), the same each time:
+
+1. Open each level in the port and in the original (Ruffle side-by-side, "Flash" button), using the level jump from 2B.0.
+2. Check, and fill the level's row in LEVELS.md: look (tiles, background, decor), enemies (types, spawn points, behavior), items (spawn spots, timing), script events, portals and secret passages, darkness, music, level clear and exit.
+3. Fix each difference in the port, or log it in the Notes column with the roadmap task that owns it.
+4. Record a short replay of the level as a regression fixture in `tests/replays/`.
+5. Tick the batch here when every row of it is filled.
+
+- [ ] 2B.0 Automated pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, portal links, backgrounds) and report differences as a test. Add a way to open a given level in both the port and Ruffle, if the original allows it (check the debug and dev entry points). Mark the Data column of LEVELS.md.
+- Adventure (107 levels), 10 per batch:
+  - [ ] 2B.1 Adventure 0-9
+  - [ ] 2B.2 Adventure 10-19
+  - [ ] 2B.3 Adventure 20-29 (boss warning at 30 starts here)
+  - [ ] 2B.4 Adventure 30-39
+  - [ ] 2B.5 Adventure 40-49
+  - [ ] 2B.6 Adventure 50-59
+  - [ ] 2B.7 Adventure 60-69
+  - [ ] 2B.8 Adventure 70-79
+  - [ ] 2B.9 Adventure 80-89
+  - [ ] 2B.10 Adventure 90-99
+  - [ ] 2B.11 Adventure 100-106 (bosses Bat and Tuberculoz, the ending)
+- Dimensions reached by portals (`xml/portalLinks.xml`), about 20 per batch:
+  - [ ] 2B.12 Small dimensions: hiko (18), hof (4), hk (1)
+  - [ ] 2B.13 bumdum 0-19
+  - [ ] 2B.14 bumdum 20-42
+  - [ ] 2B.15 ayame 0-19
+  - [ ] 2B.16 ayame 20-39
+  - [ ] 2B.17 ayame 40-57
+  - [ ] 2B.18 deepnight 0-19
+  - [ ] 2B.19 deepnight 20-39
+  - [ ] 2B.20 deepnight 40-59
+  - [ ] 2B.21 deepnight 60-79
+  - [ ] 2B.22 deepnight 80-99
+  - [ ] 2B.23 deepnight 100-119
+  - [ ] 2B.24 deepnight 120-139
+  - [ ] 2B.25 deepnight 140-159
+  - [ ] 2B.26 deepnight 160-179
+  - [ ] 2B.27 deepnight 180-199
+  - [ ] 2B.28 deepnight 200-226
+- The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer, fjv: 79 levels) are checked with their mode in Phase 4, using the same checklist.
 
 ## Phase 3: Shell and progression
 
