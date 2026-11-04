@@ -17,6 +17,7 @@ import {
 import { BaseEntity, PhysicsEntity } from './Entity';
 import { type ItemEntity, ScoreItem, SpecialItem } from './Item';
 import { PlayerArrowShoot, PlayerFireBallShoot, PlayerPearlShoot, type ShootEntity } from './Shoot';
+import { ArrowSupa, BallSupa, BubbleSupa, IceMeteorSupa, SmokeSupa, TonsSupa } from './Supa';
 
 const WEAPON_DURATION = Data.SECOND * 30;
 
@@ -1054,6 +1055,9 @@ export class PlayerEntity extends PhysicsEntity {
       case 2:
         this.shield(Data.SECOND * 60);
         break;
+      case 3:
+        BallSupa.attach(this.game);
+        break;
       case 4:
         if (!this.actives[5]) {
           this.maxBombs = this.initialMaxBombs + 1;
@@ -1072,6 +1076,13 @@ export class PlayerEntity extends PhysicsEntity {
       case 7:
         this.speedFactor = 1.5;
         this.permanent(id);
+        break;
+      case 8:
+        BubbleSupa.attach(this.game);
+        BubbleSupa.attach(this.game);
+        break;
+      case 9:
+        TonsSupa.attach(this.game);
         break;
       case 11:
         if (this.world.currentId + 1 < this.world.levelCount) {
@@ -1108,6 +1119,8 @@ export class PlayerEntity extends PhysicsEntity {
         this.fallFactor = 0.55;
         break;
       case 19:
+        SmokeSupa.attach(this.game);
+        // game.fxMan.attachBg(Data.BG_ORANGE, null, Data.SECOND * 3): special backgrounds, task 2.6
         for (const b of this.game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.forceKill(null);
         }
@@ -1140,6 +1153,9 @@ export class PlayerEntity extends PhysicsEntity {
           s.setLifeTimer(Data.SECOND * 3 + this.game.rand.random(40));
           s.endUpdate();
         }
+        break;
+      case 24:
+        IceMeteorSupa.attach(this.game);
         break;
       case 25:
         for (let i = 0; i < 4; i++) {
@@ -1200,6 +1216,11 @@ export class PlayerEntity extends PhysicsEntity {
         this.changeWeapon(Data.WEAPON_S_ICE);
         this.temporary(id, WEAPON_DURATION);
         break;
+      case 38: {
+        const s = ArrowSupa.attach(this.game);
+        s.setLifeTimer(Data.SUPA_DURATION);
+        break;
+      }
       case 39:
         this.fallFactor = 1.6;
         this.temporary(id, null);

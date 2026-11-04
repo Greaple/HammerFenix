@@ -13,6 +13,7 @@ import { ItemEntity, ScoreItem, SpecialItem } from './entity/Item';
 import { PlayerEntity } from './entity/Player';
 import { BadEntity, createBad, FireBallBad } from './entity/Bad';
 import { BombEntity } from './entity/Bomb';
+import { SupaItem } from './entity/Supa';
 import { FxManager } from './FxManager';
 import { Random } from './Random';
 import { RandomManager } from './RandomManager';
@@ -804,8 +805,24 @@ export class GameSession implements IGameContext {
     return true;
   }
 
-  /** `GameMode.onLevelClear` (+ `Adventure.onLevelClear`'s super item, task 2.1) */
+  /** `Adventure.onLevelClear`: a super item falls when the enemies were killed in order. */
   onLevelClear(): void {
+    this.gameModeOnLevelClear();
+    if (
+      !this.world.isVisited() &&
+      this.perfectOrder.length === 0 &&
+      (this.scriptRunner?.cycle ?? 0) >= 10
+    ) {
+      for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
+        p.setBaseAnims(Data.ANIM_PLAYER_WALK_V, Data.ANIM_PLAYER_STOP_V);
+      }
+      SupaItem.attach(this, this.perfectCount - 1);
+      // statsMan.inc(Data.STAT_SUPAITEM, 1): StatsManager, task 2.10
+    }
+  }
+
+  /** `GameMode.onLevelClear` */
+  private gameModeOnLevelClear(): void {
     if (this.fl_clear) return;
     this.scriptRunner?.clearEndTriggers();
     // Extend letters still on screen disappear

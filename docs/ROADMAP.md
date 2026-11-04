@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1 is done. Phase 2, starting with the super-item entities (2.1). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phase 1 is done. Phase 2: 2.1 is done; next is the missing projectiles and bombs (2.2), then the 25 missing item effects (2.3). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -22,9 +22,9 @@ Without reproducible runs you can't check whether the clone matches the original
 
 ## Phase 2: Finish the Adventure (critical path)
 
-- [ ] 2.1 Super-item entities (`entity/supa/*`: Ball, Bubble, Tons, IceMeteor, Arrow, Smoke, SupaItem), needed by item effects 3, 8, 9, 24 and others.
+- [x] 2.1 Super-item entities (`entity/supa/*`: Ball, Bubble, Tons, IceMeteor, Arrow, Smoke, SupaItem), in `entity/Supa.ts`. Item effects 3, 8, 9, 24, 38 and the smoke of 19 use them, and the super item falls after a perfect-order clear (`Adventure.onLevelClear`). Tested in `tests/supa.test.ts`.
 - [ ] 2.2 Missing projectiles and bombs: FireRain, Hammer, BossFireBall, FramBall; BossBomb, MineFrozen, PoireBombFrozen, SoccerBall.
-- [ ] 2.3 The 30 missing item effects (list in PORT_STATUS.md). Remove the generic "+2500 points" fallback in `Player.ts`.
+- [ ] 2.3 The 25 missing item effects (list in PORT_STATUS.md). Remove the generic "+2500 points" fallback in `Player.ts`.
 - [ ] 2.4 Zodiac items 40-63: add the constellation background (`fxMan.attachBg(BG_CONSTEL)`).
 - [ ] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants). `FxManager.inGameParticles` currently renders every type as ice.
 - [ ] 2.6 Special backgrounds: `FxManager.attachBg/detachBg/clearBg` and the `BG_*` effects.

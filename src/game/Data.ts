@@ -115,6 +115,9 @@ export const Data = {
   STEP_MAX: 20,
   DEATH_LINE: 550,
 
+  // Particles (`entity.fx.Particle`, task 2.5)
+  PARTICLE_ICE: 1,
+
   // Mover actions
   ACTION_MOVE: 1,
   ACTION_WALK: 2,
@@ -131,6 +134,7 @@ export const Data = {
   KICK_DISTANCE: 20,
   AIR_KICK_DISTANCE: 30,
   SHIELD_DURATION: 32 * 5,
+  SUPA_DURATION: 32 * 30,
   PLAYER_KNOCK_DURATION: 32 * 2.5,
   TELEPORTER_DISTANCE: 80,
   EXTRA_LIFE_STEPS: [100000, 500000, 1000000, 2000000, 3000000, 4000000] as readonly number[],
