@@ -1,5 +1,14 @@
 import type { BLEND_MODES } from 'pixi.js';
-import { ColorMatrixFilter, Container, Graphics, Matrix, Sprite, Text, TextStyle } from 'pixi.js';
+import {
+  ColorMatrixFilter,
+  Container,
+  Graphics,
+  type GraphicsContext,
+  Matrix,
+  Sprite,
+  Text,
+  TextStyle,
+} from 'pixi.js';
 import { type Avm1Clip, runAvm1 } from './Avm1';
 import type { SwfLibrary } from './SwfLibrary';
 import type { Cxform8, DynamicTextDef, Matrix6, PlaceCmd, SpriteDef } from './types';
@@ -146,18 +155,26 @@ export class SwfTextField extends Container {
   }
 }
 
-/** Unpadded vector stencil mask container used for SWF `clipDepth` layers. */
+/**
+ * A `clipDepth` mask layer: the mask character's filled outline as a vector stencil, so the
+ * layers it clips show only inside its real shape. `_width` / `_height` scale it, as in Flash.
+ */
 export class SwfMaskClip extends Container {
   readonly gfx: Graphics;
-  private maskWidth = 20;
-  private maskHeight = 20;
+  /** Unscaled size of the mask character in pixels. */
+  private readonly baseWidth: number;
+  private readonly baseHeight: number;
 
-  constructor(bounds: [number, number, number, number]) {
+  /**
+   * @param context Outline in twips from `SwfLibrary.getMaskContext` (`null` when headless).
+   * @param bounds `[xMin, yMin, width, height]` of the character in pixels.
+   */
+  constructor(context: GraphicsContext | null, bounds: [number, number, number, number]) {
     super();
-    this.maskWidth = Math.max(1, bounds[2]);
-    this.maskHeight = Math.max(1, bounds[3]);
-    this.gfx = new Graphics();
-    this.gfx.rect(0, -20, this.maskWidth, 80).fill(0xffffff);
+    this.baseWidth = Math.max(0.1, bounds[2]);
+    this.baseHeight = Math.max(0.1, bounds[3]);
+    this.gfx = context ? new Graphics(context) : new Graphics();
+    this.gfx.scale.set(1 / 20);
     this.addChild(this.gfx);
   }
 
@@ -174,20 +191,16 @@ export class SwfMaskClip extends Container {
     this.y = v;
   }
   get _width(): number {
-    return this.maskWidth;
+    return this.baseWidth * Math.abs(this.scale.x);
   }
   set _width(v: number) {
-    this.maskWidth = v;
-    this.gfx.clear();
-    this.gfx.rect(0, -20, Math.max(1, v), 80).fill(0xffffff);
+    if (Number.isFinite(v)) this.scale.x = v / this.baseWidth;
   }
   get _height(): number {
-    return this.maskHeight;
+    return this.baseHeight * Math.abs(this.scale.y);
   }
   set _height(v: number) {
-    this.maskHeight = v;
-    this.gfx.clear();
-    this.gfx.rect(0, -20, Math.max(1, this.maskWidth), Math.max(1, v)).fill(0xffffff);
+    if (Number.isFinite(v)) this.scale.y = v / this.baseHeight;
   }
   get _xscale(): number {
     return this.scale.x * 100;
@@ -960,7 +973,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
 
     const node =
       cmd.clip !== undefined
-        ? new SwfMaskClip(this.lib.getCharacterBounds(cmd.id))
+        ? new SwfMaskClip(this.lib.getMaskContext(cmd.id), this.lib.getCharacterBounds(cmd.id))
         : this.lib.instantiateCharacter(cmd.id);
     if (!node) return;
 

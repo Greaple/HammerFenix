@@ -63,7 +63,7 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 ## Bombs and projectiles
 
 - `entity/Bomb.ts` done (audited 1.6): Bomb, PlayerBomb, Classic, Black, Blue, Green, Red, RepelBomb, BadBomb, PoireBomb, Mine
-- done (2.2): `bomb/bad/BossBomb` (used by Tuberculoz, 2.9), `bomb/player/SoccerBall` (no glow filter: `FxManager.addGlow` is not ported; drawn square, see the mask bug in the roadmap)
+- done (2.2): `bomb/bad/BossBomb` (used by Tuberculoz, 2.9), `bomb/player/SoccerBall` (no glow filter: `FxManager.addGlow` is not ported; round since the clip mask fix)
 - unused: `bomb/player/MineFrozen`, `PoireBombFrozen` (`Mine.getFrozen` and `PoireBomb.getFrozen` are commented out in the original, so nothing creates them)
 - missing: `entity/WalkingBomb.mt`
 - `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl

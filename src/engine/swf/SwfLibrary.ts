@@ -1,4 +1,13 @@
-import { CanvasSource, Container, ImageSource, Sprite, Texture } from 'pixi.js';
+import {
+  CanvasSource,
+  Container,
+  GraphicsContext,
+  GraphicsPath,
+  ImageSource,
+  Matrix,
+  Sprite,
+  Texture,
+} from 'pixi.js';
 import { ShapeRasterizer } from './ShapeRasterizer';
 import { SwfMovieClip, SwfTextField } from './SwfMovieClip';
 import type { BitmapDef, CharacterDef, Matrix6, SwfLibraryData } from './types';
@@ -52,6 +61,7 @@ export class SwfLibrary {
   private readonly bitmapTextures = new Map<number, Texture>();
   private readonly rasterizer: ShapeRasterizer;
   private readonly boundsCache = new Map<number, [number, number, number, number]>();
+  private readonly maskContexts = new Map<number, GraphicsContext>();
 
   private constructor(
     data: SwfLibraryData,
@@ -230,6 +240,65 @@ export class SwfLibrary {
     return result;
   }
 
+  /**
+   * Vector outline of a character used as a `clipDepth` mask, in twips (draw it at scale 1/20).
+   * Flash masks with the filled area of the shapes, ignoring colors and alpha. Sprites use
+   * their first frame. `null` when headless.
+   */
+  getMaskContext(id: number): GraphicsContext | null {
+    if (this.headless) return null;
+    let ctx = this.maskContexts.get(id);
+    if (!ctx) {
+      ctx = new GraphicsContext();
+      this.addMaskShapes(ctx, id, new Matrix(), 0);
+      this.maskContexts.set(id, ctx);
+    }
+    return ctx;
+  }
+
+  /** Adds the outline of character `id` to `ctx`. `m` maps the character's twips to the mask's. */
+  private addMaskShapes(ctx: GraphicsContext, id: number, m: Matrix, depth: number): void {
+    if (depth > 8) return;
+    const def = this.data.characters[id];
+    switch (def?.kind) {
+      case 'shape':
+        ctx.setTransform(m);
+        for (const cmd of def.cmds) {
+          if (cmd.op === 'fill') {
+            // `checkForHoles` cuts inner sub-paths out of the outer one, as even-odd does.
+            ctx.path(new GraphicsPath(cmd.d, cmd.evenodd)).fill(0xffffff);
+          } else {
+            ctx.path(new GraphicsPath(cmd.d)).stroke({
+              width: cmd.stroke.w,
+              cap: cmd.stroke.cap,
+              join: cmd.stroke.join,
+              miterLimit: cmd.stroke.miter,
+              color: 0xffffff,
+            });
+          }
+        }
+        break;
+      case 'bitmap':
+        ctx.setTransform(m);
+        ctx.rect(0, 0, def.w * 20, def.h * 20).fill(0xffffff);
+        break;
+      case 'text': {
+        const [x0, y0, x1, y1] = def.bounds;
+        ctx.setTransform(m);
+        ctx.rect(x0 * 20, y0 * 20, (x1 - x0) * 20, (y1 - y0) * 20).fill(0xffffff);
+        break;
+      }
+      case 'sprite':
+        for (const cmd of def.frames[0]?.cmds ?? []) {
+          if (cmd.op !== 'place' || cmd.id === undefined || cmd.clip !== undefined) continue;
+          const [a, b, c, d, tx, ty] = cmd.m ?? [1, 0, 0, 1, 0, 0];
+          const child = m.clone().append(new Matrix(a, b, c, d, tx * 20, ty * 20));
+          this.addMaskShapes(ctx, cmd.id, child, depth + 1);
+        }
+        break;
+    }
+  }
+
   private getBitmapTexture(id: number, def: BitmapDef): Texture | null {
     const existing = this.bitmapTextures.get(id);
     if (existing) return existing;
@@ -247,6 +316,8 @@ export class SwfLibrary {
 
   destroy(): void {
     this.rasterizer.destroy();
+    for (const c of this.maskContexts.values()) c.destroy();
+    this.maskContexts.clear();
     for (const t of this.bitmapTextures.values()) t.destroy(true);
     this.bitmapTextures.clear();
   }
