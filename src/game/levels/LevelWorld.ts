@@ -67,6 +67,11 @@ export class PortalData {
   }
 }
 
+/** `Data.cleanString`: trims spaces at both ends and turns CR into spaces. */
+function cleanString(s: string): string {
+  return s.replace(/^ +/, '').replace(/ +$/, '').replace(/\r/g, ' ');
+}
+
 function cloneLevel(src: LevelData): LevelData {
   return {
     map: src.map.map((col) => col.slice()),
@@ -82,9 +87,14 @@ function cloneLevel(src: LevelData): LevelData {
 }
 
 /**
- * Port of `levels.SetManager` + `levels.GameMechanics`:
- * manages the active level's mutable cell map, `parseWalls` (`GROUND` vs `WALL`),
- * AI navigation flags (`flagMap`, `fallMap`), teleporters, and portals.
+ * Port of `levels.SetManager` (`class/hammer/levels/SetManager.mt`) and
+ * `levels.GameMechanics` (`class/hammer/levels/GameMechanics.mt`), plus the `ViewManager` flags
+ * the views are built from. The level script engine and the view are kept on `GameSession`
+ * (`scriptRunner`, `view`); `GameSession.updateWorld()` is `GameMechanics.update`.
+ *
+ * Not ported: the mirror mode (`flip`, `flipPortals`, option, task 3.3), the editor functions
+ * (`overwrite`, `rollback`, `insert`, `delete`, cookies), and the IA parse spread over frames
+ * (`parseCurrentIA` runs 30 cells per frame; the port parses the whole level at once, task 2.7).
  */
 export class LevelWorld {
   set: LevelSet;
@@ -100,6 +110,12 @@ export class LevelWorld {
   teleporterList: TeleporterData[] = [];
   portalList: PortalData[] = [];
   readonly visited = new Set<number>();
+  /** Script lock: the level script only runs while the world is unlocked. */
+  fl_lock = true;
+  // ViewManager: flags given to each new view
+  fl_hideTiles = false;
+  fl_hideBorders = false;
+  fl_shadow = true;
   /**
    * Level data, read once per game (`SetManager.levels[id]`). The original keeps a reference, so
    * changes made during play (tiles set by scripts) persist when a portal brings you back.
@@ -123,6 +139,25 @@ export class LevelWorld {
     this.visited.add(this.currentId);
   }
 
+  lock(): void {
+    this.fl_lock = true;
+  }
+
+  unlock(): void {
+    this.fl_lock = false;
+  }
+
+  /**
+   * `GameMechanics.suspend`: the world is left for another dimension. The script, as it stands,
+   * is saved into the level data, so coming back runs what was left of it.
+   */
+  suspend(script: string | null): void {
+    this.lock();
+    if (script !== null) {
+      this.current.script = cleanString(script);
+    }
+    this.markVisited();
+  }
   resetTriggers(): void {
     this.triggers = Array.from({ length: Data.LEVEL_WIDTH }, () =>
       Array.from({ length: Data.LEVEL_HEIGHT }, () => []),
@@ -143,20 +178,80 @@ export class LevelWorld {
   resetForNewGame(): void {
     this.visited.clear();
     this.levels = [];
+    this.fl_lock = true;
     this.fl_entered = false;
   }
 
+  /** `SetManager.levels[id]`, read on first use. */
+  getLevel(id: number): LevelData {
+    return (this.levels[id] ??= this.unserialize(id));
+  }
+
+  /** `GameMechanics.goto` + `SetManager.goto`. Visits are marked by `GameSession`. */
   goto(id: number): boolean {
-    if (id < 0 || id >= this.set.levels.length) return false;
-    this.currentId = id;
-    this.levels[id] ??= cloneLevel(this.set.levels[id]);
-    this.current = this.levels[id];
     this.teleporterList = [];
-    this.portalList = [];
-    this.resetTriggers();
-    this.parseWalls(this.current);
+    if (id < 0 || id >= this.set.levels.length) return false;
+    this.resetIA();
+    this.current = this.getLevel(id);
+    this.currentId = id;
     this.rebuildIA();
     return true;
+  }
+
+  /** Reads a level: `SetManager.unserialize` (walls converted) + `GameMechanics.parseWalls`. */
+  private unserialize(id: number): LevelData {
+    const l = cloneLevel(this.set.levels[id]);
+    this.convertWalls(l);
+    this.parseWalls(l);
+    return l;
+  }
+
+  private convertWalls(l: LevelData): void {
+    const map = l.map;
+    for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
+      for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
+        if (map[cx][cy] === Data.WALL) {
+          map[cx][cy] = Data.GROUND;
+        }
+      }
+    }
+  }
+
+  /** Default level data (`levels.Data` constructor). */
+  private static emptyLevel(): LevelData {
+    return {
+      map: Array.from({ length: Data.LEVEL_WIDTH }, () =>
+        new Array<number>(Data.LEVEL_HEIGHT).fill(0),
+      ),
+      badList: [],
+      playerX: 0,
+      playerY: 0,
+      skinTiles: 1,
+      skinBg: 1,
+      specialSlots: [],
+      scoreSlots: [],
+      script: '',
+    };
+  }
+
+  /** True when the level id is past the end of the set or holds nothing. */
+  isEmptyLevel(id: number, flipCoordCase: ((cx: number) => number) | null): boolean {
+    if (id >= this.set.levels.length) {
+      return true;
+    }
+    const ld = this.getLevel(id);
+    const def = LevelWorld.emptyLevel();
+    const defX = flipCoordCase === null ? def.playerX : flipCoordCase(def.playerX);
+    const defY = def.playerY;
+    return (
+      ld.playerX === defX &&
+      ld.playerY === defY &&
+      ld.skinBg === def.skinBg &&
+      ld.skinTiles === def.skinTiles &&
+      ld.badList.length === 0 &&
+      ld.specialSlots.length === 0 &&
+      ld.scoreSlots.length === 0
+    );
   }
 
   inBound(cx: number, cy: number): boolean {
@@ -165,27 +260,53 @@ export class LevelWorld {
 
   /** Port of `SetManager.getCase`. */
   getCase(cx: number, cy: number): number {
-    if (cx < 0 || cx >= Data.LEVEL_WIDTH) {
-      return Data.OUT_WALL;
+    const map = this.current.map;
+    if (this.inBound(cx, cy)) {
+      if (cy === 0) {
+        // Tiles on the top row do not act as floors
+        return map[cx][0] > 0 ? Data.WALL : 0;
+      }
+      return map[cx][cy]; // in the play area
+    } else if (cy < 0) {
+      // Above the screen: `$map[cx][0]` is undefined left and right of the level
+      return (map[cx]?.[0] ?? 0) > 0 ? Data.WALL : 0;
+    } else {
+      return Data.OUT_WALL; // off screen, below, left or right
     }
-    if (cy < 0) {
-      return (this.current.map[cx]?.[0] ?? 0) > 0 ? Data.WALL : 0;
-    }
-    if (cy >= Data.LEVEL_HEIGHT) {
-      return Data.OUT_WALL;
-    }
-    if (cy === 0) {
-      return this.current.map[cx][0] > 0 ? Data.WALL : 0;
-    }
-    return this.current.map[cx][cy] ?? 0;
   }
 
-  /** Dynamically mutates a map cell (used by level scripts `$e_add` / `$e_rem`). */
-  forceCase(cx: number, cy: number, value: number): void {
-    if (!this.inBound(cx, cy)) return;
-    this.current.map[cx][cy] = value;
-    this.parseWalls(this.current);
-    this.rebuildIA();
+  /**
+   * Changes a cell during play (`$e_add`, `$e_rem`). Clearing a tile turns the wall under it
+   * into a floor. Only the `IA_TILE` flag follows: the rest of the IA map keeps the values parsed
+   * when the level was read.
+   */
+  forceCase(cx: number, cy: number, t: number): void {
+    // SetManager.forceCase
+    if (this.inBound(cx, cy)) {
+      if (t <= 0 && this.getCase(cx, cy) > 0 && this.getCase(cx, cy + 1) === Data.WALL) {
+        this.forceCase(cx, cy + 1, Data.GROUND);
+      }
+      this.current.map[cx][cy] = t;
+    }
+    // GameMechanics.forceCase
+    if (this.inBound(cx, cy)) {
+      this.forceFlag(cx, cy, Data.IA_TILE, t === Data.GROUND);
+    }
+  }
+
+  forceFlag(cx: number, cy: number, flag: number, value: boolean): void {
+    if (value) {
+      this.flagMap[cx][cy] |= flag;
+    } else {
+      this.flagMap[cx][cy] &= ~flag;
+    }
+  }
+
+  /** True when the entity's bounding box is in the play area. */
+  shapeInBound(e: { x: number; y: number; mc: { _width: number; _height: number } }): boolean {
+    return (
+      e.x >= -e.mc._width && e.x < Data.GAME_WIDTH && e.y >= -e.mc._height && e.y < Data.GAME_HEIGHT
+    );
   }
 
   checkFlag(cx: number, cy: number, flag: number): boolean {
@@ -193,27 +314,30 @@ export class LevelWorld {
     return ((this.flagMap[cx]?.[cy] ?? 0) & flag) !== 0;
   }
 
-  /** Marks cells with another solid cell directly above them as `Data.WALL` (`2`). */
-  private parseWalls(level: LevelData): void {
-    const map = level.map;
-    for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
-      for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
-        if (map[cx][cy] > 0) {
-          map[cx][cy] = cy > 0 && map[cx][cy - 1] > 0 ? Data.WALL : Data.GROUND;
+  /** Marks the cells under another tile as walls (`Data.WALL`). */
+  private parseWalls(l: LevelData): void {
+    const map = l.map;
+    for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
+      for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
+        if (map[cx][cy] > 0 && cy > 0 && map[cx][cy - 1] > 0) {
+          map[cx][cy] = Data.WALL;
         }
       }
     }
   }
 
-  /** Synchronous port of `GameMechanics.parseCurrentIA`. */
-  rebuildIA(): void {
+  /** `GameMechanics.resetIA` */
+  resetIA(): void {
     this.flagMap = Array.from({ length: Data.LEVEL_WIDTH }, () =>
       new Array<number>(Data.LEVEL_HEIGHT).fill(0),
     );
     this.fallMap = Array.from({ length: Data.LEVEL_WIDTH }, () =>
       new Array<number>(Data.LEVEL_HEIGHT).fill(-1),
     );
+  }
 
+  /** `GameMechanics.parseCurrentIA`, run on the whole level at once. */
+  rebuildIA(): void {
     for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
       for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
         let flags = 0;
@@ -350,34 +474,40 @@ export class LevelWorld {
     return h >= max ? null : h;
   }
 
-  /** Finds a valid ground-top cell near `(cx, cy)` (port of `SetManager.getGround`). */
+  /** Returns the first floor met going down from a cell (wrapping to the top once). */
   getGround(cx: number, cy: number): { x: number; y: number } {
-    const startX = Math.max(0, Math.min(Data.LEVEL_WIDTH - 1, cx));
-    const startY = Math.max(0, Math.min(Data.LEVEL_HEIGHT - 2, cy));
-    for (let dy = 0; dy < Data.LEVEL_HEIGHT; dy++) {
-      const y = (startY + dy) % (Data.LEVEL_HEIGHT - 1);
-      for (let dx = 0; dx < Data.LEVEL_WIDTH; dx++) {
-        const x = (startX + dx) % Data.LEVEL_WIDTH;
-        if (this.getCase(x, y) <= 0 && this.getCase(x, y + 1) === Data.GROUND) {
-          return { x, y };
-        }
+    for (let n = 0, ty = cy; n <= Data.LEVEL_HEIGHT; n++, ty++) {
+      if (ty > 0 && this.getCase(cx, ty) === Data.GROUND) {
+        return { x: cx, y: ty - 1 };
+      }
+      if (ty >= Data.LEVEL_HEIGHT) {
+        ty = 0;
       }
     }
-    return { x: startX, y: startY };
+    return { x: cx, y: cy };
   }
 
+  /** Fall height to the floor under a cell, or -1 over the void (`_checkSecureFall`). */
   private checkSecureFall(cx: number, cy: number): number {
-    if (this.getCase(cx, cy) > 0) return -1;
-    let h = 0;
-    let y = cy;
-    while (y < Data.LEVEL_HEIGHT) {
-      const c = this.getCase(cx, y);
-      if (c === Data.GROUND) return h;
-      if (c > 0) return -1;
-      h++;
-      y++;
+    const map = this.current.map;
+    if (map[cx][cy] === Data.GROUND) return -1;
+    if (map[cx][cy] === Data.WALL) return -1;
+    if (((this.flagMap[cx][cy - 1] ?? 0) & Data.IA_ALLOW_FALL) > 0) {
+      return this.fallMap[cx][cy - 1] - 1;
     }
-    return -1;
+
+    let secure = false;
+    let i = cy + 1;
+    let h = 0;
+    while (!secure && i < Data.LEVEL_HEIGHT && cx >= 0 && cx < Data.LEVEL_WIDTH) {
+      if (map[cx][i] === Data.GROUND) {
+        secure = true;
+      } else {
+        i++;
+        h++;
+      }
+    }
+    return secure ? h : -1;
   }
 
   getTeleporter(cx: number, cy: number): TeleporterData | null {

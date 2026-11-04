@@ -42,9 +42,9 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 | Original                                                     | TypeScript                               | Status  | Notes                                                                                                                       |
 | ------------------------------------------------------------ | ---------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Level data kept per game; visited marked on leaving. Editor and serialization skipped on purpose                            |
-| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Missing `addShortNode`, `getFloat`, `insertItem`                                                                            |
-| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | No special backgrounds or snapshots                                                                                         |
+| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). No mirror mode (3.3); IA map parsed at once, not over frames. Editor and serialization skipped on purpose    |
+| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). Code trigger 6 needs SoccerBall (2.2); `tools/scan-scripts.ts` checks every level script                     |
+| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | Audited (1.7). No special backgrounds (2.6), snapshots (2.7), bitmap cache, editor grid                                     |
 | `levels/ViewManager.mt`                                      |                                          | missing | Level change is an instant cut, not a scroll; `GameSession.onLevelReady` runs at once                                       |
 | `levels/ViewLight.mt`                                        |                                          | missing | Darkness partly handled in `GameSession.updateDarkness`                                                                     |
 | `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in); no fade / side-scroll transition (2.7) |
@@ -147,8 +147,37 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Not ported yet: bosses (2.8, 2.9), super item on a perfect clear (2.1), `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), `endModeTimer`, bullet time, wind timer, aqua screen wobble, X/Y flips (options).
-- The level script is not saved when a dimension is left (`GameMechanics.suspend` stores `scriptEngine.script`); coming back replays the level's original script.
+- Not ported yet: bosses (2.8, 2.9), super item on a perfect clear (2.1), `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), bullet time, wind timer, aqua screen wobble, X/Y flips (options).
 - `onGameOver` / end of set are placeholders (2.11).
 - `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
 - Float random draws remain in `SpecialManager` (`Player.ts`) and `FxManager`.
+
+## Audit 1.7: level script, world and view
+
+`levels/ScriptRunner.ts` against `levels/ScriptEngine.mt`, `levels/LevelWorld.ts` against `SetManager.mt` and `GameMechanics.mt`, `levels/LevelView.ts` against `View.mt`, 2026-11-04.
+
+### Fixed
+
+- Script tree: Flash's `removeNode()` leaves `nextSibling` null, so `runScript` stops at the first trigger removed in a cycle; the triggers after it run on the next cycle. The port ran them all at once (checked in Ruffle's XML code).
+- A trigger nested in another one is moved to the end of the script (`appendChild`): the events after it in its parent are skipped (deepnight 141 in ninja mode never shows message 163), and a repeating parent adds it only once (deepnight 184).
+- Level start order (`ViewManager.onDataReady`): the view is created and `$attach` set before the compile. A level shown without a transition (new game, level picker) is ready before its script compiles, so its enemies appear on the first cycle; after a level change they appear on the next cycle. Players are placed before the compile.
+- The script only runs while the world is unlocked (`world.lock` in `goto`, pause and `suspend`; `unlock` in `startLevel`); the level clear is only checked then.
+- `GameMechanics.suspend`: the script left is saved into the level data when a dimension is left, so coming back runs what was left of it.
+- `$e_bad` with `$sys` on a visited level now decrements `badCount`; `$e_hide` removes the script's decor sprites (`View.detach`); `$e_setVar` accepts an empty value; `$e_msg` with a text the language lacks shows nothing (`Lang.get` is null; the English file lacks texts 158-163); code trigger 4 gives the elevator the player's head and starts `endModeTimer`, which ends the game; code trigger 5 (exit after Tuberculoz) ported; code triggers 7 and 8 use `setBaseAnims`.
+- `insertItem`, `addNode`, `addShortNode`, `getFloat` ported; `$e_itemLine` keeps the original's `</$$t_timer>` typo (Flash keeps the nodes read before a bad end tag).
+- `forceCase` (`$e_add`, `$e_rem`) no longer re-parses walls and rebuilds the whole IA map: clearing a tile turns the wall below into a floor, and only `IA_TILE` follows. Walls are parsed once, when the level is read.
+- `_checkSecureFall` returned one more than the original (walkers' `decideFall` reads it), and stopped at walls.
+- `getGround` searches down the given column only (wrapping once); the port searched other columns too. Extend letters and `globalActives[94]` items land in the drawn column.
+- `getCase` above the screen and outside the columns returns 0, not `OUT_WALL`.
+- Floating portal fields (`GameMechanics.update`) bob and sparkle; this was not ported.
+- `triggers` grid kept across levels; `forcedGoto` clears the world's hide flags; a new view per level built from the world's flags (`ViewManager.createView`); `View.moveTo` / `moveToPreviousPos` ported.
+- Added: `isEmptyLevel`, `shapeInBound` (for 2.1 and 2.3).
+
+### Open
+
+- Code trigger 6 (soccer set) needs `SoccerBall` (2.2).
+- The IA map is parsed at once on `goto`; the original parses 30 cells per frame, so the level's script compiles about 17 frames later (2.7, with the scroll).
+- `$e_ext` calls `GameSession.spawnExtend`, which draws the letter directly; the original picks from `StatsManager.extendList` (2.10).
+- When a trigger repeats after its nested trigger moved out, Ruffle still follows the old sibling link and adds the nested trigger again; the port adds it once. Only deepnight 184 has this.
+- Mirror mode (`SetManager.flip`, `flipPortals`) is not ported (3.3).
+- Data notes from the scan (the original ignores them too): three `$t_timer` with `repeat` instead of `$repeat` (adventure 100), `$s` instead of `$si` (adventure 102), sprites missing from every original SWF (`$jail_large`, `$mcMarioBlock`, `$doorSideRight`, not in the Adventure set).

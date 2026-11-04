@@ -53,6 +53,8 @@ export interface IGameContext {
   forcedDarkness: number | null;
   fakeLevelId: number | null;
   huTimer: number;
+  badCount: number;
+  endModeTimer: number;
   huState: number;
 
   readonly globalActives: boolean[];

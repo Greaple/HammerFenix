@@ -1,0 +1,35 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`level scripts > report matches its snapshot 1`] = `
+[
+  "note adventure:0 <$e_msg> text #158 is missing in en: no message",
+  "ignored adventure:100 <$t_timer> repeat="64" is never read",
+  "ignored adventure:102 <$e_score> $s="0" is never read",
+  "ignored adventure_english:100 <$t_timer> repeat="64" is never read",
+  "ignored adventure_english:102 <$e_score> $s="0" is never read",
+  "ignored basicAdventure:100 <$t_timer> repeat="64" is never read",
+  "ignored basicAdventure:102 <$e_score> $s="0" is never read",
+  "note basicAdventure:104 <$e_mc> symbol "$jail_large" is in no original SWF: nothing shows",
+  "note basicAdventure:104 <$e_mc> symbol "$jail_large" is in no original SWF: nothing shows",
+  "note basicAdventure:111 <$e_mc> symbol "$mcMarioBlock" is in no original SWF: nothing shows",
+  "note basicAdventure:111 <$e_mc> symbol "$mcMarioBlock" is in no original SWF: nothing shows",
+  "ignored bumdum:13 <$e_rem> $type="0" is never read",
+  "ignored bumdum:13 <$e_rem> $type="0" is never read",
+  "note deepnight:141 <$t_timer> nested in <$ninja> is moved to the script end: the events after it are skipped",
+  "note deepnight:141 <$e_msg> text #163 is missing in en: no message",
+  "note deepnight:141 <$e_msg> text #161 is missing in en: no message",
+  "note deepnight:154 <$e_msg> text #159 is missing in en: no message",
+  "note deepnight:154 <$e_msg> text #160 is missing in en: no message",
+  "note deepnight:184 <$birth> nested in a repeating <$birth> is only added once",
+  "note deepnight:185 <$e_msg> text #162 is missing in en: no message",
+  "note dev:10 <$e_mc> symbol "$doorSideRight" is in no original SWF: nothing shows",
+  "note shareware:6 <$e_goto> to level 999 ends the set",
+  "unported soccer:7 code trigger #6: SoccerBall (task 2.2)",
+  "unported soccer:7 code trigger #6: SoccerBall (task 2.2)",
+  "unported soccer:7 code trigger #6: SoccerBall (task 2.2)",
+  "unported soccer:7 code trigger #6: SoccerBall (task 2.2)",
+  "note test:11 <$e_mc> symbol "$doorSideRight" is in no original SWF: nothing shows",
+  "note tutorial:0 <$e_goto> to level 999 ends the set",
+  "note tutorial:18 <$e_goto> to level 999 ends the set",
+]
+`;

@@ -397,7 +397,7 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "gameOver": false,
     "items": [
       "11: 90,220",
-      "0:5 30,160",
+      "0:5 290,180",
       "41: 389,300",
     ],
     "level": 12,
@@ -470,7 +470,7 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:1 370,360",
+      "0:1 210,400",
     ],
     "level": 12,
     "player": {
@@ -493,12 +493,14 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "clear": false,
     "dim": 0,
     "gameOver": false,
-    "items": [],
+    "items": [
+      "0:1 210,400",
+    ],
     "level": 12,
     "player": {
       "anim": 6,
       "lives": 1,
-      "score": 5,
+      "score": 0,
       "weapon": 3,
       "x": 356.21,
       "y": 360,
@@ -515,14 +517,14 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "dim": 0,
     "gameOver": false,
     "items": [
-      "0:6 370,360",
+      "0:6 50,380",
       "0:0 216.28,18.64",
     ],
     "level": 12,
     "player": {
       "anim": 1,
       "lives": 0,
-      "score": 5,
+      "score": 0,
       "weapon": 1,
       "x": 62.9,
       "y": 160,
@@ -540,13 +542,13 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "gameOver": false,
     "items": [
       "0:0 216.28,120",
-      "0:3 250,59",
+      "0:3 50,159",
     ],
     "level": 12,
     "player": {
       "anim": 0,
       "lives": 0,
-      "score": 5,
+      "score": 0,
       "weapon": 1,
       "x": 98.18,
       "y": 220,
@@ -564,13 +566,13 @@ exports[`replays > level-12.json matches its snapshot and replays identically 1`
     "gameOver": false,
     "items": [
       "0:0 216.28,120",
-      "0:3 250,59",
+      "0:3 50,159",
     ],
     "level": 12,
     "player": {
       "anim": 0,
       "lives": 0,
-      "score": 5,
+      "score": 0,
       "weapon": 1,
       "x": 98.18,
       "y": 220,
@@ -764,9 +766,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
 [
   {
     "bads": [
-      "BombeBad 362.98,380",
-      "BombeBad 226,380",
-      "BombeBad 281.02,260",
+      "BombeBad 364.98,380",
+      "BombeBad 370.98,260",
+      "BombeBad 344.68,256.57",
     ],
     "bombs": 0,
     "clear": false,
@@ -786,9 +788,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 115.79,372.64",
-      "BombeBad 161.02,320",
-      "BombeBad 243.02,380",
+      "BombeBad 201.02,320",
+      "BombeBad 346.98,260",
+      "BombeBad 372.98,260",
     ],
     "bombs": 0,
     "clear": false,
@@ -808,9 +810,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 280.98,336.42",
-      "BombeBad 278.98,320",
-      "BombeBad 326.98,320",
+      "BombeBad 309.02,320",
+      "BombeBad 368.98,380",
+      "BombeBad 342.98,380",
     ],
     "bombs": 1,
     "clear": false,
@@ -830,9 +832,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 164.98,380",
-      "BombeBad 279.02,260",
-      "BombeBad 333.6,243.56",
+      "BombeBad 275.02,380",
+      "BombeBad 121.02,320",
+      "BombeBad 162.21,372.64",
     ],
     "bombs": 0,
     "clear": false,
@@ -852,9 +854,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 346.98,380",
-      "BombeBad 59.02,440",
-      "BombeBad 380.98,260",
+      "BombeBad 95.02,380",
+      "BombeBad 364.98,380",
+      "BombeBad 231.26,300.58",
     ],
     "bombs": 0,
     "clear": false,
@@ -874,9 +876,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 180.98,320.61",
-      "BombeBad 299.02,440",
-      "BombeBad 197.02,320",
+      "BombeBad 331.02,440",
+      "BombeBad 189.02,380",
+      "BombeBad 344.68,256.57",
     ],
     "bombs": 0,
     "clear": false,
@@ -896,9 +898,9 @@ exports[`replays > level-40.json matches its snapshot and replays identically 1`
   },
   {
     "bads": [
-      "BombeBad 125.02,320",
-      "BombeBad 166.98,380",
-      "BombeBad 258.98,440",
+      "BombeBad 153.6,363.56",
+      "BombeBad 370.98,380",
+      "BombeBad 219.02,375.72",
     ],
     "bombs": 1,
     "clear": false,

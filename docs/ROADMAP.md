@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Finish Phase 1 with the level script audit (1.7), then Phase 2, starting with the super-item entities (2.1). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5", "Audit 1.6").
+Phase 1 is done. Phase 2, starting with the super-item entities (2.1). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -17,7 +17,8 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 1.4 Input recorder and headless replay: record key events per tick, replay with `stepSingleFrame()`, snapshot entity state. Add Vitest regression tests from replays. Also: animation steps are tied to logic ticks (5 per 4), Flash scripts use a seeded random source, and `_width` / `_height` (hit boxes) come from vector bounds instead of rendered sprites, so a browser recording replays identically in Node.
 - [x] 1.5 Line-by-line audit of `Player.ts` and `Bad.ts` against the original, logging deviations in PORT_STATUS.md. About 30 deviations fixed; the open ones are listed under "Audit 1.5" there.
 - [x] 1.6 Same audit for `GameSession.ts` (against `mode/GameMode.mt`, `mode/Adventure.mt`), `Bomb.ts`, `Shoot.ts` and `Item.ts`. Shots were rewritten; the level flow, hurry-up and portals now follow the original.
-- [ ] 1.7 Same audit for `levels/ScriptRunner.ts` (against `levels/ScriptEngine.mt`; `addShortNode`, `getFloat` and `insertItem` are missing), `levels/LevelWorld.ts` (`SetManager.mt`, `GameMechanics.mt`) and `levels/LevelView.ts` (`View.mt`). Add a tool or test that scans every level script in every set of `xml/levels/` and lists the nodes, triggers and attributes the engine does not handle, so no level breaks silently.
+- [x] 1.7 Same audit for `levels/ScriptRunner.ts` (against `levels/ScriptEngine.mt`), `levels/LevelWorld.ts` (`SetManager.mt`, `GameMechanics.mt`) and `levels/LevelView.ts` (`View.mt`). The script engine now follows Flash's XML behavior (a removed trigger ends the cycle's scan, nested triggers move to the script end), tile changes and the enemy fall map follow the original, and the script is saved when a dimension is left. `tools/scan-scripts.ts` and `tests/scripts.test.ts` check every level script of every set.
+- [ ] Bug (found in 1.7): on level 86 (torches) and other dark levels, the darkness shows two large red discs near the top of the screen instead of light around the torches. Already on `main` before 1.7; belongs with the lighting (2.7).
 
 ## Phase 2: Finish the Adventure (critical path)
 
@@ -46,7 +47,7 @@ Checklist for every batch task (2B.1 onward), the same each time:
 4. Record a short replay of the level as a regression fixture in `tests/replays/`.
 5. Tick the batch here when every row of it is filled.
 
-- [ ] 2B.0 Automated pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, portal links, backgrounds) and report differences as a test. Add a way to open a given level in both the port and Ruffle, if the original allows it (check the debug and dev entry points). Mark the Data column of LEVELS.md.
+- [ ] 2B.0 Automated pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, portal links, backgrounds) and report differences as a test. Add a way to open a given level in both the port and Ruffle, if the original allows it (check the debug and dev entry points). Mark the Data column of LEVELS.md. Level scripts are already checked by `tests/scripts.test.ts` (1.7).
 - Adventure (107 levels), 10 per batch:
   - [ ] 2B.1 Adventure 0-9
   - [ ] 2B.2 Adventure 10-19

@@ -17,9 +17,13 @@ export class LevelView {
   readonly depthMan: DepthManager;
   readonly xOffset = 10;
 
+  viewX: number | null = null;
+  viewY: number | null = null;
+  fl_attach = false;
   fl_shadow = true;
   fl_hideTiles = false;
   fl_hideBorders = false;
+  levelId: number | null = null;
 
   private data!: LevelData;
   private top: SwfMovieClip | null = null;
@@ -63,19 +67,19 @@ export class LevelView {
     return id >= 100 ? Math.floor(id / 100) : id;
   }
 
-  displayCurrent(): void {
-    this.data = this.world.current;
-    this.fl_hideTiles = false;
-    this.fl_hideBorders = false;
-    this.detach();
+  /** Shows a level of the world's set (`world.levels[id]`). */
+  display(id: number): void {
+    this.data = this.world.getLevel(id);
+    this.levelId = id;
     this.attach();
   }
 
-  /** Rebuilds only the tile/field geometry (e.g. after `$e_add`, `$e_rem`, `$e_hide`), keeping decor MCs. */
-  redrawLevelOnly(): void {
-    this.data = this.world.current;
-    this.detachLevel();
-    this.attach();
+  displayCurrent(): void {
+    this.display(this.world.currentId);
+  }
+
+  removeShadows(): void {
+    this.fl_shadow = false;
   }
 
   private isWall(cx: number, cy: number): boolean {
@@ -87,7 +91,6 @@ export class LevelView {
   }
 
   attach(): void {
-    this.data = this.world.current;
     this.world.teleporterList = [];
     this.world.portalList = [];
 
@@ -98,9 +101,7 @@ export class LevelView {
     this.fieldDm = new DepthManager(this.field);
     this.backDm = new DepthManager(this.back);
 
-    this.top._x = -this.xOffset;
-    this.back._x = -this.xOffset;
-    this.field._x = 0;
+    this.top._x = this.xOffset;
 
     this.attachBg();
 
@@ -166,6 +167,8 @@ export class LevelView {
     this.rightBorder._x = Data.GAME_WIDTH + 15;
     this.leftBorder._visible = !this.fl_hideBorders;
     this.rightBorder._visible = !this.fl_hideBorders;
+
+    this.fl_attach = true;
   }
 
   private attachBg(): void {
@@ -340,6 +343,33 @@ export class LevelView {
   detach(): void {
     this.detachLevel();
     this.detachSprites();
+    this.fl_attach = false;
+  }
+
+  /** Moves the level to a given point. */
+  moveTo(x: number, y: number): void {
+    this.viewX = x;
+    this.viewY = y;
+    if (!this.top || !this.back || !this.field) return;
+    this.top._x = x - this.xOffset;
+    this.top._y = y;
+    this.back._x = this.top._x;
+    this.back._y = this.top._y;
+    this.field._x = this.top._x + this.xOffset;
+    this.field._y = this.top._y;
+    this.spriteBack._x = this.top._x;
+    this.spriteBack._y = this.top._y;
+    this.spriteTop._x = this.top._x;
+    this.spriteTop._y = this.top._y;
+  }
+
+  /** Puts the view back in place. */
+  moveToPreviousPos(): void {
+    if (this.viewX !== null && this.viewY !== null) {
+      this.moveTo(this.viewX, this.viewY);
+    } else {
+      this.moveTo(0, 0);
+    }
   }
 
   destroy(): void {

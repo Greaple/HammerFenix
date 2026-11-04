@@ -44,6 +44,9 @@ export interface GameHost {
   readonly stage: Container;
 }
 
+/** `GameManager.musics`: the in-game, boss and hurry-up tracks. */
+export const MUSIC_TRACKS: readonly string[] = ['music_ingame', 'music_boss', 'music_hurry'];
+
 export class GameSession implements IGameContext {
   readonly app: GameHost;
   readonly lib: SwfLibrary;
@@ -125,6 +128,8 @@ export class GameSession implements IGameContext {
   private readonly unregList: { type: number; ent: BaseEntity }[] = [];
   private uniqIdCounter = 1;
   badCount = 0;
+  /** Ends the game when it runs out (the elevator exit after Tuberculoz, code trigger 4). */
+  endModeTimer = 0;
 
   currentSetName = 'adventure';
   currentDim = 0;
@@ -309,7 +314,8 @@ export class GameSession implements IGameContext {
     this.hud.setLives(this.player.lives);
     this.hud.clearExtends();
 
-    this.onLevelReady();
+    // The first level has no scroll: it is ready at once, before its script compiles
+    this.onDataReady(true);
   }
 
   /**
@@ -340,6 +346,7 @@ export class GameSession implements IGameContext {
     for (let i = 5000; i < 5100; i++) {
       if (this.hasFamily(i)) this.giveKey(i - 5000);
     }
+    this.endModeTimer = 0;
     this.shakeTimer = 0;
     this.shakeTotal = 0;
     this.shakePower = 0;
@@ -363,17 +370,65 @@ export class GameSession implements IGameContext {
     );
   }
 
-  /**
-   * The new level's data is ready (`GameMechanics.onReadComplete` / `onDataReady` /
-   * `createView`): a fresh script engine compiles the level script and runs its first cycle,
-   * before the level scrolls in. The scroll itself (`ViewManager`) is task 2.7.
-   */
+  /** `GameMechanics.onReadComplete`: a new script engine for the level just read. */
   private onWorldRead(): void {
-    this.scriptRunner?.destroy();
     this.scriptRunner = new ScriptRunner(this, this.world.current);
-    this.scriptRunner.compile();
-    this.scriptRunner.onLevelAttach();
-    this.view.displayCurrent();
+  }
+
+  /**
+   * `ViewManager.onDataReady` + `GameMechanics.onDataReady`: the level's view is created, then
+   * its script compiles and runs its first cycle. A level shown without a transition (`fl_direct`:
+   * new game, level picker) is ready before the compile, so its bads and items join the script
+   * before the first cycle. Otherwise the level scrolls in first (task 2.7; the port has no
+   * scroll yet and the caller calls `onLevelReady`). The original also parses the IA map over
+   * several frames before this.
+   */
+  private onDataReady(fl_direct: boolean): void {
+    this.view.destroy();
+    this.view = this.createView(this.world.currentId);
+    this.view.moveTo(0, 0);
+    if (fl_direct) {
+      this.onLevelReady();
+    }
+    this.scriptRunner?.compile();
+  }
+
+  /** `GameMechanics.createView` + `ViewManager.createView` */
+  private createView(id: number): LevelView {
+    this.scriptRunner?.onLevelAttach();
+    const v = new LevelView(this.world, this.depthMan);
+    v.fl_hideTiles = this.world.fl_hideTiles;
+    v.fl_hideBorders = this.world.fl_hideBorders;
+    v.detach();
+    if (!this.world.fl_shadow) {
+      v.removeShadows();
+    }
+    v.display(id);
+    return v;
+  }
+
+  /** `GameMechanics.update`. The IA map is parsed at once in `LevelWorld.goto`. */
+  private updateWorld(): void {
+    if (!this.world.fl_lock) {
+      this.scriptRunner?.update();
+    }
+
+    // Floating portal fields
+    for (const p of this.world.portalList) {
+      p.mc._y = p.y + 3 * Math.sin(p.cpt);
+      p.cpt += 0.1;
+      if (this.rand.random(5) === 0) {
+        const a = this.fxMan.attachFx(
+          p.x + Data.CASE_WIDTH * 0.5 + this.rand.random(15) * (this.rand.random(2) * 2 - 1),
+          p.y + Data.CASE_WIDTH * 0.5 + this.rand.random(15) * (this.rand.random(2) * 2 - 1),
+          'hammer_fx_star',
+        );
+        if (a) {
+          a.mc._xscale = this.rand.random(70) + 30;
+          a.mc._yscale = a.mc._xscale;
+        }
+      }
+    }
   }
 
   /** `GameMode.onLevelReady` + `Adventure.onLevelReady`: the level has scrolled in. */
@@ -437,6 +492,7 @@ export class GameSession implements IGameContext {
       this.addLevelItems();
     }
     this.scriptRunner?.onPlayerBirth();
+    this.world.unlock();
     this.fl_badsCallback = false;
     if (this.isBossLevel(this.world.currentId)) {
       this.fxMan.attachWarning();
@@ -524,6 +580,8 @@ export class GameSession implements IGameContext {
   /** `GameMode.forcedGoto` */
   forcedGoto(id: number): void {
     this.fakeLevelId = (this.fakeLevelId ?? 0) + id - this.world.currentId;
+    this.world.fl_hideBorders = false;
+    this.world.fl_hideTiles = false;
     this.fl_deferLevelReady = true;
     this.goto(id);
     this.fl_deferLevelReady = false;
@@ -536,6 +594,7 @@ export class GameSession implements IGameContext {
       p.hide();
     }
     // No scroll yet (task 2.7): the level is ready at once
+    this.onDataReady(false);
     this.onLevelReady();
   }
 
@@ -550,6 +609,7 @@ export class GameSession implements IGameContext {
     }
 
     this.clearExtraHoles();
+    this.world.lock();
     this.killPortals();
     this.clearLevel();
     this.fl_lock = true;
@@ -579,9 +639,12 @@ export class GameSession implements IGameContext {
     this.fxMan.onNextLevel();
     this.audio.playSound('sound_level_clear', Data.CHAN_INTERF);
 
-    // No scroll yet (task 2.7): the level is ready at once. forcedGoto and portals call it
-    // themselves after placing the players.
-    if (!this.fl_deferLevelReady) this.onLevelReady();
+    // No scroll yet (task 2.7): the level is ready at once. forcedGoto calls these itself after
+    // placing the players.
+    if (!this.fl_deferLevelReady) {
+      this.onDataReady(false);
+      this.onLevelReady();
+    }
   }
 
   /** `Adventure.onEndOfSet`: the original leaves the game (`exitGame`). */
@@ -1070,11 +1133,9 @@ export class GameSession implements IGameContext {
     this.cleanKills();
     this.currentDim = id;
 
-    // world.suspend(): the level being left counts as visited
-    this.world.markVisited();
+    // world.suspend(): the script left is saved and the level counts as visited
+    this.world.suspend(this.scriptRunner?.scriptToString() ?? null);
     this.world = this.dimensions[id];
-    this.view.destroy();
-    this.view = new LevelView(this.world, this.depthMan);
     this.fl_lock = true;
     this.fl_clear = false;
 
@@ -1083,6 +1144,7 @@ export class GameSession implements IGameContext {
     this.world.goto(lid);
     this.world.fl_entered = true;
     this.onWorldRead();
+    this.onDataReady(false);
     for (const e of this.getList(Data.ENTITY)) e.world = this.world;
 
     this.fakeLevelId = this.world.fl_mainWorld ? null : 0;
@@ -1218,10 +1280,9 @@ export class GameSession implements IGameContext {
 
   /** `Mode.playMusic`: tracks are `[music, boss, hurryUp]`. */
   playMusicTrack(trackId: number): void {
-    const names = ['music_ingame', 'music_boss', 'music_hurry'];
-    if (names[trackId] === undefined) return;
+    if (MUSIC_TRACKS[trackId] === undefined) return;
     this.currentTrack = trackId;
-    this.audio.playMusic(names[trackId]);
+    this.audio.playMusic(MUSIC_TRACKS[trackId]);
   }
 
   setWarpStart(): void {
@@ -1252,6 +1313,7 @@ export class GameSession implements IGameContext {
   onPause(): void {
     if (this.fl_lock || this.fl_gameOver) return;
     this.fl_pause = true;
+    this.world.lock();
     this.pauseMC?.removeMovieClip();
 
     this.pauseMC = this.depthMan.attach('hammer_interf_instructions', Data.DP_INTERF);
@@ -1284,6 +1346,7 @@ export class GameSession implements IGameContext {
   onUnpause(): void {
     if (!this.fl_pause) return;
     this.fl_pause = false;
+    this.world.unlock();
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: false });
@@ -1316,8 +1379,7 @@ export class GameSession implements IGameContext {
     this.fl_ice = this.getDynamicVar('$ICE') !== undefined;
     this.fl_aqua = this.getDynamicVar('$AQUA') !== undefined;
 
-    // world.update(): the level script runs while the world is unlocked
-    this.scriptRunner?.update();
+    this.updateWorld();
     this.hud.update();
 
     if (this.fl_lock) return;
@@ -1346,6 +1408,14 @@ export class GameSession implements IGameContext {
       }
     }
 
+    // Automatic end of the mode (scores are registered by the game over, task 2.11)
+    if (this.endModeTimer > 0) {
+      this.endModeTimer -= 1;
+      if (this.endModeTimer <= 0) {
+        this.onGameOver();
+      }
+    }
+
     this.fxMan.update();
 
     // Hurry up
@@ -1370,7 +1440,9 @@ export class GameSession implements IGameContext {
 
     this.holeUpdate();
     this.cleanKills();
-    this.checkLevelClear();
+    if (!this.world.fl_lock) {
+      this.checkLevelClear();
+    }
 
     // Floating portal: players shrink into it, then the dimension changes
     if (this.nextLink !== null) {

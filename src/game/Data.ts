@@ -428,6 +428,11 @@ export class GameDataStore {
     return this.lang.statics[id] ?? '';
   }
 
+  /** `Lang.get`: null when the language has no such text. */
+  getLangText(id: number): string | null {
+    return this.lang.statics[id] ?? null;
+  }
+
   getItemName(id: number): string {
     return this.lang.items[id] ?? '';
   }
