@@ -17,6 +17,8 @@ export class FixedGameLoop {
   private logicTicks = 0;
   private animTicks = 0;
   timeScale = 1.0;
+  /** Bullet time (`GameMode.bulletTime`): slows the game on top of `timeScale`. */
+  bulletScale = 1.0;
 
   private readonly onLogicStep: () => void;
   private readonly onAnimStep: () => void;
@@ -67,7 +69,10 @@ export class FixedGameLoop {
 
   private readonly tick = (nowMs: number) => {
     if (!this.running) return;
-    const dtSec = Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000)) * this.timeScale;
+    const dtSec =
+      Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000)) *
+      this.timeScale *
+      this.bulletScale;
     this.lastTimeMs = nowMs;
 
     const logicDt = 1 / FixedGameLoop.LOGIC_HZ;

@@ -218,6 +218,8 @@ export const Data = {
   HU_STEPS: [35 * 32, 25 * 32] as readonly number[],
   BAT_LEVEL: 100,
   TUBERCULOZ_LEVEL: 101,
+  BOSS_BAT_MIN_DIST: 20 * 7,
+  BOSS_BAT_MIN_X_DIST: 20 * 3,
 
   // Item lifetimes & special IDs
   ITEM_LIFE_TIME: 8 * 32,
@@ -266,6 +268,34 @@ export const Data = {
   ANIM_BAD_THINK: { id: 7, loop: false } as AnimDef,
   ANIM_BAD_JUMP: { id: 8, loop: true } as AnimDef,
   ANIM_BAD_SHOOT_LOOP: { id: 9, loop: true } as AnimDef,
+
+  ANIM_BAT_WAIT: { id: 0, loop: true } as AnimDef,
+  ANIM_BAT_MOVE: { id: 1, loop: true } as AnimDef,
+  ANIM_BAT_SWITCH: { id: 2, loop: false } as AnimDef,
+  ANIM_BAT_DIVE: { id: 3, loop: false } as AnimDef,
+  ANIM_BAT_INTRO: { id: 4, loop: false } as AnimDef,
+  ANIM_BAT_KNOCK: { id: 5, loop: true } as AnimDef,
+  ANIM_BAT_FINAL_DIVE: { id: 6, loop: true } as AnimDef,
+  ANIM_BAT_ANGER: { id: 7, loop: true } as AnimDef,
+
+  ANIM_BOSS_WAIT: { id: 0, loop: true } as AnimDef,
+  ANIM_BOSS_SWITCH: { id: 1, loop: false } as AnimDef,
+  ANIM_BOSS_JUMP_UP: { id: 2, loop: false } as AnimDef,
+  ANIM_BOSS_JUMP_DOWN: { id: 3, loop: false } as AnimDef,
+  ANIM_BOSS_JUMP_LAND: { id: 4, loop: false } as AnimDef,
+  ANIM_BOSS_TORNADO_START: { id: 5, loop: false } as AnimDef,
+  ANIM_BOSS_TORNADO_END: { id: 6, loop: false } as AnimDef,
+  ANIM_BOSS_BAT_FORM: { id: 7, loop: false } as AnimDef,
+  ANIM_BOSS_BURN_START: { id: 8, loop: false } as AnimDef,
+  ANIM_BOSS_DEATH: { id: 9, loop: false } as AnimDef,
+  ANIM_BOSS_DASH_START: { id: 10, loop: false } as AnimDef,
+  ANIM_BOSS_DASH: { id: 11, loop: false } as AnimDef,
+  ANIM_BOSS_BOMB: { id: 12, loop: false } as AnimDef,
+  ANIM_BOSS_HIT: { id: 13, loop: false } as AnimDef,
+  ANIM_BOSS_DASH_BUILD: { id: 14, loop: true } as AnimDef,
+  ANIM_BOSS_BURN_LOOP: { id: 15, loop: true } as AnimDef,
+  ANIM_BOSS_TORNADO_LOOP: { id: 16, loop: true } as AnimDef,
+  ANIM_BOSS_DASH_LOOP: { id: 17, loop: true } as AnimDef,
 
   ANIM_SHOOT: { id: 0, loop: false } as AnimDef,
   ANIM_SHOOT_LOOP: { id: 0, loop: true } as AnimDef,
@@ -358,6 +388,17 @@ export const Data = {
 
   getCrystalValue(comboIndex: number): number {
     return Math.round(Math.min(50000, 500 * Math.round(Math.pow(comboIndex + 1, 2))));
+  },
+
+  /** `Data.formatNumber`: groups digits by 3 with dots (negative numbers are left as is). */
+  formatNumber(n: number): string {
+    let txt = String(n);
+    if (txt.indexOf('-') < 0) {
+      for (let i = txt.length - 3; i > 0; i -= 3) {
+        txt = txt.substring(0, i) + '.' + txt.substring(i);
+      }
+    }
+    return txt;
   },
 
   formatNumberStr(raw: string | number): string {

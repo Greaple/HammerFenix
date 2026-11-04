@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1 is done. Phase 2: 2.1 to 2.7 are done; next is the first boss, Bat (2.8). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phase 1 is done. Phase 2: 2.1 to 2.9 are done; next is `StatsManager` and `Chrono` (2.10). The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -30,8 +30,8 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants), in `entity/Particle.ts`. Every caller uses its original type; the missing calls were added (Crawler, Saw, Bombe, portal opening, Guu doll rain, aqua bubbles), with `MAX_FX` and `destroySome`. Soccer, Framboise's other calls and the bosses' wait for 4.4, 2.12, 2.8 and 2.9. Tested in `tests/particles.test.ts`.
 - [x] 2.6 Special backgrounds: `FxManager.attachBg/detachBg/clearBg` and the `BG_*` effects. `View.attachSpecialBg` hides the level background under `hammer_special_bg`; items 19, 21, 28, 83, 84, 86 and 100 use it. Tested in `tests/specials.test.ts`.
 - [x] 2.7 Level transition scroll (`levels/ViewManager.mt`) and lighting. The IA map is parsed 30 cases per frame (17 frames), then the level scrolls up over a snapshot of the old one (40 frames); portals scroll sideways, or fade when arriving at no portal. Darkness (`GameMode.updateDarkness`) fully ported: light holes on the players and torches, candle and light bulb. `ViewLight.mt` turned out to be a wireframe preview for the `Browser` dev tool, out of scope. Replay snapshots re-recorded. Tested in `tests/transitions.test.ts`.
-- [ ] 2.8 Boss: Bat (`entity/boss/Bat.mt`, level 100) and `isBossLevel` logic, boss music.
-- [ ] 2.9 Boss: Tuberculoz (`entity/boss/Tuberculoz.mt`, level 101) and the ending.
+- [x] 2.8 Boss: Bat (`entity/boss/Bat.mt`, level 100) and `isBossLevel` logic, boss music. In `entity/Boss.ts`; its glow is a new WebGL `GlowFilter` (`SwfMovieClip.setGlow`). Boss music comes from the level script. Tested in `tests/bosses.test.ts`.
+- [x] 2.9 Boss: Tuberculoz (`entity/boss/Tuberculoz.mt`, level 101) and the ending. Also in `entity/Boss.ts`, with his life bar, bullet time (`GameMode.bulletTime`, approximated by slowing the loop's clock) and the exit to level 102. The ending (elevator on 103, then the game ends) already worked; its game over screen is 2.11.
 - [ ] 2.10 `StatsManager.mt` (extend and perfect rules) and `Chrono.mt`.
 - [ ] 2.11 Game over sequence and score screen (replace the placeholder text in `onGameOver()`). Pass the anger level to `callEvilOne()` as the original does.
 - [ ] 2.12 Simplified enemies: Framboise (250 original lines), Baleine (currently plain `FlyerBad`).

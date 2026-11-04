@@ -12,6 +12,7 @@ import {
   TextStyle,
 } from 'pixi.js';
 import { type Avm1Clip, runAvm1 } from './Avm1';
+import { GlowFilter } from './GlowFilter';
 import type { SwfLibrary } from './SwfLibrary';
 import type { Cxform8, DynamicTextDef, Matrix6, PlaceCmd, SpriteDef } from './types';
 
@@ -345,6 +346,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   private depthSlots = new Map<number, DepthSlot>();
   private namedChildren = new Map<string, Container>();
   private tintFilter: ColorMatrixFilter | null = null;
+  private glowFilter: GlowFilter | null = null;
   /** Set by `setLayerBlend`: carries `_alpha`, applied to the composited layer. */
   private layerFilter: AlphaFilter | null = null;
   mcDepth = 0;
@@ -572,6 +574,12 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     return n instanceof SwfMovieClip ? n : null;
   }
 
+  /** Typed lookup for a named child that masks others (`clipDepth`), e.g. a bar's fill. */
+  getMask(name: string): SwfMaskClip | null {
+    const n = this.namedChildren.get(name);
+    return n instanceof SwfMaskClip ? n : null;
+  }
+
   /** Typed lookup for a named child dynamic text field (`score0`, `level`, etc.). */
   getText(name: string): SwfTextField | null {
     const n = this.namedChildren.get(name);
@@ -601,7 +609,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     if (!this.tintFilter) {
       if (this.lib.headless) return;
       this.tintFilter = new ColorMatrixFilter();
-      this.filters = [this.tintFilter];
+      this.applyEntityFilters();
     }
     this.tintFilter.matrix = [
       q,
@@ -641,9 +649,42 @@ export class SwfMovieClip extends Container implements Avm1Clip {
 
   resetColor(): void {
     if (this.tintFilter) {
-      this.filters = [];
       this.tintFilter = null;
+      this.applyEntityFilters();
     }
+  }
+
+  /**
+   * Flash `filters = [new GlowFilter(...)]`, kept alongside the `setColorHex` tint. Skipped when
+   * headless.
+   */
+  setGlow(color: number, alpha: number, blurX: number, blurY: number, strength: number): void {
+    if (this.lib.headless) return;
+    if (!this.glowFilter) {
+      this.glowFilter = new GlowFilter();
+      this.applyEntityFilters();
+    }
+    const g = this.glowFilter;
+    g.color = color;
+    g.alpha = alpha;
+    g.blurX = blurX;
+    g.blurY = blurY;
+    g.strength = strength;
+  }
+
+  /** Flash `filters = null` for a glow set by `setGlow`. */
+  clearGlow(): void {
+    if (this.glowFilter) {
+      this.glowFilter = null;
+      this.applyEntityFilters();
+    }
+  }
+
+  private applyEntityFilters(): void {
+    const l = [];
+    if (this.glowFilter) l.push(this.glowFilter);
+    if (this.tintFilter) l.push(this.tintFilter);
+    this.filters = l;
   }
 
   /** Advances this clip and all playing descendant MovieClips by one timeline frame. */

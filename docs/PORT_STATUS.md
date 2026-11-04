@@ -8,7 +8,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 | Original                                                                   | TypeScript                                        | Status  | Notes                                                                                                                                           |
 | -------------------------------------------------------------------------- | ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 211 ported values match. Missing: `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`, boss animations                                          |
+| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 239 ported values match. Missing: `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`                                                           |
 | `Entity.mt`                                                                | `entity/Entity.ts` BaseEntity                     | done    | Audited (1.5). No `fl_stickRot` / `fl_stickBound` (no caller yet)                                                                               |
 | `entity/Animator.mt`                                                       | `entity/Entity.ts` AnimatorEntity                 | done    | Audited (1.5)                                                                                                                                   |
 | `entity/Physics.mt`                                                        | `entity/Entity.ts` PhysicsEntity                  | done    | Audited (1.5). Aqua bubbles in `endUpdate` (2.5)                                                                                                |
@@ -34,10 +34,10 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Modes
 
-| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                     |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Missing: bosses, map, StatsManager, options, score saving; game over is placeholder text |
-| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                              |
+| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Bosses and bullet time (2.8, 2.9). Missing: map, StatsManager, options, score saving; game over is placeholder text |
+| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                                                         |
 
 ## Levels
 
@@ -59,12 +59,12 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 - approx: Framboise (original 250 lines, task 2.12)
 - unused: `walker/Coward.mt`, `walker/Hunter.mt` (the original's `attachBad` never creates them)
 - All classes above audited line by line in 1.5, see "Audit 1.5" below.
-- missing: `boss/Bat.mt` (level 100), `boss/Tuberculoz.mt` (level 101)
+- done (2.8, 2.9): `boss/Bat.mt` (level 100), `boss/Tuberculoz.mt` (level 101), in `entity/Boss.ts`. See "Bosses" below.
 
 ## Bombs and projectiles
 
 - `entity/Bomb.ts` done (audited 1.6): Bomb, PlayerBomb, Classic, Black, Blue, Green, Red, RepelBomb, BadBomb, PoireBomb, Mine
-- done (2.2): `bomb/bad/BossBomb` (used by Tuberculoz, 2.9), `bomb/player/SoccerBall` (no glow filter: `FxManager.addGlow` is not ported; round since the clip mask fix)
+- done (2.2): `bomb/bad/BossBomb` (used by Tuberculoz, 2.9), `bomb/player/SoccerBall` (no glow: `FxManager.addGlow` is not ported, though `SwfMovieClip.setGlow` now exists; round since the clip mask fix)
 - unused: `bomb/player/MineFrozen`, `PoireBombFrozen` (`Mine.getFrozen` and `PoireBomb.getFrozen` are commented out in the original, so nothing creates them)
 - missing: `entity/WalkingBomb.mt`
 - `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
@@ -83,11 +83,23 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 All 118 effects are ported (task 2.3, 2026-11-04), with `interrupt`, `levelConversion`, `warpZone`, `onPerfect` and the recurring events. The id is the `// *** N.` comment in the original. Tested in `tests/specials.test.ts`.
 
 - Special backgrounds (2.4, 2.6): `fxMan.attachBg` queues them and shows one at a time; any effect ending (`interrupt`) and every level change clear them. Tested in `tests/specials.test.ts`.
-- 86 ghost candy: the glow filters on the player and the enemies are not ported (no glow filter in Pixi core).
+- 86 ghost candy: the glow filters on the player and the enemies are not ported yet (`SwfMovieClip.setGlow` from 2.8 can do them).
 - 84: the clouds' `BlurFilter` (4 px box blur) is approximated with Pixi's gaussian blur (`SwfMovieClip.setBlur`).
 - 10 phone does nothing, as in the original (the effect is commented out).
 - Original quirks kept: picking any item with id 17 (`CONVERT_DIAMANT`, also the gold mushroom) counts as a pearl, so after a finished conversion it gives the 50000 perfect bonus again; the fish callbacks (77-79) are not cleared on a level change and run at the next level clear; interrupting the shoe (7) resets the speed to 1.0 even in nightmare mode.
 - Fixed in the existing effects while porting: warp umbrellas (11, 12) stop at boss and empty levels and show the alert; 22, 88 and 91 showed the wrong curse icon; 26 and 68 now update the darkness; 94 sets its global flag; 114 is temporary, not permanent; 102 plays script clip 100; random draws of 23, 83, 101 and strikes match the original.
+
+## Bosses (`entity/Boss.ts`)
+
+Ported line by line (tasks 2.8, 2.9, 2026-11-05). Tested in `tests/bosses.test.ts`. Boss music and the ending (code triggers 4 and 5, the elevator of level 103) come from the level scripts and were already ported.
+
+- Bat: registers as `Data.BAD`, so bombs, shots and item effects reach it like any enemy. The `entity.Bad` methods it lacks (`setCombo`, `calmDown`, `onHurryUp`, `burn`, ...) are no-ops, as undefined methods are in AS2.
+- Bat glow (shield off): `GlowFilter` (`src/engine/swf/GlowFilter.ts`), a WebGL shader for Flash's outer glow at quality 1 (13 x 13 alpha samples per pixel). Kept beside the blink tint (`SwfMovieClip.setGlow` / `clearGlow`).
+- Tuberculoz life bar: `bar` is a mask (`SwfMovieClip.getMask`), scaled to show the fill.
+- Bullet time (`GameMode.bulletTime`, Tuberculoz's death): the original sets `Timer.tmod` to 0.3 for 2 s. Logic here always steps by 1, so the loop's clock slows to 0.3 (`FixedGameLoop.bulletScale`) for about 20 ticks: same moves, but movie clips slow down too (in Flash they kept 40 fps).
+- The exit arrow attached at level start (no enemies in the level data) stays during both fights, as the original's code reads. Not checked in Ruffle.
+- The original's `getOne` draws a random number even on an empty list; the port's does not (older difference). So the boss lookups added to `resetHurry`, `onKillBad` and `onExplode` draw only on boss levels.
+- Dev keys of the original (K kills the Bat, Enter kills Tuberculoz, Shift removes his lives) are not ported.
 
 ## Audit 1.5: Player and enemies
 
@@ -149,7 +161,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Not ported yet: bosses (2.8, 2.9), `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), bullet time, wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
+- Not ported yet: `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
 - `onGameOver` / end of set are placeholders (2.11).
 - `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
 - Float random draws remain in `FxManager`.

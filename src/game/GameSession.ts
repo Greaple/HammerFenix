@@ -13,6 +13,7 @@ import { ItemEntity, ScoreItem, SpecialItem } from './entity/Item';
 import { PlayerEntity } from './entity/Player';
 import { BadEntity, createBad, FireBallBad } from './entity/Bad';
 import { BombEntity } from './entity/Bomb';
+import { BatBoss, type BossEntity, TuberculozBoss } from './entity/Boss';
 import { SupaItem } from './entity/Supa';
 import { FxManager } from './FxManager';
 import { Random } from './Random';
@@ -46,6 +47,9 @@ export interface GameHost {
   /** Draws the level snapshots of the transitions; absent when headless. */
   readonly renderer?: Renderer;
 }
+
+/** `Timer.tmod` during bullet time (`GameMode.main`). */
+const BULLET_TMOD = 0.3;
 
 /** `GameManager.musics`: the in-game, boss and hurry-up tracks. */
 export const MUSIC_TRACKS: readonly string[] = ['music_ingame', 'music_boss', 'music_hurry'];
@@ -156,6 +160,11 @@ export class GameSession implements IGameContext {
   private shakeTimer = 0;
   private shakeTotal = 0;
   private shakePower = 0;
+
+  /** `GameMode.fl_bullet`: bullet time is allowed (always, in the original). */
+  fl_bullet = true;
+  /** Bullet time left, in frames of the original's real time. */
+  private bulletTimer = 0;
 
   /** Screen flips of the blue and red glasses (items 30, 31). */
   fl_flipX = false;
@@ -380,6 +389,8 @@ export class GameSession implements IGameContext {
     this.shakeTimer = 0;
     this.shakeTotal = 0;
     this.shakePower = 0;
+    this.bulletTimer = 0;
+    this.gameLoop.bulletScale = 1;
     this.endLevelStack = [];
     this.perfectItemCpt = NaN;
     this.flipX(false);
@@ -706,7 +717,17 @@ export class GameSession implements IGameContext {
     if (this.isBossLevel(this.world.currentId)) {
       this.fxMan.attachWarning();
     }
-    // Bosses (Bat, Tuberculoz) are tasks 2.8 and 2.9
+    // Boss 1
+    if (this.world.fl_mainWorld && this.world.currentId === Data.BAT_LEVEL) {
+      BatBoss.attach(this);
+      this.fl_clear = false;
+    }
+    // Boss 2
+    if (this.world.fl_mainWorld && this.world.currentId === Data.TUBERCULOZ_LEVEL) {
+      TuberculozBoss.attach(this);
+      this.fl_clear = false;
+    }
+    // No exit arrow on level 0
     if (this.world.fl_mainWorld && this.world.currentId === 0) {
       this.fxMan.detachExit();
     }
@@ -1082,12 +1103,34 @@ export class GameSession implements IGameContext {
     this.shakePower = power;
   }
 
+  /** `Adventure.onExplode` + `GameMode.onExplode`: a player bomb exploded. */
   onExplode(x: number, y: number, radius: number): void {
     this.scriptRunner?.onExplode(x, y, radius);
+    if (this.world.fl_mainWorld && this.world.currentId === Data.TUBERCULOZ_LEVEL) {
+      this.getBoss()?.onExplode?.(x, y, radius);
+    }
+  }
+
+  /** `GameMode.getOne(Data.BOSS)` */
+  getBoss(): BossEntity | null {
+    return this.getOne(Data.BOSS) as BossEntity | null;
+  }
+
+  /**
+   * `GameMode.bulletTime`: `d` frames of slow motion. The original sets `Timer.tmod` to 0.3;
+   * logic here always steps by 1, so the loop's clock slows instead (same moves, slower).
+   */
+  bulletTime(d: number): void {
+    if (!this.fl_bullet) return;
+    this.bulletTimer = d;
   }
 
   /** `Adventure.onKillBad` (GameMode's is empty) */
   onKillBad(b: BaseEntity): void {
+    // Boss Tuberculoz
+    if (this.world.fl_mainWorld && this.world.currentId === Data.TUBERCULOZ_LEVEL) {
+      this.getBoss()?.onKillBad?.();
+    }
     if (this.badCount > 1 && b.uniqId === this.perfectOrder[0]) {
       this.perfectOrder.splice(0, 1);
     }
@@ -1134,7 +1177,8 @@ export class GameSession implements IGameContext {
     for (const b of this.getBads()) {
       b.calmDown();
     }
-    // Bosses' onPlayerDeath: tasks 2.8 and 2.9
+    // Boss
+    this.getBoss()?.onPlayerDeath();
 
     if (this.currentTrack === 2) {
       this.playMusicTrack(0);
@@ -1720,6 +1764,12 @@ export class GameSession implements IGameContext {
     // Check pause key toggle
     if (this.input.consumePress('pause')) {
       this.togglePause();
+    }
+
+    // Bullet time: the original counts it in real frames, each moving the game by 0.3
+    if (this.fl_bullet && this.bulletTimer > 0) {
+      this.bulletTimer -= 1 / BULLET_TMOD;
+      this.gameLoop.bulletScale = this.bulletTimer > 0 ? BULLET_TMOD : 1;
     }
 
     if (this.fl_gameOver) {

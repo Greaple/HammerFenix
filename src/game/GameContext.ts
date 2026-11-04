@@ -28,6 +28,8 @@ export interface IGameContext {
   readonly rand: Random;
   readonly randMan: RandomManager;
 
+  /** `GameMode.mc`: the clip holding the whole game, moved by the screen shake. */
+  readonly gameRoot: SwfMovieClip;
   readonly xOffset: number;
   cycle: number;
   xFriction: number;
@@ -86,6 +88,7 @@ export interface IGameContext {
   nextLevel(): void;
   forcedGoto(id: number): void;
   shake(duration: number | null, power: number | null): void;
+  bulletTime(d: number): void;
   flipX(fl: boolean): void;
   flipY(fl: boolean): void;
   isBossLevel(id: number): boolean;
