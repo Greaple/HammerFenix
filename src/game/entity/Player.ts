@@ -916,8 +916,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   // --------------------------------------------------- Special Item Execution
-  // Port of `SpecialManager` (`class/hammer/SpecialManager.mt`). Special backgrounds
-  // (`fxMan.attachBg` / `clearBg`, `BG_*`) are task 2.6 and left as comments.
+  // Port of `SpecialManager` (`class/hammer/SpecialManager.mt`).
 
   private permanent(id: number): void {
     if (!this.actives[id]) {
@@ -944,7 +943,7 @@ export class PlayerEntity extends PhysicsEntity {
   interruptSpecial(id: number): void {
     if (!this.actives[id]) return;
     this.actives[id] = false;
-    // game.fxMan.clearBg(): special backgrounds, task 2.6
+    this.game.fxMan.clearBg();
 
     switch (id) {
       // *** 4. gold and black lamps
@@ -1148,8 +1147,8 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   /** `SpecialManager.getZodiac`: a score item above each enemy. */
-  private getZodiac(_id: number): void {
-    // game.fxMan.attachBg(Data.BG_CONSTEL, id, Data.SECOND * 4): task 2.4
+  private getZodiac(id: number): void {
+    this.game.fxMan.attachBg(Data.BG_CONSTEL, id, Data.SECOND * 4);
     for (const b of this.game.getList(Data.BAD_CLEAR)) {
       ScoreItem.attach(this.game, b.x, b.y - Data.CASE_HEIGHT * 2, 169, 0);
     }
@@ -1358,7 +1357,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 19. sunflower
       case 19:
         SmokeSupa.attach(game);
-        // game.fxMan.attachBg(Data.BG_ORANGE, null, Data.SECOND * 3): task 2.6
+        game.fxMan.attachBg(Data.BG_ORANGE, null, Data.SECOND * 3);
         for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.forceKill(null);
         }
@@ -1378,7 +1377,7 @@ export class PlayerEntity extends PhysicsEntity {
         if (bad) {
           game.fxMan.attachFx(bad.x, bad.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
           bad.forceKill(null);
-          // game.fxMan.attachBg(Data.BG_SINGER, null, Data.SECOND * 3): task 2.6
+          game.fxMan.attachBg(Data.BG_SINGER, null, Data.SECOND * 3);
         }
         break;
       }
@@ -1441,7 +1440,7 @@ export class PlayerEntity extends PhysicsEntity {
 
       // *** 28. silver cup
       case 28:
-        // game.fxMan.attachBg(Data.BG_STAR, null, Data.SECOND * 9): task 2.6
+        game.fxMan.attachBg(Data.BG_STAR, null, Data.SECOND * 9);
         for (const b of game.getList(Data.BAD_CLEAR) as BadEntity[]) {
           b.knock(Data.SECOND * 10);
         }
@@ -1692,7 +1691,7 @@ export class PlayerEntity extends PhysicsEntity {
         this.temporary(id, null);
         this.registerRecurring(() => this.onStrike(), Data.SECOND, true);
         this.onStrike();
-        // game.fxMan.attachBg(Data.BG_PYRAMID, null, 9999): task 2.6
+        game.fxMan.attachBg(Data.BG_PYRAMID, null, 9999);
         break;
 
       // *** 84. fire rain talisman
@@ -1708,7 +1707,7 @@ export class PlayerEntity extends PhysicsEntity {
         this.temporary(id, null);
         this.registerRecurring(() => this.onFireRain(), Data.SECOND * 0.8, true);
         this.onFireRain();
-        // game.fxMan.attachBg(Data.BG_STORM, null, 9999): task 2.6
+        game.fxMan.attachBg(Data.BG_STORM, null, 9999);
         break;
       }
 
@@ -1720,9 +1719,11 @@ export class PlayerEntity extends PhysicsEntity {
         break;
       }
 
-      // *** 86. ghost candy: ghostbuster mode. The glow filters and BG_GHOSTS are not ported.
+      // *** 86. ghost candy: ghostbuster mode. The glow filters on the player and the enemies
+      // are not ported.
       case 86:
         this.temporary(id, Data.SECOND * 60);
+        game.fxMan.attachBg(Data.BG_GHOSTS, null, Data.SECOND * 57);
         break;
 
       // *** 87. blue larva: turns a random enemy into a blue larva
@@ -1827,7 +1828,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 100. Guu doll
       case 100: {
         this.temporary(id, Data.SECOND * 30);
-        // game.fxMan.attachBg(Data.BG_GUU, null, Data.SECOND * 30): task 2.6
+        game.fxMan.attachBg(Data.BG_GUU, null, Data.SECOND * 30);
         const mc = game.depthMan.attach('hammer_fx_cloud', Data.DP_PLAYER);
         this.stick(mc, 0, -80);
         this.setElaStick(0.4);

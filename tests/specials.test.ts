@@ -268,3 +268,68 @@ describe('item effects (SpecialManager.execute)', () => {
     expect(session.player!.actives[94]).toBe(true);
   });
 });
+
+describe('special backgrounds (FxManager.attachBg, View.attachSpecialBg)', () => {
+  /** The level's own background clip (`View._bg`). */
+  function levelBg() {
+    return (session.view as unknown as { bg: { _visible: boolean } }).bg;
+  }
+
+  it('28: the silver cup shows the star background for 9 seconds in place of the level one', () => {
+    start();
+    useItem(28);
+    expect(session.view.specialBg).toBeNull(); // shown by the next FxManager.main
+    step(1);
+    const bg = session.view.specialBg!;
+    expect(bg).not.toBeNull();
+    expect(bg._currentframe).toBe(Data.BG_STAR + 1);
+    expect(levelBg()._visible).toBe(false);
+    step(Data.SECOND * 9);
+    expect(session.view.specialBg).toBeNull();
+    expect(levelBg()._visible).toBe(true);
+  });
+
+  it('queued backgrounds show one after the other', () => {
+    start();
+    useItem(19); // orange, 3 s
+    useItem(28); // star, 9 s
+    step(1);
+    expect(session.view.specialBg!._currentframe).toBe(Data.BG_ORANGE + 1);
+    step(Data.SECOND * 3);
+    expect(session.view.specialBg!._currentframe).toBe(Data.BG_STAR + 1);
+  });
+
+  it.each([40, 45, 51])('%i: a zodiac sign shows its constellation for 4 seconds', (id) => {
+    start();
+    useItem(id);
+    step(1);
+    const bg = session.view.specialBg!;
+    expect(bg._currentframe).toBe(Data.BG_CONSTEL + 1);
+    expect(bg.getClip('sub')!._currentframe).toBe(id - 40 + 1);
+    step(Data.SECOND * 4);
+    expect(session.view.specialBg).toBeNull();
+  });
+
+  it('83: the black pyramid background lasts until the level ends', () => {
+    start();
+    useItem(83);
+    step(Data.SECOND * 20);
+    expect(session.view.specialBg!._currentframe).toBe(Data.BG_PYRAMID + 1);
+    session.nextLevel();
+    step(1);
+    expect(session.view.specialBg).toBeNull();
+    expect(levelBg()._visible).toBe(true);
+  });
+
+  it('any effect ending clears the backgrounds (SpecialManager.interrupt)', () => {
+    start();
+    useItem(7); // shoe, temporary
+    useItem(28);
+    step(1);
+    expect(session.view.specialBg).not.toBeNull();
+    session.player!.interruptSpecial(7);
+    expect(session.view.specialBg).toBeNull();
+    step(1);
+    expect(session.view.specialBg).toBeNull();
+  });
+});

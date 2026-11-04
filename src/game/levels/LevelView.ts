@@ -31,6 +31,7 @@ export class LevelView {
   private field: SwfMovieClip | null = null;
   private tiles: SwfMovieClip | null = null;
   private bg: SwfMovieClip | null = null;
+  specialBg: SwfMovieClip | null = null;
   private leftBorder: SwfMovieClip | null = null;
   private rightBorder: SwfMovieClip | null = null;
 
@@ -168,6 +169,12 @@ export class LevelView {
     this.leftBorder._visible = !this.fl_hideBorders;
     this.rightBorder._visible = !this.fl_hideBorders;
 
+    // With a special background up, the level is drawn without its own background
+    // (the original's Flash 8 path draws the back layer from `tileCache`).
+    if (this.specialBg && this.bg) {
+      this.bg._visible = false;
+    }
+
     this.fl_attach = true;
   }
 
@@ -180,6 +187,34 @@ export class LevelView {
     if (this.world.fl_mirror) {
       this.bg._xscale *= -1;
       this.bg._x += Data.GAME_WIDTH;
+    }
+  }
+
+  /**
+   * Shows a special background (`hammer_special_bg`, frame `id + 1`) in place of the level's.
+   * The original's Flash 8 path (`fl_cache`) swaps the cached back layer for one drawn without
+   * `_bg`; hiding `_bg` (its other path) gives the same picture.
+   */
+  attachSpecialBg(id: number, subId: number | null): SwfMovieClip {
+    this.specialBg = this.depthMan.attach('hammer_special_bg', Data.DP_SPECIAL_BG);
+    this.specialBg.gotoAndStop(String(id + 1));
+
+    if (subId !== null) {
+      this.specialBg.getClip('sub')?.gotoAndStop(String(subId + 1));
+    }
+    if (this.bg) {
+      this.bg._visible = false;
+    }
+
+    return this.specialBg;
+  }
+
+  /** Removes the current special background. */
+  detachSpecialBg(): void {
+    this.specialBg?.removeMovieClip();
+    this.specialBg = null;
+    if (this.bg) {
+      this.bg._visible = true;
     }
   }
 
@@ -374,6 +409,10 @@ export class LevelView {
 
   destroy(): void {
     this.detach();
+    // Port only: the special background sits on the game's depth manager, which the original
+    // drops whole with its game; `changeSet` here destroys the view before the effects clear.
+    this.specialBg?.removeMovieClip();
+    this.specialBg = null;
     this.spriteBack.removeMovieClip();
     this.spriteTop.removeMovieClip();
   }

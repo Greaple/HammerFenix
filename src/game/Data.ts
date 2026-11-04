@@ -133,6 +133,22 @@ export const Data = {
   PARTICLE_FRAMB: 14,
   PARTICLE_FRAMB_SMALL: 14,
 
+  // Special backgrounds (frames of `hammer_special_bg`, minus one)
+  BG_STAR: 0,
+  BG_FLASH: 1,
+  BG_ORANGE: 2,
+  BG_FIREBALL: 3,
+  BG_HYPNO: 4,
+  BG_CONSTEL: 5,
+  BG_JAP: 6,
+  BG_GHOSTS: 7,
+  BG_FIRE: 8,
+  BG_PYRAMID: 9,
+  BG_SINGER: 10,
+  BG_STORM: 11,
+  BG_GUU: 12,
+  BG_SOCCER: 13,
+
   // Mover actions
   ACTION_MOVE: 1,
   ACTION_WALK: 2,

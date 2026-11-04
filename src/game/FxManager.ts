@@ -87,6 +87,8 @@ export class FxManager {
   private animList: FxAnim[] = [];
   private mcList: SwfMovieClip[] = [];
   private stack: { t: number; link: string; x: number; y: number }[] = [];
+  private bgList: { id: number; subId: number | null; timer: number }[] = [];
+  private fl_bg = false;
 
   private lastAlert: SwfMovieClip | null = null;
   private levelName: SwfMovieClip | null = null;
@@ -281,10 +283,33 @@ export class FxManager {
     this.stack.push({ t, x, y, link });
   }
 
+  /**
+   * Queues a special background shown in place of the level's for `timer` cycles (15 by
+   * default). Queued backgrounds show one after the other.
+   */
+  attachBg(id: number, subId: number | null, timer: number | null = null): void {
+    if (timer === null) {
+      timer = 15;
+    }
+    this.bgList.push({ id, subId, timer });
+  }
+
+  detachBg(): void {
+    this.fl_bg = false;
+    this.game.view.detachSpecialBg();
+  }
+
+  /** Drops the queued special backgrounds and the one showing. */
+  clearBg(): void {
+    this.bgList = [];
+    this.detachBg();
+  }
+
   clear(): void {
     this.detachExit();
     this.levelName?.removeMovieClip();
     this.levelName = null;
+    this.clearBg();
     this.igMsg?.removeMovieClip();
     this.igMsg = null;
     this.game.destroyList(Data.FX);
@@ -303,6 +328,20 @@ export class FxManager {
   }
 
   update(): void {
+    // Special backgrounds
+    if (this.bgList.length > 0) {
+      const b = this.bgList[0];
+      if (!this.fl_bg) {
+        this.fl_bg = true;
+        this.game.view.attachSpecialBg(b.id, b.subId);
+      }
+      b.timer -= 1;
+      if (b.timer <= 0) {
+        this.bgList.splice(0, 1);
+        this.detachBg();
+      }
+    }
+
     if (this.levelName) {
       this.nameTimer -= 1;
       if (this.nameTimer <= 0) {
