@@ -303,15 +303,20 @@ export class PlayerFireBallShoot extends ShootEntity {
   }
 
   override destroy(): void {
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 3); // PARTICLE_SPARK (task 2.5)
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 4); // PARTICLE_STONE
+    this.game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, 3);
+    this.game.fxMan.inGameParticles(Data.PARTICLE_STONE, this.x, this.y, 4);
     super.destroy();
   }
 
   override update(): void {
     super.update();
     if (this.game.rand.random(3) === 0) {
-      this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(3)); // SPARK
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_SPARK,
+        this.x,
+        this.y,
+        this.game.rand.random(3),
+      );
     }
   }
 }
@@ -347,8 +352,8 @@ export class PlayerPearlShoot extends ShootEntity {
   }
 
   hitWallAnim(): void {
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 2); // PARTICLE_ICE (task 2.5)
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 3); // PARTICLE_STONE
+    this.game.fxMan.inGameParticles(Data.PARTICLE_ICE, this.x, this.y, 2);
+    this.game.fxMan.inGameParticles(Data.PARTICLE_STONE, this.x, this.y, 3);
     if (this.dx < 0) {
       this.game.fxMan.attachFx(
         this.x + Data.CASE_WIDTH * 0.5,

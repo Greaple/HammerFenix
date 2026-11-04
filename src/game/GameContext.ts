@@ -77,6 +77,7 @@ export interface IGameContext {
   getOne(type: number): BaseEntity | null;
   getAnotherOne(type: number, e: BaseEntity): BaseEntity | null;
   destroyList(type: number): void;
+  destroySome(type: number, n: number): void;
   cleanKills(): void;
 
   countCombo(comboId: number): number;

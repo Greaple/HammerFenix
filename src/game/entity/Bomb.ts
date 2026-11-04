@@ -114,7 +114,7 @@ export class BombEntity extends MoverEntity {
     super.onPortalRefusal();
     this.dx = -this.dx * 3;
     this.dy = -5;
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 5);
+    this.game.fxMan.inGameParticles(Data.PARTICLE_PORTAL, this.x, this.y, 5);
   }
 
   override onBump(): void {
@@ -254,7 +254,12 @@ export class ClassicBomb extends PlayerBomb {
       e.freeze(Data.FREEZE_DURATION);
       this.shockWave(e, this.radius, this.power);
     }
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_ICE,
+      this.x,
+      this.y,
+      this.game.rand.random(2) + 2,
+    );
 
     const badBombs = this.bombGetClose(Data.BAD_BOMB) as BadBomb[];
     for (const bb of badBombs) {
@@ -381,7 +386,12 @@ export class GreenBomb extends PlayerBomb {
       e.freeze(Data.FREEZE_DURATION);
       this.shockWave(e, this.radius, this.power);
     }
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_ICE,
+      this.x,
+      this.y,
+      this.game.rand.random(2) + 2,
+    );
 
     const badBombs = this.bombGetClose(Data.BAD_BOMB) as BadBomb[];
     for (const bb of badBombs) {
@@ -434,7 +444,12 @@ export class RedBomb extends PlayerBomb {
       }
     }
 
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_ICE,
+      this.x,
+      this.y,
+      this.game.rand.random(2) + 2,
+    );
     this.game.fxMan.attachExplodeZone(this.x, this.y, this.radius);
 
     const players = this.game.getList(Data.PLAYER) as PlayerEntity[];
@@ -493,7 +508,12 @@ export class RepelBomb extends PlayerBomb {
   override onExplode(): void {
     super.onExplode();
 
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_ICE,
+      this.x,
+      this.y,
+      this.game.rand.random(2) + 2,
+    );
     this.game.fxMan.attachExplodeZone(this.x, this.y, this.radius);
 
     const players = this.game.getList(Data.PLAYER) as PlayerEntity[];
@@ -909,12 +929,12 @@ export class SoccerBall extends PlayerBomb {
     if (this.world.getCase(ocx, ocy) !== Data.GROUND) {
       this.dx = -this.dx;
       if (Math.abs(this.dx) > 7) {
-        // inGameParticlesDir (task 2.5)
-        this.game.fxMan.inGameParticles(
+        this.game.fxMan.inGameParticlesDir(
           Data.PARTICLE_DUST,
           this.x,
           this.y,
           this.game.rand.random(5) + 1,
+          this.dx,
         );
       }
     }

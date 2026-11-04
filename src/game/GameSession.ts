@@ -964,6 +964,17 @@ export class GameSession implements IGameContext {
     }
   }
 
+  /** `GameMode.destroySome`: destroys `n` random entities of a type. */
+  destroySome(type: number, n: number): void {
+    const l = [...this.getList(type)];
+    while (l.length > 0 && n > 0) {
+      const i = this.rand.random(l.length);
+      l[i].destroy();
+      l.splice(i, 1);
+      n--;
+    }
+  }
+
   cleanKills(): void {
     for (const item of this.unregList) {
       this.removeFromList(item.type, item.ent);
@@ -1342,6 +1353,7 @@ export class GameSession implements IGameContext {
     mc._y = y;
 
     this.fxMan.attachExplosion(x, y, 40);
+    this.fxMan.inGameParticles(Data.PARTICLE_PORTAL, x, y, 5);
     this.fxMan.attachShine(x, y);
     this.portalMcList[pid] = { x, y, mc, cpt: 0 };
     return true;

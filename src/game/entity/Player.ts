@@ -784,7 +784,21 @@ export class PlayerEntity extends PhysicsEntity {
       this.dx = -this.dx * 0.5;
       if (Math.abs(this.dx) >= 10 && this.world.getCase(this.cx, this.cy) <= 0) {
         this.game.shake(Math.round(Data.SECOND * 0.7), 5);
-        this.game.fxMan.inGameParticles(0, this.x, this.y, 4);
+        const rand = this.game.rand;
+        this.game.fxMan.inGameParticlesDir(
+          Data.PARTICLE_STONE,
+          this.x,
+          this.y,
+          1 + rand.random(3),
+          this.dx,
+        );
+        this.game.fxMan.inGameParticlesDir(
+          Data.PARTICLE_CLASSIC_BOMB,
+          this.x,
+          this.y,
+          3 + rand.random(5),
+          this.dx,
+        );
       }
     } else {
       super.onHitWall();
@@ -804,7 +818,12 @@ export class PlayerEntity extends PhysicsEntity {
     this.y = this.oldY;
     this.dx = -this.dx;
     this.knock(Data.SECOND * 0.5);
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(5) + 5);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_PORTAL,
+      this.x,
+      this.y,
+      this.game.rand.random(5) + 5,
+    );
     this.game.shake(Data.SECOND, 3);
     this.fl_stopStepping = true;
   }
@@ -1960,6 +1979,22 @@ export class PlayerEntity extends PhysicsEntity {
       if (this.game.cycle - this.recentKicks[i].t > 2) {
         this.recentKicks.splice(i, 1);
         i--;
+      }
+    }
+
+    // Guu doll: its cloud rains on the player, who grows back slowly and dies too small
+    if (this.actives[100]) {
+      const rand = this.game.rand;
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_RAIN,
+        this.x + rand.random(20) * (rand.random(2) * 2 - 1),
+        this.y - 60 - rand.random(5),
+        rand.random(2) + 1,
+      );
+      this.scale(Math.min(100, (this.scaleFactor + 0.002) * 100));
+      if (this.scaleFactor <= 0.6) {
+        this.killHit(null);
+        this.interruptSpecial(100);
       }
     }
 

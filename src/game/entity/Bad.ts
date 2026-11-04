@@ -65,7 +65,12 @@ export class BadEntity extends MoverEntity {
 
   override killHit(dx: number | null): void {
     if (this.fl_freeze) {
-      this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(3) + 2);
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_ICE,
+        this.x,
+        this.y,
+        this.game.rand.random(3) + 2,
+      );
       this.game.fxMan.attachExplosion(this.x, this.y - Data.CASE_HEIGHT * 0.5, Data.CASE_WIDTH * 2);
       this.melt();
     }
@@ -110,7 +115,12 @@ export class BadEntity extends MoverEntity {
             this.freeze(Data.FREEZE_DURATION);
             this.setCombo(null);
             this.game.fxMan.attachExplodeZone(this.x, this.y - 5, 30);
-            this.game.fxMan.inGameParticles(0, this.x, this.y - 5, 3 + this.game.rand.random(3));
+            this.game.fxMan.inGameParticles(
+              Data.PARTICLE_CLASSIC_BOMB,
+              this.x,
+              this.y - 5,
+              3 + this.game.rand.random(3),
+            );
           } else if (!et.fl_shield) {
             et.killHit(et.x < this.x ? -1 : 1);
           }
@@ -257,7 +267,12 @@ export class BadEntity extends MoverEntity {
   override onHitGround(h: number): void {
     super.onHitGround(h);
     if (this.fl_freeze) {
-      this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(3) + 2);
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_ICE_BAD,
+        this.x,
+        this.y,
+        this.game.rand.random(3) + 2,
+      );
       if (h >= Data.DUST_FALL_HEIGHT) {
         this.game.fxMan.dust(this.cx, this.cy + 1);
       }
@@ -559,7 +574,12 @@ export class WalkerBad extends BadEntity {
     if (this.fl_freeze && Math.abs(this.dx) >= 4) {
       if (this.recentParticles <= 0) {
         this.game.shake(Math.round(Data.SECOND * 0.2), 2);
-        this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(4) + 1);
+        this.game.fxMan.inGameParticles(
+          Data.PARTICLE_ICE_BAD,
+          this.x,
+          this.y,
+          this.game.rand.random(4) + 1,
+        );
         this.recentParticles = 10;
       }
       if (this.fl_stable) {
@@ -1807,7 +1827,13 @@ class BombeBad extends JumperBad {
     }
     this.game.audio.playSound('sound_bomb_black', Data.CHAN_BOMB);
     this.dropReward();
-    this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(4) + 5);
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_METAL,
+      this.x,
+      this.y,
+      this.game.rand.random(4) + 5,
+    );
+    this.game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, this.game.rand.random(4));
     this.onKill();
     this.destroy();
   }
@@ -2042,6 +2068,12 @@ class CrawlerBad extends WallWalkerBad {
     s.dx = -this.cp.x * CrawlerBad.SHOOT_SPEED;
     s.dy = -this.cp.y * CrawlerBad.SHOOT_SPEED;
     s.scale(70);
+    const n = this.game.rand.random(3) + 2;
+    if (this.cp.x !== 0) {
+      this.game.fxMan.inGameParticlesDir(Data.PARTICLE_BLOB, this.x, this.y, n, -this.cp.x);
+    } else {
+      this.game.fxMan.inGameParticles(Data.PARTICLE_BLOB, this.x, this.y, n);
+    }
     this.game.fxMan.attachExplosion(this.x, this.y, 20);
 
     if (this.sub) {
@@ -2142,6 +2174,26 @@ class CrawlerBad extends WallWalkerBad {
     }
   }
 
+  /** A long fall squashes the blob and splashes (`Crawler.onHitGround`). */
+  override onHitGround(h: number): void {
+    super.onHitGround(h);
+    if (Math.abs(h) >= Data.CASE_HEIGHT * 3) {
+      if (this.sub) {
+        this.sub._xscale = 2 * 100 * this.scaleFactor;
+        this.sub._yscale = 0.2 * 100 * this.scaleFactor;
+        this.sub._y = this.ySubBase + 10;
+      }
+      if (!this.fl_freeze) {
+        this.game.fxMan.inGameParticles(
+          Data.PARTICLE_BLOB,
+          this.x,
+          this.y,
+          this.game.rand.random(3) + 2,
+        );
+      }
+    }
+  }
+
   override update(): void {
     if (this.fl_attack) {
       this.dx = 0;
@@ -2191,6 +2243,16 @@ class SawBad extends WallWalkerBad {
   private stun(): void {
     if (this.fl_stop) return;
     this.game.fxMan.attachExplosion(this.x, this.y - Data.CASE_HEIGHT * 0.5, 30);
+    if (!this.fl_stun) {
+      this.game.fxMan.inGameParticlesDir(Data.PARTICLE_METAL, this.x, this.y, 5, this.dx);
+      this.game.fxMan.inGameParticlesDir(
+        Data.PARTICLE_STONE,
+        this.x,
+        this.y,
+        this.game.rand.random(4),
+        this.dx,
+      );
+    }
     this.fl_stun = true;
     this.fl_wallWalk = false;
     this.stunTimer = SawBad.STUN_DURATION;
@@ -2218,12 +2280,23 @@ class SawBad extends WallWalkerBad {
   }
 
   override hit(e: BaseEntity): void {
+    if (this.isHealthy()) {
+      if (e.isType(Data.PLAYER)) {
+        this.game.fxMan.inGameParticles(
+          Data.PARTICLE_CLASSIC_BOMB,
+          this.x,
+          this.y,
+          this.game.rand.random(5) + 3,
+        );
+      }
+    }
     super.hit(e);
     if (this.isHealthy() && e.isType(Data.BOMB) && !e.isType(Data.BAD_BOMB)) {
       const b = e as BombEntity;
       b.setLifeTimer(Data.SECOND * 0.6);
       b.dx = this.dx !== 0 ? -this.dx : -this.cp.x * 4;
       b.dy = this.cp.y !== 0 ? -this.cp.y * 13 : -8;
+      this.game.fxMan.inGameParticlesDir(Data.PARTICLE_SPARK, b.x, b.y, 2, b.dx);
     }
   }
 
@@ -2242,6 +2315,7 @@ class SawBad extends WallWalkerBad {
     this.fl_wallWalk = true;
     this.moveToSafePos();
     this.updateSpeed();
+    this.game.fxMan.inGameParticles(Data.PARTICLE_STONE, this.x, this.y, 3);
   }
 
   override endUpdate(): void {
@@ -2302,6 +2376,9 @@ class SawBad extends WallWalkerBad {
     }
 
     if (this.fl_stun) {
+      if (this.game.rand.random(10) === 0) {
+        this.game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, 1);
+      }
       this.stunTimer -= 1;
       if (this.stunTimer <= 0) {
         this.fl_stun = false;
@@ -2376,7 +2453,13 @@ class LitchiBad extends JumperBad {
     child.dir = this.dir;
     child.fl_ninFoe = this.fl_ninFoe;
     child.fl_ninFriend = this.fl_ninFriend;
-    this.game.fxMan.inGameParticles(0, this.x, this.y - 10, 6);
+    const rand = this.game.rand;
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_LITCHI,
+      this.x + rand.random(20) * (rand.random(2) * 2 - 1),
+      this.y - rand.random(20),
+      rand.random(3) + 5,
+    );
     child.playAnim(Data.ANIM_BAD_SHOOT_START);
     this.child = child;
   }
@@ -2447,8 +2530,14 @@ class FramboiseBad extends ShooterBad {
     }
     if (invalid) return;
 
+    // Framboise.phaseOut (the phasing itself is task 2.12)
+    this.game.fxMan.inGameParticles(
+      Data.PARTICLE_FRAMB_SMALL,
+      this.x,
+      this.y,
+      this.game.rand.random(3) + 2,
+    );
     this.game.fxMan.attachExplosion(this.x, this.y, 40);
-    this.game.fxMan.inGameParticles(0, this.x, this.y, 4);
     this.moveTo(BaseEntity.x_ctr(ctx), BaseEntity.y_ctr(cty));
     this.game.fxMan.attachExplosion(this.x, this.y, 40);
     this.shootCD = Data.SECOND * 1.5;

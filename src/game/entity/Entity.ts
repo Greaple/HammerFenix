@@ -833,6 +833,20 @@ export class PhysicsEntity extends AnimatorEntity {
         this.x = Data.GAME_WIDTH - Data.BORDER_MARGIN - 1;
       }
     }
+
+    // Bubbles behind what moves on water levels ($AQUA)
+    if (this.game.fl_aqua) {
+      if (!this.isType(Data.FX) && (this.dx !== 0 || this.dy !== 0)) {
+        if (this.game.rand.random(100) <= 10) {
+          this.game.fxMan.inGameParticles(
+            Data.PARTICLE_BUBBLE,
+            this.x + this.game.rand.random(Data.CASE_WIDTH) * (this.game.rand.random(2) * 2 - 1),
+            this.y - this.game.rand.random(Data.CASE_HEIGHT),
+            1,
+          );
+        }
+      }
+    }
     super.endUpdate();
   }
 

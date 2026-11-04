@@ -1,6 +1,7 @@
 import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { Data } from './Data';
 import type { IGameContext } from './GameContext';
+import { Particle } from './entity/Particle';
 
 /**
  * Port of `Animation` (`class/hammer/Animation.mt`):
@@ -263,19 +264,43 @@ export class FxManager {
     }
   }
 
-  inGameParticles(_id: number, x: number, y: number, n: number): void {
-    if (this.game.fl_lock) return;
-    const count = Math.min(8, Math.max(1, n));
-    for (let i = 0; i < count; i++) {
-      const ox = (this.game.rand.next() - 0.5) * 28;
-      const oy = -this.game.rand.next() * 22;
-      const fx = this.attachFx(x + ox, y + oy, 'hammer_fx_partIce');
-      if (fx) {
-        fx.mc.rotationDeg = this.game.rand.random(360);
-        const s = 40 + this.game.rand.random(70);
-        fx.mc._xscale = s;
-        fx.mc._yscale = s;
+  inGameParticles(id: number, x: number, y: number, n: number): void {
+    this.inGameParticlesDir(id, x, y, n, null);
+  }
+
+  /**
+   * `n` particles of type `id` (`PARTICLE_*`), thrown left and right in turn, or all towards
+   * `dir` (its sign) when given. At most `MAX_FX` at once: past it, half as many are thrown and
+   * random old ones removed. The original also skips them in low detail, which the port lacks.
+   */
+  inGameParticlesDir(id: number, x: number, y: number, n: number, dir: number | null): void {
+    if (this.game.fl_lock) {
+      return;
+    }
+
+    // Cleanup of the fx
+    const l = this.game.getList(Data.FX);
+    if (l.length + n > Data.MAX_FX) {
+      n = Math.ceil(n * 0.5);
+      this.game.destroySome(Data.FX, n + l.length - Data.MAX_FX);
+    }
+
+    let fl_left = this.game.rand.random(2) === 0;
+    for (let i = 0; i < n; i++) {
+      const mc = Particle.attach(this.game, id, x, y);
+      if (x <= Data.CASE_WIDTH) {
+        fl_left = false;
       }
+      if (x >= Data.GAME_WIDTH - Data.CASE_WIDTH) {
+        fl_left = true;
+      }
+      fl_left = dir !== null ? dir < 0 : fl_left;
+
+      // Rain and bubbles have no next move
+      if (mc.next) {
+        mc.next.dx = fl_left ? -Math.abs(mc.next.dx) : Math.abs(mc.next.dx);
+      }
+      fl_left = !fl_left;
     }
   }
 

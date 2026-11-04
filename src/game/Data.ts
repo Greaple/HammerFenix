@@ -115,7 +115,8 @@ export const Data = {
   STEP_MAX: 20,
   DEATH_LINE: 550,
 
-  // Particles (`entity.fx.Particle`, task 2.5)
+  // Particles (`entity.fx.Particle`, frames of `hammer_fx_particle`)
+  MAX_FX: 16,
   PARTICLE_ICE: 1,
   PARTICLE_CLASSIC_BOMB: 2,
   PARTICLE_STONE: 3,

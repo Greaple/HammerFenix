@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1 is done. Phase 2: 2.1 to 2.4, 2.6 and 2.7 are done; next is the particle system (2.5). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phase 1 is done. Phase 2: 2.1 to 2.7 are done; next is the first boss, Bat (2.8). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -27,7 +27,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] Bug (found in 2.2): SWF clip masks (`clipDepth`) are drawn as plain rectangles (`SwfMaskClip`), not the mask shape. The soccer ball shows a strip of its pattern instead of a round ball; 30 exported symbols use masks (player, bombs, items, portals, the boss bar). Fixed: masks are vector `Graphics` built from the mask character's paths (`SwfLibrary.getMaskContext`, holes kept); `_width` / `_height` scale them. Limit: a sprite mask uses its first frame only.
 - [x] 2.3 The 24 missing item effects. All 118 effects of `SpecialManager.execute` are now a faithful port (no more "+2500 points" fallback), with screen flips (`GameMode.flipX/flipY`), the end-of-level stack, level conversion into pearls and the perfect bonus, and warps that stop at boss and empty levels. Several existing effects were fixed on the way (wrong curse icons, missing global flag, darkness). Special backgrounds stay for 2.6. Tested in `tests/specials.test.ts`.
 - [x] 2.4 Zodiac items 40-63: add the constellation background (`fxMan.attachBg(BG_CONSTEL)`). Each sign shows its constellation (`sub` frame) for 4 seconds.
-- [ ] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants). `FxManager.inGameParticles` currently renders every type as ice.
+- [x] 2.5 Particle system (`entity/fx/Particle.mt`, `PARTICLE_*` constants), in `entity/Particle.ts`. Every caller uses its original type; the missing calls were added (Crawler, Saw, Bombe, portal opening, Guu doll rain, aqua bubbles), with `MAX_FX` and `destroySome`. Soccer, Framboise's other calls and the bosses' wait for 4.4, 2.12, 2.8 and 2.9. Tested in `tests/particles.test.ts`.
 - [x] 2.6 Special backgrounds: `FxManager.attachBg/detachBg/clearBg` and the `BG_*` effects. `View.attachSpecialBg` hides the level background under `hammer_special_bg`; items 19, 21, 28, 83, 84, 86 and 100 use it. Tested in `tests/specials.test.ts`.
 - [x] 2.7 Level transition scroll (`levels/ViewManager.mt`) and lighting. The IA map is parsed 30 cases per frame (17 frames), then the level scrolls up over a snapshot of the old one (40 frames); portals scroll sideways, or fade when arriving at no portal. Darkness (`GameMode.updateDarkness`) fully ported: light holes on the players and torches, candle and light bulb. `ViewLight.mt` turned out to be a wireframe preview for the `Browser` dev tool, out of scope. Replay snapshots re-recorded. Tested in `tests/transitions.test.ts`.
 - [ ] 2.8 Boss: Bat (`entity/boss/Bat.mt`, level 100) and `isBossLevel` logic, boss music.
