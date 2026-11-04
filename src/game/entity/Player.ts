@@ -16,7 +16,13 @@ import {
 } from './Bomb';
 import { BaseEntity, PhysicsEntity } from './Entity';
 import { type ItemEntity, ScoreItem, SpecialItem } from './Item';
-import { PlayerArrowShoot, PlayerFireBallShoot, PlayerPearlShoot, type ShootEntity } from './Shoot';
+import {
+  HammerShoot,
+  PlayerArrowShoot,
+  PlayerFireBallShoot,
+  PlayerPearlShoot,
+  type ShootEntity,
+} from './Shoot';
 import { ArrowSupa, BallSupa, BubbleSupa, IceMeteorSupa, SmokeSupa, TonsSupa } from './Supa';
 
 const WEAPON_DURATION = Data.SECOND * 30;
@@ -918,7 +924,8 @@ export class PlayerEntity extends PhysicsEntity {
     }
   }
 
-  private interruptSpecial(id: number): void {
+  /** `SpecialManager.interrupt` */
+  interruptSpecial(id: number): void {
     if (!this.actives[id]) return;
     this.actives[id] = false;
 
@@ -1312,6 +1319,12 @@ export class PlayerEntity extends PhysicsEntity {
         });
         this.onStrike();
         break;
+      case 85: {
+        const s = HammerShoot.attach(this.game, this.x, this.y);
+        s.setOwner(this);
+        this.temporary(id, null);
+        break;
+      }
       case 86:
         this.temporary(id, Data.SECOND * 60);
         break;

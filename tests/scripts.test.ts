@@ -17,7 +17,7 @@ describe('level scripts', async () => {
   });
 
   it('only need what the port has, apart from the known missing parts', () => {
-    expect(details('unported')).toEqual(['code trigger #6: SoccerBall (task 2.2)']);
+    expect(details('unported')).toEqual([]);
   });
 
   it('report matches its snapshot', () => {

@@ -1,8 +1,8 @@
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
 import type { IGameContext } from '../GameContext';
-import type { BadEntity } from './Bad';
-import { type BaseEntity, MoverEntity } from './Entity';
+import { type BadEntity, createBad } from './Bad';
+import { BaseEntity, MoverEntity } from './Entity';
 import { ScoreItem } from './Item';
 import type { PlayerEntity } from './Player';
 
@@ -507,6 +507,29 @@ export class RepelBomb extends PlayerBomb {
         p.dy = Math.sin(ang) * this.power * ratio;
       }
     }
+
+    // Ball
+    const l = this.game.getList(Data.SOCCERBALL) as SoccerBall[];
+    for (let i = 0; i < l.length; i++) {
+      const ball = l[i];
+      const dist = this.distance(ball.x, ball.y);
+      if (dist <= this.radius) {
+        ball.lastPlayer = this.owner;
+        const ratio = (this.radius - dist) / this.radius;
+        const ang = Math.atan2(ball.y - this.y, ball.x - this.x);
+        ball.dx = Math.cos(ang) * this.power * ratio * 1.5;
+        ball.dy = Math.sin(ang) * this.power * ratio * 1.5;
+        if (ball.dy < 4 && ball.dy > -8) {
+          ball.dy = -8;
+        }
+        ball.burn();
+        if (ball.fl_stable) {
+          ball.dx *= 2;
+        } else {
+          ball.dx *= 1.5;
+        }
+      }
+    }
   }
 }
 
@@ -727,5 +750,196 @@ export class MineBomb extends BadBomb {
         }
       }
     }
+  }
+}
+
+/**
+ * Port of `entity.bomb.bad.BossBomb`: Tuberculoz's bomb (task 2.9). It hatches an Orange that
+ * drops nothing, angrier as the boss loses lives.
+ */
+export class BossBomb extends BadBomb {
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    const rand = game.rand;
+    this.duration = Data.SECOND * 2 + (rand.random(50) / 10) * (rand.random(2) * 2 - 1);
+    this.fl_blink = true;
+    this.fl_alphaBlink = false;
+    this.blinkColorAlpha = 50;
+    this.explodeSound = null;
+  }
+
+  static attach(game: IGameContext, x: number, y: number): BossBomb {
+    const mc = new BossBomb(game, game.depthMan.attach('hammer_bomb_boss', Data.DP_BOMBS));
+    mc.initBomb(x, y);
+    return mc;
+  }
+
+  override initBomb(x: number, y: number): void {
+    super.initBomb(x, y);
+    this.setLifeTimer(this.duration * 1.5);
+    this.updateLifeTimer(this.duration);
+  }
+
+  override duplicate(): BossBomb {
+    return BossBomb.attach(this.game, this.x, this.y);
+  }
+
+  override onExplode(): void {
+    super.onExplode();
+    // `entity.bad.walker.Orange.attach`: not through `game.attachBad`
+    const b = createBad(
+      this.game,
+      Data.BAD_ORANGE,
+      this.x - Data.CASE_WIDTH * 0.5,
+      this.y - Data.CASE_HEIGHT * 0.5,
+    );
+    const boss = this.game.getOne(Data.BOSS) as { lives: number } | null;
+    // AS2: with no boss, `undefined <= 70` is false
+    const lives = boss?.lives ?? NaN;
+    if (lives <= 70) {
+      b.angerMore();
+    }
+    if (lives <= 50) {
+      b.angerMore();
+    }
+    b.moveUp(10);
+    b.knock(Data.SECOND);
+    // `b.dropReward = null`: calling a null method does nothing in AS2
+    b.dropReward = () => {};
+    this.playAnim(Data.ANIM_BOMB_EXPLODE);
+  }
+
+  /** Easy to push back. */
+  override onKick(p: PlayerEntity): void {
+    super.onKick(p);
+    this.setLifeTimer(this.lifeTimer + Data.SECOND * 0.5);
+  }
+}
+
+/** Port of `entity.bomb.player.SoccerBall`: the ball of the soccer mode (task 4.4) and of level scripts. */
+export class SoccerBall extends PlayerBomb {
+  static readonly TOP_SPEED = 4;
+
+  speed = 0;
+  burnTimer: number;
+  lastPlayer: PlayerEntity | null;
+
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    this.lastPlayer = null;
+    this.duration = 999999;
+    this.burnTimer = 0;
+    this.bounceFactor = 0.8;
+    this.fl_bounce = true;
+    this.slideFriction = Data.FRICTION_SLIDE * 0.9;
+  }
+
+  static attach(game: IGameContext, x: number, y: number): SoccerBall {
+    const mc = new SoccerBall(game, game.depthMan.attach('hammer_bomb_soccer', Data.DP_BOMBS));
+    mc.initBomb(x, y);
+    return mc;
+  }
+
+  /** `init` runs before `initBomb` moves the ball, so the shine appears at (0, 0). */
+  override initBomb(x: number, y: number): void {
+    this.register(Data.SOCCERBALL);
+    // FxManager.addGlow(this, 0x808080, 2): glow filters are not ported
+    this.game.fxMan.attachShine(this.x, this.y - Data.CASE_HEIGHT * 0.5);
+    super.initBomb(x, y);
+  }
+
+  override duplicate(): null {
+    return null;
+  }
+
+  override upgradeBomb(_p: PlayerEntity): void {
+    // do nothing
+  }
+
+  override onKick(p: PlayerEntity): void {
+    super.onKick(p);
+    this.lastPlayer = p;
+    if (Math.abs(this.dx) < 10) {
+      this.dx *= 3;
+      this.dy *= 1.1;
+    }
+  }
+
+  /** Sets the ball on fire. */
+  burn(): void {
+    this.burnTimer = Data.SECOND;
+  }
+
+  override onExplode(): void {
+    // never explodes
+  }
+
+  protected override infix(): void {
+    super.infix();
+    const id = this.world.getCase(this.cx, this.cy);
+    // `goal` exists only in the soccer mode: elsewhere the AS2 call does nothing
+    const game = this.game as unknown as { goal?: (side: number) => void };
+    if (id === Data.FIELD_GOAL_1) {
+      game.goal?.(1);
+      this.destroy();
+    }
+    if (id === Data.FIELD_GOAL_2) {
+      game.goal?.(0);
+      this.destroy();
+    }
+  }
+
+  override endUpdate(): void {
+    super.endUpdate();
+    const sub = this.sub;
+    if (sub) {
+      sub.rotationDeg += this.dx * 5;
+      if (this.dx > 0) {
+        sub._xscale = -Math.abs(sub._xscale);
+      }
+      if (this.dx < 0) {
+        sub._xscale = Math.abs(sub._xscale);
+      }
+    }
+  }
+
+  override onHitWall(): void {
+    const ocx = BaseEntity.x_rtc(this.oldX);
+    const ocy = BaseEntity.y_rtc(this.oldY);
+    if (this.world.getCase(ocx, ocy) !== Data.GROUND) {
+      this.dx = -this.dx;
+      if (Math.abs(this.dx) > 7) {
+        // inGameParticlesDir (task 2.5)
+        this.game.fxMan.inGameParticles(
+          Data.PARTICLE_DUST,
+          this.x,
+          this.y,
+          this.game.rand.random(5) + 1,
+        );
+      }
+    }
+  }
+
+  override update(): void {
+    this.speed = Math.sqrt(Math.pow(this.dx, 2) + Math.pow(this.dy, 2));
+    this.animFactor = (0.5 * this.speed) / SoccerBall.TOP_SPEED;
+    this.fl_airKick = true;
+
+    if (this.burnTimer > 0) {
+      const rand = this.game.rand;
+      this.game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, rand.random(3));
+      const fx = this.game.fxMan.attachFx(
+        this.x + rand.random(5) * (rand.random(2) * 2 - 1),
+        this.y - rand.random(20),
+        'hammer_fx_ballBurn',
+      );
+      const ratio = Math.min(1, this.speed / SoccerBall.TOP_SPEED);
+      if (fx) {
+        fx.mc._xscale = 100 * ratio;
+        fx.mc._yscale = fx.mc._xscale;
+      }
+      this.burnTimer -= 1;
+    }
+    super.update();
   }
 }

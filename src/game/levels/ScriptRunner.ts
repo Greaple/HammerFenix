@@ -1,6 +1,7 @@
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { LevelData } from '../data/types';
+import { SoccerBall } from '../entity/Bomb';
 import { BaseEntity } from '../entity/Entity';
 import { ItemEntity, ScoreItem, SpecialItem } from '../entity/Item';
 import type { PlayerEntity } from '../entity/Player';
@@ -152,9 +153,7 @@ export class ScriptRunner {
   ];
 
   /** Code triggers (`codeTrigger`) the port does not run yet, with the task that adds them. */
-  static readonly UNPORTED_CODE_TRIGGERS: Readonly<Record<number, string>> = {
-    6: 'SoccerBall (task 2.2)',
-  };
+  static readonly UNPORTED_CODE_TRIGGERS: Readonly<Record<number, string>> = {};
 
   readonly game: IGameContext;
   readonly data: LevelData;
@@ -951,6 +950,16 @@ export class ScriptRunner {
             game.forcedGoto(102);
           }
         }
+        break;
+      }
+
+      case 6: {
+        // soccer balls on the special slots
+        const slots = game.world.current.specialSlots;
+        const sl = slots[game.rand.random(slots.length)];
+        const b = SoccerBall.attach(game, BaseEntity.x_ctr(sl.x), BaseEntity.y_ctr(sl.y));
+        b.dx = (10 + game.rand.random(10)) * (game.rand.random(2) * 2 - 1);
+        b.dy = -game.rand.random(5) - 5;
         break;
       }
 

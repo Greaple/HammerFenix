@@ -2,6 +2,7 @@ import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { IGameContext } from '../GameContext';
 import type { BadEntity } from './Bad';
+import type { BombEntity } from './Bomb';
 import { type BaseEntity, PhysicsEntity } from './Entity';
 import type { PlayerEntity } from './Player';
 
@@ -398,5 +399,342 @@ export class PlayerPearlShoot extends ShootEntity {
         this.shotList.push(et.uniqId);
       }
     }
+  }
+}
+
+/** Port of `entity.shoot.FireRain`: a drop of the fire rain (item 84), burning the enemies it hits. */
+export class FireRainShoot extends ShootEntity {
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    this.shootSpeed = 10 + game.rand.random(5);
+    this.fl_checkBounds = false;
+  }
+
+  protected override initShootEntity(): void {
+    super.initShootEntity();
+    this.playAnim(Data.ANIM_SHOOT_LOOP);
+  }
+
+  static attach(game: IGameContext, x: number, y: number): FireRainShoot {
+    const s = new FireRainShoot(game, game.depthMan.attach('hammer_shoot_firerain', Data.DP_SHOTS));
+    s.initShoot(x, y - 10);
+    return s;
+  }
+
+  override onDeathLine(): void {
+    this.destroy();
+  }
+
+  override hit(e: BaseEntity): void {
+    if (e.isType(Data.BAD_CLEAR)) {
+      const et = e as BadEntity;
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_SPARK,
+        this.x,
+        this.y,
+        this.game.rand.random(5) + 1,
+      );
+      et.burn();
+      this.destroy();
+    }
+  }
+
+  // Never called: shots have fl_hitWall and fl_hitGround off (the original has them commented out)
+  override onHitWall(): void {
+    this.hitLevel();
+  }
+
+  override onHitGround(_h: number): void {
+    this.hitLevel();
+  }
+
+  /** Hits the level. */
+  hitLevel(): void {
+    this.game.fxMan.attachExplodeZone(this.x, this.y, 30);
+    this.game.fxMan.inGameParticles(Data.PARTICLE_STONE, this.x, this.y, this.game.rand.random(4));
+    this.destroy();
+  }
+
+  override update(): void {
+    super.update();
+    if (this.x < 0) {
+      this.hitLevel();
+    }
+  }
+}
+
+/** What a Hammer needs from its carrier (`entity.Player` and its `SpecialManager`). */
+interface HammerCarrier {
+  x: number;
+  y: number;
+  dir: number;
+  fl_kill: boolean;
+  actives: boolean[];
+  /** `specialMan.interrupt` */
+  interruptSpecial(id: number): void;
+}
+
+/** Port of `entity.shoot.Hammer` (item 85): a hammer held in front of the player, killing enemies. */
+export class HammerShoot extends ShootEntity {
+  player!: HammerCarrier;
+
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    this.shootSpeed = 0;
+  }
+
+  protected override initShootEntity(): void {
+    super.initShootEntity();
+    this.playAnim(Data.ANIM_SHOOT_LOOP);
+  }
+
+  static attach(game: IGameContext, x: number, y: number): HammerShoot {
+    const s = new HammerShoot(game, game.depthMan.attach('hammer_shoot_hammer', Data.DP_SPEAR));
+    s.initShoot(x, y - 10);
+    return s;
+  }
+
+  override destroy(): void {
+    this.player.interruptSpecial(85);
+    this.game.fxMan.attachFx(this.x, this.y - Data.CASE_HEIGHT / 2, 'hammer_fx_pop');
+    super.destroy();
+  }
+
+  setOwner(p: HammerCarrier): void {
+    this.player = p;
+  }
+
+  override endUpdate(): void {
+    super.endUpdate();
+    // No owner yet on the first call (from `initShoot`): AS2 compares undefined, always false
+    const dir = this.player?.dir ?? 0;
+    if (dir > 0 && this.mc._xscale < 0) {
+      this.mc._xscale = Math.abs(this.mc._xscale);
+    }
+    if (dir < 0 && this.mc._xscale > 0) {
+      this.mc._xscale = -Math.abs(this.mc._xscale);
+    }
+  }
+
+  override update(): void {
+    let hx = this.player.x + this.player.dir * Data.CASE_WIDTH * 0.7;
+    hx = Math.min(Data.GAME_WIDTH - 1, hx);
+    hx = Math.max(1, hx);
+    let hy = this.player.y - Data.CASE_HEIGHT * 0.7;
+    hx = Math.max(1, Math.min(Data.GAME_WIDTH - 1, hx));
+    hy = Math.max(20, Math.min(Data.GAME_HEIGHT - 1, hy));
+    this.moveTo(hx, hy);
+    super.update();
+
+    // Contact
+    const l = this.game.getClose(Data.BAD, this.x, this.y, Data.CASE_WIDTH * 2, false);
+    for (let i = 0; i < l.length; i++) {
+      (l[i] as BadEntity).killHit(this.player.dir * 9);
+    }
+
+    if (this.player.fl_kill || this.game.fl_clear || !this.player.actives[85]) {
+      this.destroy();
+    }
+  }
+}
+
+/** Port of `entity.shoot.BossFireBall`: a fire ball spiralling out of the Bat boss (task 2.8). */
+export class BossFireBallShoot extends ShootEntity {
+  maxDist: number;
+  bat!: { x: number; y: number };
+  ang = 0; // radians
+  dist: number;
+  distSpeed: number;
+  turnSpeed: number;
+
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    this.fl_checkBounds = false;
+    this.fl_largeTrigger = true;
+    this.turnSpeed = 0.025;
+    this.distSpeed = 2;
+    this.dist = Data.CASE_WIDTH * 0.2;
+    this.maxDist = Data.CASE_WIDTH * 5;
+    this.disablePhysics();
+  }
+
+  protected override initShootEntity(): void {
+    super.initShootEntity();
+    this.playAnim(Data.ANIM_SHOOT_LOOP);
+  }
+
+  /** `a` in degrees. */
+  initBossShoot(b: { x: number; y: number }, a: number): void {
+    this.bat = b;
+    this.ang = (a * Math.PI) / 180;
+    this.center();
+  }
+
+  /** Places the fire ball around the boss. */
+  center(): void {
+    this.moveTo(
+      this.bat.x + Math.cos(this.ang) * this.dist,
+      this.bat.y + Math.sin(this.ang) * this.dist,
+    );
+  }
+
+  static attach(game: IGameContext, x: number, y: number): BossFireBallShoot {
+    const s = new BossFireBallShoot(
+      game,
+      game.depthMan.attach('hammer_shoot_boss_fireball', Data.DP_SHOTS),
+    );
+    s.initShoot(x, y - 10);
+    return s;
+  }
+
+  override destroy(): void {
+    this.game.fxMan.attachExplodeZone(this.x, this.y, Data.CASE_WIDTH * 2);
+    super.destroy();
+  }
+
+  override hit(e: BaseEntity): void {
+    if (e.isType(Data.BOMB)) {
+      const et = e as BombEntity;
+      if (!et.fl_explode) {
+        this.game.fxMan.attachFx(et.x, et.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
+        et.destroy();
+        this.game.fxMan.inGameParticles(Data.PARTICLE_CLASSIC_BOMB, this.x, this.y, 6);
+        this.destroy();
+        return;
+      }
+    }
+    if (e.isType(Data.PLAYER)) {
+      (e as PlayerEntity).killHit(this.dx);
+    }
+  }
+
+  override update(): void {
+    super.update();
+
+    const ocx = this.cx;
+    const ocy = this.cy;
+    this.ang += this.turnSpeed;
+    this.dist += this.distSpeed;
+    this.dist = Math.min(this.dist, this.maxDist);
+    this.center();
+    if (ocx !== this.cx || ocy !== this.cy) {
+      this.checkHits();
+    }
+  }
+}
+
+/** What a FramBall needs from its owner (`entity.bad.walker.Framboise`, task 2.12). */
+export interface FramBallOwner {
+  tx: number;
+  ty: number;
+  anger: number;
+  onArrived(fb: FramBallShoot): void;
+}
+
+/**
+ * Port of `entity.shoot.FramBall`: a fragment of a Framboise flying to the spot where it
+ * reassembles (task 2.12).
+ */
+export class FramBallShoot extends ShootEntity {
+  turnSpeed: number;
+  owner!: FramBallOwner;
+  ang: number;
+  fl_arrived: boolean;
+  white: number;
+
+  constructor(game: IGameContext, mc: SwfMovieClip) {
+    super(game, mc);
+    const rand = game.rand;
+    this.shootSpeed = 5 + rand.random(3);
+    this.turnSpeed = 0.03 + rand.random(10) / 100 + this.shootSpeed * 0.02;
+    this._yOffset = -2;
+    this.setLifeTimer(Data.SECOND * 4);
+    this.fl_checkBounds = false;
+    this.fl_blink = false;
+    this.fl_arrived = false;
+    this.fl_anim = false;
+    this.mc.gotoAndStop('1');
+    this.ang = rand.random(314);
+    this.white = 0;
+  }
+
+  setOwner(b: FramBallOwner): void {
+    this.owner = b;
+    const tang = Math.atan2(this.owner.ty - this.y, this.owner.tx - this.x);
+    const rand = this.game.rand;
+    this.ang = -tang + (rand.random(168) / 100) * (rand.random(2) * 2 - 1);
+    if (this.owner.anger > 0) {
+      this.shootSpeed *= 1 + this.owner.anger * 0.5;
+    }
+  }
+
+  static attach(game: IGameContext, x: number, y: number): FramBallShoot {
+    const s = new FramBallShoot(
+      game,
+      game.depthMan.attach('hammer_shoot_framBall2', Data.DP_SHOTS),
+    );
+    s.initShoot(x, y);
+    return s;
+  }
+
+  override hit(e: BaseEntity): void {
+    if (e.isType(Data.PLAYER)) {
+      (e as PlayerEntity).killHit(this.dx);
+    }
+  }
+
+  adjustAngRad(a: number): number {
+    if (a < -Math.PI) return a + Math.PI * 2;
+    if (a > Math.PI) return a - Math.PI * 2;
+    return a;
+  }
+
+  override onLifeTimer(): void {
+    this.onArrived();
+    super.onLifeTimer();
+  }
+
+  onArrived(): void {
+    if (this.fl_arrived) {
+      return;
+    }
+    this.fl_arrived = true;
+    this.owner.onArrived(this);
+  }
+
+  // endUpdate: the original's white glow is commented out
+
+  protected override infix(): void {
+    super.infix();
+    // slow down if close
+    const d = this.distance(this.owner.tx, this.owner.ty);
+    if (d < 40) {
+      this.turnSpeed *= 1.1;
+    }
+    if (d < 20) {
+      this.shootSpeed *= 0.9;
+      if (this.shootSpeed <= 5.8 || this.owner.anger > 0) {
+        this.onArrived();
+      }
+      this.white += 0.1;
+      this.white = Math.min(1, this.white);
+    }
+    this.turnSpeed = Math.min(1, this.turnSpeed);
+    this.shootSpeed = Math.max(2, this.shootSpeed);
+  }
+
+  override update(): void {
+    // targetting
+    const tang = Math.atan2(this.owner.ty - this.y, this.owner.tx - this.x);
+    if (this.adjustAngRad(tang - this.ang) > 0) {
+      this.ang += this.turnSpeed;
+    }
+    if (this.adjustAngRad(tang - this.ang) < 0) {
+      this.ang -= this.turnSpeed;
+    }
+
+    this.dx = Math.cos(this.ang) * this.shootSpeed;
+    this.dy = Math.sin(this.ang) * this.shootSpeed;
+    super.update();
   }
 }

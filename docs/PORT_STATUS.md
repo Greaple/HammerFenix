@@ -6,22 +6,22 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Core
 
-| Original                                                                   | TypeScript                                        | Status  | Notes                                                                                                                                             |
-| -------------------------------------------------------------------------- | ------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 211 ported values match. Missing: `PARTICLE_*` (but `PARTICLE_ICE`), `BG_*`, `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`, boss animations |
-| `Entity.mt`                                                                | `entity/Entity.ts` BaseEntity                     | done    | Audited (1.5). No `fl_stickRot` / `fl_stickBound` (no caller yet)                                                                                 |
-| `entity/Animator.mt`                                                       | `entity/Entity.ts` AnimatorEntity                 | done    | Audited (1.5)                                                                                                                                     |
-| `entity/Physics.mt`                                                        | `entity/Entity.ts` PhysicsEntity                  | done    | Audited (1.5). Aqua bubbles in `endUpdate` wait for particles (2.5)                                                                               |
-| `entity/Mover.mt`                                                          | `entity/Entity.ts` MoverEntity                    | done    | Audited (1.5)                                                                                                                                     |
-| `entity/Player.mt`, `PlayerController.mt`                                  | `entity/Player.ts`                                | done    | Audited (1.5), see "Audit 1.5" below                                                                                                              |
-| `SpecialManager.mt`                                                        | `entity/Player.ts`                                | partial | 64 of 118 effects; see below                                                                                                                      |
-| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    | Audited (1.6)                                                                                                                                     |
-| `entity/Trigger.mt`                                                        | `entity/Entity.ts`                                | done    |                                                                                                                                                   |
-| `FxManager.mt`                                                             | `src/game/FxManager.ts`                           | partial | No `attachBg/detachBg/clearBg`; `inGameParticles` renders every type as ice                                                                       |
-| `entity/fx/Particle.mt`                                                    |                                                   | missing |                                                                                                                                                   |
-| `RandomManager.mt`                                                         | `src/game/RandomManager.ts`, `src/game/Random.ts` | done    | Seeded generator (`game.rand`) replaces `Std.random` and `Math.random`. Item families are fixed to 0-2 and 1000-1002 until profiles exist (3.2)   |
-| `StatsManager.mt`, `Stat.mt`, `Chrono.mt`                                  |                                                   | missing |                                                                                                                                                   |
-| `Cookie.mt`, `Lang.mt`, `Loader.mt`, `GameManager.mt`, `GameParameters.mt` | `src/main.ts`, `Data.ts` (lang)                   | approx  | No menus, options or profile                                                                                                                      |
+| Original                                                                   | TypeScript                                        | Status  | Notes                                                                                                                                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 211 ported values match. Missing: `BG_*`, `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`, boss animations                                  |
+| `Entity.mt`                                                                | `entity/Entity.ts` BaseEntity                     | done    | Audited (1.5). No `fl_stickRot` / `fl_stickBound` (no caller yet)                                                                               |
+| `entity/Animator.mt`                                                       | `entity/Entity.ts` AnimatorEntity                 | done    | Audited (1.5)                                                                                                                                   |
+| `entity/Physics.mt`                                                        | `entity/Entity.ts` PhysicsEntity                  | done    | Audited (1.5). Aqua bubbles in `endUpdate` wait for particles (2.5)                                                                             |
+| `entity/Mover.mt`                                                          | `entity/Entity.ts` MoverEntity                    | done    | Audited (1.5)                                                                                                                                   |
+| `entity/Player.mt`, `PlayerController.mt`                                  | `entity/Player.ts`                                | done    | Audited (1.5), see "Audit 1.5" below                                                                                                            |
+| `SpecialManager.mt`                                                        | `entity/Player.ts`                                | partial | 64 of 118 effects; see below                                                                                                                    |
+| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    | Audited (1.6)                                                                                                                                   |
+| `entity/Trigger.mt`                                                        | `entity/Entity.ts`                                | done    |                                                                                                                                                 |
+| `FxManager.mt`                                                             | `src/game/FxManager.ts`                           | partial | No `attachBg/detachBg/clearBg`; `inGameParticles` renders every type as ice                                                                     |
+| `entity/fx/Particle.mt`                                                    |                                                   | missing |                                                                                                                                                 |
+| `RandomManager.mt`                                                         | `src/game/RandomManager.ts`, `src/game/Random.ts` | done    | Seeded generator (`game.rand`) replaces `Std.random` and `Math.random`. Item families are fixed to 0-2 and 1000-1002 until profiles exist (3.2) |
+| `StatsManager.mt`, `Stat.mt`, `Chrono.mt`                                  |                                                   | missing |                                                                                                                                                 |
+| `Cookie.mt`, `Lang.mt`, `Loader.mt`, `GameManager.mt`, `GameParameters.mt` | `src/main.ts`, `Data.ts` (lang)                   | approx  | No menus, options or profile                                                                                                                    |
 
 ## Engine
 
@@ -43,7 +43,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 | Original                                                     | TypeScript                               | Status  | Notes                                                                                                                       |
 | ------------------------------------------------------------ | ---------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). No mirror mode (3.3); IA map parsed at once, not over frames. Editor and serialization skipped on purpose    |
-| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). Code trigger 6 needs SoccerBall (2.2); `tools/scan-scripts.ts` checks every level script                     |
+| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). `tools/scan-scripts.ts` checks every level script                                                            |
 | `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | Audited (1.7). No special backgrounds (2.6), snapshots (2.7), bitmap cache, editor grid                                     |
 | `levels/ViewManager.mt`                                      |                                          | missing | Level change is an instant cut, not a scroll; `GameSession.onLevelReady` runs at once                                       |
 | `levels/ViewLight.mt`                                        |                                          | missing | Darkness partly handled in `GameSession.updateDarkness`                                                                     |
@@ -63,9 +63,11 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 ## Bombs and projectiles
 
 - `entity/Bomb.ts` done (audited 1.6): Bomb, PlayerBomb, Classic, Black, Blue, Green, Red, RepelBomb, BadBomb, PoireBomb, Mine
-- missing: `bomb/bad/BossBomb`, `bomb/player/MineFrozen`, `PoireBombFrozen`, `SoccerBall`, `entity/WalkingBomb.mt`
+- done (2.2): `bomb/bad/BossBomb` (used by Tuberculoz, 2.9), `bomb/player/SoccerBall` (no glow filter: `FxManager.addGlow` is not ported; drawn square, see the mask bug in the roadmap)
+- unused: `bomb/player/MineFrozen`, `PoireBombFrozen` (`Mine.getFrozen` and `PoireBomb.getFrozen` are commented out in the original, so nothing creates them)
+- missing: `entity/WalkingBomb.mt`
 - `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
-- missing: `shoot/BossFireBall`, `FireRain`, `FramBall`, `Hammer`
+- done (2.2): `shoot/FireRain`, `Hammer` (item 85), `BossFireBall` (used by the Bat, 2.8), `FramBall` (used by Framboise, 2.12)
 - `entity/Supa.ts` done (2.1): `entity/Supa.mt` and all of `entity/supa/*` (Arrow, Ball, Bubble, IceMeteor, Smoke, SupaItem, Tons). Not ported: `SupaItem.pick`'s `logAction` (server log) and `STAT_SUPAITEM` (StatsManager, 2.10).
 
 ## Interface
@@ -77,13 +79,13 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 
 ## Item effects (`SpecialManager.execute`)
 
-25 missing plus 24 approximated (zodiac). The id is the `// *** N.` comment in the original. Missing ids fall into `Player.ts`'s generic "+2500 points" fallback.
+24 missing plus 24 approximated (zodiac). The id is the `// *** N.` comment in the original. Missing ids fall into `Player.ts`'s generic "+2500 points" fallback.
 
 - 10 phone
 - 19 sunflower: approx (smoke and kills work, orange background `BG_ORANGE` missing, 2.6)
 - 30, 31 blue and red glasses
 - 40-51 zodiac signs and 52-63 zodiac potions: approx (score items work, constellation background missing)
-- 77, 78, 79 blue, red and yellow fish · 81 blue pearl · 84 fire rain talisman · 85 hammer · 87 blue larva
+- 77, 78, 79 blue, red and yellow fish · 81 blue pearl · 84 fire rain talisman · 87 blue larva
 - 93 mailbox · 96, 97, 98 orange, green and pink pearls (conversion) · 100 Guu doll
 - 106 mushroom book · 107 star book · 108 green umbrella · 109, 110, 111 snowflakes 1 to 3 · 112 pioupiouz
 - 113 Tuberculoz cape · 116 Ankhel jewel · 117 Gordon key
@@ -176,7 +178,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Code trigger 6 (soccer set) needs `SoccerBall` (2.2).
 - The IA map is parsed at once on `goto`; the original parses 30 cells per frame, so the level's script compiles about 17 frames later (2.7, with the scroll).
 - `$e_ext` calls `GameSession.spawnExtend`, which draws the letter directly; the original picks from `StatsManager.extendList` (2.10).
 - When a trigger repeats after its nested trigger moved out, Ruffle still follows the old sibling link and adds the nested trigger again; the port adds it once. Only deepnight 184 has this.
