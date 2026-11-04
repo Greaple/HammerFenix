@@ -112,6 +112,13 @@ export class GameSession implements IGameContext {
   private fl_badsCallback = false;
   /** Set while forcedGoto / portals place the players before the level becomes ready. */
   private fl_deferLevelReady = false;
+  /**
+   * End of the level transition, run at the start of the next `updateWorld`: where the
+   * original's scroll or fade ends (`ViewManager.update` -> `onViewReady`), just before the level
+   * script's update. The script then adds the level's enemies before the frame's level-clear
+   * check. The scroll itself is task 2.7.
+   */
+  private pendingLevelReady: (() => void) | null = null;
   /** Players that were not on the portal when the dimension changed (`latePlayers`). */
   private latePlayers: PlayerEntity[] = [];
   /** Arrival portal of the last dimension change. */
@@ -283,6 +290,7 @@ export class GameSession implements IGameContext {
     this.resetGameState();
     this.backToMainWorld(); // a new GameMode starts in dimensions[0]
     this.fakeLevelId = null;
+    this.pendingLevelReady = null; // a level transition of the previous game
     this.seed = seed;
     this.rand.reseed(seed);
     this.animRand.reseed(seed ^ 0x5eed);
@@ -410,6 +418,11 @@ export class GameSession implements IGameContext {
 
   /** `GameMechanics.update`. The IA map is parsed at once in `LevelWorld.goto`. */
   private updateWorld(): void {
+    if (this.pendingLevelReady) {
+      const ready = this.pendingLevelReady;
+      this.pendingLevelReady = null;
+      ready();
+    }
     if (!this.world.fl_lock) {
       this.scriptRunner?.update();
     }
@@ -594,9 +607,9 @@ export class GameSession implements IGameContext {
       p.shield(Data.SHIELD_DURATION * 1.3);
       p.hide();
     }
-    // No scroll yet (task 2.7): the level is ready at once
+    // No scroll yet (task 2.7): the level is ready at the start of the next world update
     this.onDataReady(false);
-    this.onLevelReady();
+    this.pendingLevelReady = () => this.onLevelReady();
   }
 
   /** `Adventure.goto` + `GameMode.goto` */
@@ -640,11 +653,11 @@ export class GameSession implements IGameContext {
     this.fxMan.onNextLevel();
     this.audio.playSound('sound_level_clear', Data.CHAN_INTERF);
 
-    // No scroll yet (task 2.7): the level is ready at once. forcedGoto calls these itself after
-    // placing the players.
+    // No scroll yet (task 2.7): the level is ready at the start of the next world update.
+    // forcedGoto does this itself after placing the players.
     if (!this.fl_deferLevelReady) {
       this.onDataReady(false);
-      this.onLevelReady();
+      this.pendingLevelReady = () => this.onLevelReady();
     }
   }
 
@@ -1168,9 +1181,12 @@ export class GameSession implements IGameContext {
     this.portalId = pid;
     this.nextLink = null;
 
-    // End of the transition (GameMechanics.onFadeDone / onHScrollDone)
-    this.onRestore();
-    this.onLevelReady();
+    // End of the transition (GameMechanics.onFadeDone / onHScrollDone), at the start of the
+    // next world update
+    this.pendingLevelReady = () => {
+      this.onRestore();
+      this.onLevelReady();
+    };
   }
 
   /** `GameMode.getPortalEntrance`: arrival case after a dimension change. */

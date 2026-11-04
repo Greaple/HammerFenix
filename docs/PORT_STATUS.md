@@ -133,7 +133,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Fixed
 
-- Level flow follows the original chain: `goto` (players keep their x and fall from above) → `onLevelReady` → `initLevel` → `startLevel`. The scroll between them is not ported (2.7), so it runs at once.
+- Level flow follows the original chain: `goto` (players keep their x and fall from above) → `onLevelReady` → `initLevel` → `startLevel`. The scroll between them is not ported (2.7): the level becomes ready at the start of the next world update, where the scroll would end, just before the level script runs. (It used to become ready mid-frame, so that frame's level-clear check found no enemies yet and removed the level's item timers: a level reached from the previous one got no items.)
 - The level script compiles and runs its first cycle when the level is read; enemies and items inserted at level start run on the next script update.
 - Levels are marked visited when left, not when entered; level data (tiles changed by scripts) persists for the whole game.
 - Hurry-up is reset only on unvisited levels, recomputes `diffFactor` from spare lives and nightmare mode, and switches the music to the hurry track and back.
