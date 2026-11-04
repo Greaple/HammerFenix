@@ -15,7 +15,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 | `entity/Mover.mt`                                                          | `entity/Entity.ts` MoverEntity                    | done    | Audited (1.5)                                                                                                                                   |
 | `entity/Player.mt`, `PlayerController.mt`                                  | `entity/Player.ts`                                | done    | Audited (1.5), see "Audit 1.5" below                                                                                                            |
 | `SpecialManager.mt`                                                        | `entity/Player.ts`                                | partial | 64 of 118 effects; see below                                                                                                                    |
-| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    |                                                                                                                                                 |
+| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    | Audited (1.6)                                                                                                                                   |
 | `entity/Trigger.mt`                                                        | `entity/Entity.ts`                                | done    |                                                                                                                                                 |
 | `FxManager.mt`                                                             | `src/game/FxManager.ts`                           | partial | No `attachBg/detachBg/clearBg`; `inGameParticles` renders every type as ice                                                                     |
 | `entity/fx/Particle.mt`                                                    |                                                   | missing |                                                                                                                                                 |
@@ -33,21 +33,21 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Modes
 
-| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                         |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | --------------------------------------------------------------------------------------------- |
-| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | No boss spawning, `isBossLevel`, map, end of set, score saving; game over is placeholder text |
-| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                  |
+| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Missing: bosses, map, super item, StatsManager, options, score saving; game over is placeholder text |
+| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                         |
 
 ## Levels
 
-| Original                                                     | TypeScript                               | Status  | Notes                                                   |
-| ------------------------------------------------------------ | ---------------------------------------- | ------- | ------------------------------------------------------- |
-| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Editor and serialization functions skipped on purpose   |
-| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Missing `addShortNode`, `getFloat`, `insertItem`        |
-| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | No special backgrounds or snapshots                     |
-| `levels/ViewManager.mt`                                      |                                          | missing | Level change is an instant cut, not a scroll            |
-| `levels/ViewLight.mt`                                        |                                          | missing | Darkness partly handled in `GameSession.updateDarkness` |
-| `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | `usePortal` ignores the arrival portal position         |
+| Original                                                     | TypeScript                               | Status  | Notes                                                                                                                       |
+| ------------------------------------------------------------ | ---------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Level data kept per game; visited marked on leaving. Editor and serialization skipped on purpose                            |
+| `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Missing `addShortNode`, `getFloat`, `insertItem`                                                                            |
+| `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | No special backgrounds or snapshots                                                                                         |
+| `levels/ViewManager.mt`                                      |                                          | missing | Level change is an instant cut, not a scroll; `GameSession.onLevelReady` runs at once                                       |
+| `levels/ViewLight.mt`                                        |                                          | missing | Darkness partly handled in `GameSession.updateDarkness`                                                                     |
+| `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in); no fade / side-scroll transition (2.7) |
 
 ## Enemies (`entity/Bad.ts`)
 
@@ -62,9 +62,9 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 
 ## Bombs and projectiles
 
-- `entity/Bomb.ts` done: Bomb, PlayerBomb, Classic, Black, Blue, Green, Red, RepelBomb, BadBomb, PoireBomb, Mine
+- `entity/Bomb.ts` done (audited 1.6): Bomb, PlayerBomb, Classic, Black, Blue, Green, Red, RepelBomb, BadBomb, PoireBomb, Mine
 - missing: `bomb/bad/BossBomb`, `bomb/player/MineFrozen`, `PoireBombFrozen`, `SoccerBall`, `entity/WalkingBomb.mt`
-- `entity/Shoot.ts` done: Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
+- `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
 - missing: `shoot/BossFireBall`, `FireRain`, `FramBall`, `Hammer`
 - missing: all of `entity/supa/*` (Arrow, Ball, Bubble, IceMeteor, Smoke, SupaItem, Tons) and `entity/Supa.mt`
 
@@ -123,4 +123,32 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - `Physics` portals: the original calls `onPortal(null)` when no portal matches; the port does nothing.
 - `Spear`: no spawn puff when created after the first second; `Kiwi.clearMines` is never called in the original, not ported.
 - Visual: `Bad.onDeathLine` attaches its fx through `fxMan` instead of a bare clip.
-- Session (not audited yet): hurry-up is reset on every level start, the original only on unvisited levels (`resetHurry` in `initLevel`).
+
+## Audit 1.6: session, bombs, shots, items
+
+`GameSession.ts` against `mode/GameMode.mt` and `mode/Adventure.mt`, plus `Bomb.ts`, `Shoot.ts` and `Item.ts`, 2026-11-04.
+
+### Fixed
+
+- Level flow follows the original chain: `goto` (players keep their x and fall from above) → `onLevelReady` → `initLevel` → `startLevel`. The scroll between them is not ported (2.7), so it runs at once.
+- The level script compiles and runs its first cycle when the level is read; enemies and items inserted at level start run on the next script update.
+- Levels are marked visited when left, not when entered; level data (tiles changed by scripts) persists for the whole game.
+- Hurry-up is reset only on unvisited levels, recomputes `diffFactor` from spare lives and nightmare mode, and switches the music to the hurry track and back.
+- The fire ball of the second hurry-up starts as a harmless summon at anger 0 (it was instantly lethal at anger 1); later ones get `round(huTimer / AUTO_ANGER)` anger.
+- Clearing a level removes the extend letters on screen; boss levels never clear by themselves; `onKillBad` no longer re-checks the clear.
+- Main loop order: level script, HUD, portals, effects, hurry-up, entities, then level clear, floating portal, shake, exit arrow, nightmare anger.
+- Boss levels (30, 40, ..., 100, 101) show the warning; `globalActives[94]` adds a second score item; extends are only inserted when the level has special slots.
+- Portals: the dimension switch requires a cleared level, resets the players (temporary effects, weapon, controls), places them at the arrival portal (`getPortalEntrance`), knocks late players, and handles the floating portal's pull-in. A new game always starts in the main world.
+- `getClose` included dead entities in the original; the port filtered them out.
+- Shake: offsets use the original's integer draws, and the power resets when the shake ends.
+- Bombs: no invented "already exploded" guards (only `Green` has one), `duplicate()` no longer sets owner and parent, red bomb and mine no longer clear `fl_stable`, the mine calls `blinkLife()`.
+- Shots: rewritten from the original. Speeds, cooldowns (2 s for the player's arrow, fire ball and pearl), offsets and hit rules were invented: the player's fire ball and pearl go through enemies, pips and zests do not disappear on hit, a missed ball goes back to a random Fraise.
+- World keys from quest families 5000-5099; `setBaseAnims` ported.
+
+### Open
+
+- Not ported yet: bosses (2.8, 2.9), super item on a perfect clear (2.1), `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), `endModeTimer`, bullet time, wind timer, aqua screen wobble, X/Y flips (options).
+- The level script is not saved when a dimension is left (`GameMechanics.suspend` stores `scriptEngine.script`); coming back replays the level's original script.
+- `onGameOver` / end of set are placeholders (2.11).
+- `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
+- Float random draws remain in `SpecialManager` (`Player.ts`) and `FxManager`.

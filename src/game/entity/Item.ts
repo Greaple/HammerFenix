@@ -158,7 +158,7 @@ export class SpecialItem extends ItemEntity {
   override update(): void {
     super.update();
     if (this.id !== 0 && this.game.rand.random(4) === 0) {
-      const ox = this.game.rand.random(15) * (this.game.rand.next() < 0.5 ? -1 : 1);
+      const ox = this.game.rand.random(15) * (this.game.rand.random(2) * 2 - 1);
       const oy = -this.game.rand.random(10);
       const fx = this.game.fxMan.attachFx(this.x + ox, this.y + oy, 'hammer_fx_star');
       if (fx) {

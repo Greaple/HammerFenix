@@ -64,7 +64,7 @@ export class PlayerEntity extends PhysicsEntity {
 
   fl_knock = false;
   knockTimer = 0;
-  private lockTimer = 0;
+  lockTimer = 0;
 
   /** Down-kick of bombs: a quest reward in the original (family 101). */
   fl_upKick = false;
@@ -432,6 +432,21 @@ export class PlayerEntity extends PhysicsEntity {
     this.lockTimer = d;
     this.playAnim(this.baseStopAnim);
     this.fl_lockControls = true;
+  }
+
+  /** Changes the base walk/stop animations (null keeps one), replaying them if active. */
+  setBaseAnims(aWalk: AnimDef | null, aStop: AnimDef | null): void {
+    let flWalk = false;
+    let flStop = false;
+    if (this.animId === this.baseWalkAnim.id) flWalk = true;
+    if (this.animId === this.baseStopAnim.id) flStop = true;
+    if (this.animId === Data.ANIM_PLAYER_WAIT1.id || this.animId === Data.ANIM_PLAYER_WAIT2.id) {
+      flStop = true;
+    }
+    if (aWalk !== null) this.baseWalkAnim = aWalk;
+    if (aStop !== null) this.baseStopAnim = aStop;
+    if (flWalk) this.playAnim(this.baseWalkAnim);
+    if (flStop) this.playAnim(this.baseStopAnim);
   }
 
   override playAnim(a: AnimDef): void {

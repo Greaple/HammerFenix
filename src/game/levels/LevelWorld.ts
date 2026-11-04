@@ -100,6 +100,13 @@ export class LevelWorld {
   teleporterList: TeleporterData[] = [];
   portalList: PortalData[] = [];
   readonly visited = new Set<number>();
+  /**
+   * Level data, read once per game (`SetManager.levels[id]`). The original keeps a reference, so
+   * changes made during play (tiles set by scripts) persist when a portal brings you back.
+   */
+  private levels: (LevelData | undefined)[] = [];
+  /** False until the game enters this world: a fresh `SetManager` has no current level yet. */
+  fl_entered = false;
 
   constructor(set: LevelSet, initialId = 0, isMainWorld = true) {
     this.set = set;
@@ -128,14 +135,22 @@ export class LevelWorld {
 
   setLevelSet(set: LevelSet, id = 0): void {
     this.set = set;
-    this.visited.clear();
+    this.resetForNewGame();
     this.goto(id);
+  }
+
+  /** Forgets visits and level changes: a new game reads every level afresh. */
+  resetForNewGame(): void {
+    this.visited.clear();
+    this.levels = [];
+    this.fl_entered = false;
   }
 
   goto(id: number): boolean {
     if (id < 0 || id >= this.set.levels.length) return false;
     this.currentId = id;
-    this.current = cloneLevel(this.set.levels[id]);
+    this.levels[id] ??= cloneLevel(this.set.levels[id]);
+    this.current = this.levels[id];
     this.teleporterList = [];
     this.portalList = [];
     this.resetTriggers();

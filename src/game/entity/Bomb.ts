@@ -39,7 +39,6 @@ export class BombEntity extends MoverEntity {
     this.setLifeTimer(this.duration);
     this.updateCoords();
     this.playAnim(Data.ANIM_BOMB_DROP);
-    this.endUpdate();
   }
 
   override needsPatch(): boolean {
@@ -51,7 +50,6 @@ export class BombEntity extends MoverEntity {
   }
 
   onExplode(): void {
-    if (this.fl_explode) return;
     this.playAnim(Data.ANIM_BOMB_EXPLODE);
     if (this.explodeSound !== null) {
       this.game.audio.playSound(this.explodeSound, Data.CHAN_BOMB);
@@ -72,7 +70,7 @@ export class BombEntity extends MoverEntity {
   }
 
   override endUpdate(): void {
-    if (!this.fl_stable && !this.fl_explode) {
+    if (!this.fl_stable) {
       const ang = 30;
       if (this.dx > 0) {
         this.rotation += 0.02 * (ang - this.rotation);
@@ -147,19 +145,18 @@ export class PlayerBomb extends BombEntity {
 
   setOwner(p: PlayerEntity | null): void {
     this.owner = p;
-    this.setParent(p);
   }
 
   override hit(e: BaseEntity): void {
     super.hit(e);
-    if (this.fl_unstable && e.isType(Data.BAD) && !this.fl_explode) {
+    if (this.fl_unstable && e.isType(Data.BAD)) {
       this.onExplode();
     }
   }
 
   override onHitGround(h: number): void {
     super.onHitGround(h);
-    if (this.fl_unstable && this.fl_bounce && !this.fl_explode) {
+    if (this.fl_unstable && this.fl_bounce) {
       this.onExplode();
     }
   }
@@ -189,7 +186,6 @@ export class PlayerBomb extends BombEntity {
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     if (this.upgrades > 0) {
@@ -244,16 +240,13 @@ export class ClassicBomb extends PlayerBomb {
   }
 
   override duplicate(): ClassicBomb {
-    const b = ClassicBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return ClassicBomb.attach(this.game, this.x, this.y);
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
-    this.game.shake(Math.round(Data.SECOND * 0.35), 1.5);
+    this.game.shake(Data.SECOND * 0.35, 1.5); // `fl_shaky` option, on by default
 
     const bads = this.bombGetClose(Data.BAD) as BadEntity[];
     for (const e of bads) {
@@ -293,13 +286,10 @@ export class BlackBomb extends PlayerBomb {
   }
 
   override duplicate(): BlackBomb {
-    const b = BlackBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return BlackBomb.attach(this.game, this.x, this.y);
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     const bads = this.bombGetClose(Data.BAD) as BadEntity[];
@@ -332,13 +322,10 @@ export class BlueBomb extends PlayerBomb {
   }
 
   override duplicate(): BlueBomb {
-    const b = BlueBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return BlueBomb.attach(this.game, this.x, this.y);
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     const bads = this.bombGetClose(Data.BAD) as BadEntity[];
@@ -374,9 +361,7 @@ export class GreenBomb extends PlayerBomb {
   }
 
   override duplicate(): GreenBomb {
-    const b = GreenBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return GreenBomb.attach(this.game, this.x, this.y);
   }
 
   override endUpdate(): void {
@@ -429,13 +414,10 @@ export class RedBomb extends PlayerBomb {
   }
 
   override duplicate(): RedBomb {
-    const b = RedBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return RedBomb.attach(this.game, this.x, this.y);
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     const bads = this.bombGetClose(Data.BAD) as BadEntity[];
@@ -470,7 +452,6 @@ export class RedBomb extends PlayerBomb {
       if (dist <= 40) {
         if (e.dy > 0) e.dy = 0;
         e.dy -= this.jumpPower;
-        e.fl_stable = false;
         if (e.dy <= -35) {
           this.game.shake(10, 3);
           this.game.fxMan.attachExplodeZone(e.x, e.y - 40, 50);
@@ -501,9 +482,7 @@ export class RepelBomb extends PlayerBomb {
   }
 
   override duplicate(): RepelBomb {
-    const b = RepelBomb.attach(this.game, this.x, this.y);
-    b.setOwner(this.owner);
-    return b;
+    return RepelBomb.attach(this.game, this.x, this.y);
   }
 
   override onKick(p: PlayerEntity): void {
@@ -512,7 +491,6 @@ export class RepelBomb extends PlayerBomb {
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     this.game.fxMan.inGameParticles(0, this.x, this.y, this.game.rand.random(2) + 2);
@@ -560,7 +538,6 @@ export class BadBomb extends BombEntity {
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
     if (this.game.getDynamicVar('$BAD_BOMB_TRIGGER') !== undefined) {
       this.game.onExplode(this.x, this.y, this.radius);
@@ -594,7 +571,6 @@ export class PoireBomb extends BadBomb {
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     super.onExplode();
 
     this.game.fxMan.attachExplodeZone(this.x, this.y, this.radius);
@@ -669,7 +645,6 @@ export class MineBomb extends BadBomb {
   }
 
   override onExplode(): void {
-    if (this.fl_explode) return;
     if (!this.fl_trigger || this.fl_defuse) {
       this.game.fxMan.attachFx(this.x, this.y - Data.CASE_HEIGHT, 'hammer_fx_pop');
       this.destroy();
@@ -706,11 +681,11 @@ export class MineBomb extends BadBomb {
     this.fl_trigger = true;
     this.playAnim(Data.ANIM_BOMB_DROP);
     this.dy = -7;
-    this.fl_stable = false;
     this.show();
     this.alpha = 100;
-    this.setLifeTimer(MineBomb.SUDDEN_DEATH * 3);
+    this.setLifeTimer(MineBomb.SUDDEN_DEATH * 3); // to force the blink
     this.updateLifeTimer(MineBomb.SUDDEN_DEATH);
+    this.blinkLife();
   }
 
   override playAnim(a: AnimDef): void {
@@ -733,7 +708,6 @@ export class MineBomb extends BadBomb {
     if (this.fl_plant && !this.fl_trigger && this.alpha > 0) {
       this.alpha -= MineBomb.HIDE_SPEED;
       if (this.alpha <= 0) {
-        this.alpha = 0;
         this.hide();
       }
     }

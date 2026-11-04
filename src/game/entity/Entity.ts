@@ -437,7 +437,7 @@ export class AnimatorEntity extends BaseEntity {
     }
   }
 
-  private blinkLife(): void {
+  protected blinkLife(): void {
     if (!this.totalLife || this.totalLife <= 0) return;
     const ratio = this.lifeTimer / this.totalLife;
     if (ratio <= 0.1) {
@@ -633,6 +633,20 @@ export class PhysicsEntity extends AnimatorEntity {
     const rad = Math.atan2(e.y - this.y, e.x - this.x);
     this.dx = Math.cos(rad) * speed;
     this.dy = Math.sin(rad) * speed;
+  }
+
+  moveToPoint(x: number, y: number, speed: number): void {
+    const rad = Math.atan2(y - this.y, x - this.x);
+    this.dx = Math.cos(rad) * speed;
+    this.dy = Math.sin(rad) * speed;
+  }
+
+  moveUp(speed: number): void {
+    this.moveToAng(-90, speed);
+  }
+
+  moveDown(speed: number): void {
+    this.moveToAng(90, speed);
   }
 
   moveLeft(speed: number): void {

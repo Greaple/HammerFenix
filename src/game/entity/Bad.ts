@@ -1881,13 +1881,16 @@ class FraiseBad extends ShooterBad {
     const s = BallShoot.attach(this.game, this.x, this.y);
     s.moveToTarget(this.ballTarget, s.shootSpeed);
     s.targetCatcher = this.ballTarget;
-    s.onCatch = (catcher) => {
-      if (catcher instanceof FraiseBad && catcher.isHealthy()) {
-        catcher.next = null;
-        catcher.walk();
-        catcher.assignBall();
-      }
-    };
+  }
+
+  /** The ball reached this Fraise. */
+  catchBall(b: BallShoot): void {
+    if (!this.isHealthy()) return;
+    this.next = null;
+    this.walk();
+    this.assignBall();
+    b.destroy();
+    this.ballTarget = null;
   }
 
   override onEndAnim(id: number): void {

@@ -231,6 +231,8 @@ export const Data = {
   ANIM_BAD_JUMP: { id: 8, loop: true } as AnimDef,
   ANIM_BAD_SHOOT_LOOP: { id: 9, loop: true } as AnimDef,
 
+  ANIM_SHOOT: { id: 0, loop: false } as AnimDef,
+  ANIM_SHOOT_LOOP: { id: 0, loop: true } as AnimDef,
   ANIM_BOMB_DROP: { id: 0, loop: false } as AnimDef,
   ANIM_BOMB_LOOP: { id: 1, loop: true } as AnimDef,
   ANIM_BOMB_EXPLODE: { id: 2, loop: false } as AnimDef,

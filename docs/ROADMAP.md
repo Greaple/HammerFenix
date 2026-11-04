@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phase 1: audit the rest of the game loop (1.6). Then Phase 2, starting with the super-item entities (2.1). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`.
+Phase 1 is done. Phase 2, starting with the super-item entities (2.1). After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5", "Audit 1.6").
 
 ## Phase 1: Stabilize and make fidelity measurable
 
@@ -16,7 +16,7 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] Bug (found in play): the player's head and skin cycled through every frame and the carrot showed on his neck. The SWF frame scripts that pick those frames were dropped at build time; they now run in an AVM1 interpreter.
 - [x] 1.4 Input recorder and headless replay: record key events per tick, replay with `stepSingleFrame()`, snapshot entity state. Add Vitest regression tests from replays. Also: animation steps are tied to logic ticks (5 per 4), Flash scripts use a seeded random source, and `_width` / `_height` (hit boxes) come from vector bounds instead of rendered sprites, so a browser recording replays identically in Node.
 - [x] 1.5 Line-by-line audit of `Player.ts` and `Bad.ts` against the original, logging deviations in PORT_STATUS.md. About 30 deviations fixed; the open ones are listed under "Audit 1.5" there.
-- [ ] 1.6 Same audit for `GameSession.ts` (against `mode/GameMode.mt`, `mode/Adventure.mt`), `Bomb.ts`, `Shoot.ts` and `Item.ts`. Known: hurry-up reset on every level start.
+- [x] 1.6 Same audit for `GameSession.ts` (against `mode/GameMode.mt`, `mode/Adventure.mt`), `Bomb.ts`, `Shoot.ts` and `Item.ts`. Shots were rewritten; the level flow, hurry-up and portals now follow the original.
 
 ## Phase 2: Finish the Adventure (critical path)
 
