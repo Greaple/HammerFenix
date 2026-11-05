@@ -26,8 +26,6 @@ It is slow on purpose (one file every ~7 s): the Wayback Machine refuses connect
 - `hammerfest.fr/swf/`: `pyramid.swf` (ranking pyramid) and `game_v96.swf` (the site's 2008
   `game.swf`, a different build from `assets-src/original/swf/game.swf`)
 - `hammerfest.es/`, `hfest.net/`: Spanish and English home pages and language CSS
-- `forum-screenshots/`: screenshots players posted on the forum (fridge pages, a results screen,
-  a quest flowchart), from image hosts that are gone
 - `wiki/`: WikiTeam dump (2022) of hammerfest.fandom.com, the small English player wiki
 
 ## Other sources
@@ -41,7 +39,10 @@ It is slow on purpose (one file every ~7 s): the Wayback Machine refuses connect
 
 - **The results page after a game** (`/play.html/<id>/result`): about 27,000 captures exist on the
   three sites, but the page only showed a game to its owner, so every capture is the
-  "EVNI … Not owner" error. Forum screenshots are the only hope.
+  "EVNI … Not owner" error.
+- **Forum screenshots**: players posted about 110 screenshots of their fridge, one results screen
+  (`resultatjour3rm2.png`) and a quest flowchart, on imageshack, hiboox, casimages and others.
+  None of them was archived.
 - **The logged-in quest and fridge pages** (`/user.html/quests`, `/user.html/inventory`) and the
   mode menu page: behind the login, only redirects were archived. The public profile and the
   `choice_*` / `help_*` images show most of their content.
