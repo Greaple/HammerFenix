@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phases 1 and 2 are done. Next is Phase 2B, starting with the automated data pass and the level jump for Ruffle (2B.0). The score screen is 3.1c and reads `GameSession.lastResult` (2.11). The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Phases 1 and 2 are done. Next is Phase 2B, starting with the automated data pass and the level jump for Ruffle (2B.0), then the small dimensions (2B.12) and the Adventure batches (2B.1 to 2B.11). Phase 3 comes after those; the larger dimensions (2B.13 to 2B.28) come after Phase 3 (see "Order" in Phase 2B). The research of 3.1a / 3.2a writes no game code and can run alongside. The score screen is 3.1c and reads `GameSession.lastResult` (2.11). The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Bugs (found in play)
 
@@ -45,6 +45,8 @@ Without reproducible runs you can't check whether the clone matches the original
 ## Phase 2B: Level-by-level comparison with the original
 
 Start once Phase 2 is done; before that, most differences are features already listed there. 2B.0 runs first and checks the data of every level automatically, so the batches only cover what needs eyes. Progress is tracked per level in [LEVELS.md](LEVELS.md).
+
+Order: 2B.0, then 2B.12 (small dimensions, a short first run of the checklist), then the Adventure (2B.1 to 2B.11), then Phase 3, then the larger dimensions (2B.13 to 2B.28) alongside Phase 4. Reason: the Ruffle side-by-side starts the original without the site (only `lang`), so with the base item families, no options and no profile, which is what the port runs today; Phase 3 changes the item pool and adds options, so the core levels are compared before it. 2B.0 must also find out which item families the original uses without the site, so item drops are compared on the same pool.
 
 Checklist for every batch task (2B.1 onward), the same each time:
 
