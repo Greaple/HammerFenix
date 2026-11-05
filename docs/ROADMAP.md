@@ -6,6 +6,12 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 Phase 1 is done. Phase 2: 2.1 to 2.11 are done; next is the simplified enemies Framboise and Baleine (2.12). The score screen is 3.1c and reads `GameSession.lastResult` (2.11). The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
+## Bugs (found in play)
+
+Logged during play, not yet investigated in depth. Check each against the Ruffle side-by-side before fixing.
+
+- [ ] Shield animation seems to loop (invincibility after losing a life, or from an item). `Player.shield()` and `onShieldOut()` in `src/game/entity/Player.ts` match the original (`hammer/entity/Player.mt` `shield()`, which also sets `shieldMC.fl_loop = true`), so first compare with Ruffle. If the original only plays an intro once, look at the `hammer_player_shield` symbol's timeline (frame scripts, `stop()`) and at how `FxAnim` handles `fl_loop` and `lifeTimer`.
+
 ## Phase 1: Stabilize and make fidelity measurable
 
 Without reproducible runs you can't check whether the clone matches the original.
