@@ -163,7 +163,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 - `gameChrono` is only read by `Adventure.onGameOver` for the server history (`T=`), which is not ported.
 - Not ported yet: the map and its events, ninja mode (`onBadsReady`, 3.3), wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
-- `onGameOver` / end of set are placeholders (2.11).
+- `onGameOver` / end of set are placeholders: the original hand-off to the Loader is 2.11, the results screen 3.1c.
 - `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
 - Float random draws remain in `FxManager`.
 
