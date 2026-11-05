@@ -11,6 +11,7 @@ import type { LevelWorld } from './levels/LevelWorld';
 import type { ScriptRunner } from './levels/ScriptRunner';
 import type { Random } from './Random';
 import type { RandomManager } from './RandomManager';
+import type { StatsManager } from './StatsManager';
 
 /**
  * Shared runtime contract exposed by `GameSession` to entities, FX, HUD, and level scripts.
@@ -27,6 +28,7 @@ export interface IGameContext {
   readonly hud: GameHud;
   readonly rand: Random;
   readonly randMan: RandomManager;
+  readonly statsMan: StatsManager;
 
   /** `GameMode.mc`: the clip holding the whole game, moved by the screen shake. */
   readonly gameRoot: SwfMovieClip;
@@ -103,7 +105,6 @@ export interface IGameContext {
   attachBad(id: number, x: number, y: number): BaseEntity;
   spawnScoreItem(x: number, y: number, id: number, subId: number | null): BaseEntity;
   spawnSpecialItem(x: number, y: number, id: number, subId: number | null): BaseEntity | null;
-  spawnExtend(): void;
 
   attachPop(msg: string, flTuto: boolean): void;
   killPop(): void;

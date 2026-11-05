@@ -171,6 +171,9 @@ export class BadEntity extends MoverEntity {
     const itY = this.world.inBound(this.cx, this.cy) ? this.y : -30;
     if (this.comboId !== null) {
       const n = this.game.countCombo(this.comboId) - 1;
+      if (n + 1 > this.game.statsMan.read(Data.STAT_MAX_COMBO)) {
+        this.game.statsMan.write(Data.STAT_MAX_COMBO, n + 1);
+      }
       ScoreItem.attach(this.game, this.x, itY, 0, n);
     } else {
       ScoreItem.attach(this.game, this.x, itY, Data.DIAMANT, null);
@@ -299,6 +302,7 @@ export class BadEntity extends MoverEntity {
     this.fallFactor = Data.FALL_FACTOR_KNOCK;
     this.knockTimer = timer;
     this.fl_knock = true;
+    this.game.statsMan.inc(Data.STAT_KNOCK, 1);
     this.onKnock();
   }
 

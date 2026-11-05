@@ -138,8 +138,13 @@ describe('item effects (SpecialManager.execute)', () => {
     expect(shots().length).toBe(1);
     const clouds = session.player!['clouds'];
     expect(clouds.length).toBe(2);
-    step(Math.ceil(Data.SECOND * 0.8));
-    expect(shots().length).toBeGreaterThanOrEqual(2);
+    // Count every drop made: a drop can leave the screen before the next one falls
+    const seen = new Set(shots());
+    for (let i = 0; i < Math.ceil(Data.SECOND * 0.8); i++) {
+      step(1);
+      for (const s of shots()) seen.add(s);
+    }
+    expect(seen.size).toBeGreaterThanOrEqual(2);
     session.player!.clearTemp();
     expect(session.player!['clouds'].length).toBe(0);
   });

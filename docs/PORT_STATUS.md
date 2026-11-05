@@ -6,22 +6,22 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Core
 
-| Original                                                                   | TypeScript                                        | Status  | Notes                                                                                                                                           |
-| -------------------------------------------------------------------------- | ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 239 ported values match. Missing: `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`                                                           |
-| `Entity.mt`                                                                | `entity/Entity.ts` BaseEntity                     | done    | Audited (1.5). No `fl_stickRot` / `fl_stickBound` (no caller yet)                                                                               |
-| `entity/Animator.mt`                                                       | `entity/Entity.ts` AnimatorEntity                 | done    | Audited (1.5)                                                                                                                                   |
-| `entity/Physics.mt`                                                        | `entity/Entity.ts` PhysicsEntity                  | done    | Audited (1.5). Aqua bubbles in `endUpdate` (2.5)                                                                                                |
-| `entity/Mover.mt`                                                          | `entity/Entity.ts` MoverEntity                    | done    | Audited (1.5)                                                                                                                                   |
-| `entity/Player.mt`, `PlayerController.mt`                                  | `entity/Player.ts`                                | done    | Audited (1.5), see "Audit 1.5" below                                                                                                            |
-| `SpecialManager.mt`                                                        | `entity/Player.ts`                                | partial | all 118 effects, with special backgrounds; the ghost glow missing, see below                                                                    |
-| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    | Audited (1.6)                                                                                                                                   |
-| `entity/Trigger.mt`                                                        | `entity/Entity.ts`                                | done    |                                                                                                                                                 |
-| `FxManager.mt`                                                             | `src/game/FxManager.ts`                           | done    | `inGameParticles` / `inGameParticlesDir` (2.5); no low-detail mode, so particles always show                                                    |
-| `entity/fx/Particle.mt`                                                    | `entity/Particle.ts`                              | done    | All 15 types (2.5). `Std.random(sub._totalframes)` with no `sub` is 0, without a draw                                                           |
-| `RandomManager.mt`                                                         | `src/game/RandomManager.ts`, `src/game/Random.ts` | done    | Seeded generator (`game.rand`) replaces `Std.random` and `Math.random`. Item families are fixed to 0-2 and 1000-1002 until profiles exist (3.2) |
-| `StatsManager.mt`, `Stat.mt`, `Chrono.mt`                                  |                                                   | missing |                                                                                                                                                 |
-| `Cookie.mt`, `Lang.mt`, `Loader.mt`, `GameManager.mt`, `GameParameters.mt` | `src/main.ts`, `Data.ts` (lang)                   | approx  | No menus, options or profile                                                                                                                    |
+| Original                                                                   | TypeScript                                        | Status  | Notes                                                                                                                                                                                              |
+| -------------------------------------------------------------------------- | ------------------------------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Data.mt`                                                                  | `src/game/Data.ts`                                | partial | All 239 ported values match. Missing: `CURSE_*`, `HEAD_*`, `OPT_*`, `STAT_*`, `EXT_*`                                                                                                              |
+| `Entity.mt`                                                                | `entity/Entity.ts` BaseEntity                     | done    | Audited (1.5). No `fl_stickRot` / `fl_stickBound` (no caller yet)                                                                                                                                  |
+| `entity/Animator.mt`                                                       | `entity/Entity.ts` AnimatorEntity                 | done    | Audited (1.5)                                                                                                                                                                                      |
+| `entity/Physics.mt`                                                        | `entity/Entity.ts` PhysicsEntity                  | done    | Audited (1.5). Aqua bubbles in `endUpdate` (2.5)                                                                                                                                                   |
+| `entity/Mover.mt`                                                          | `entity/Entity.ts` MoverEntity                    | done    | Audited (1.5)                                                                                                                                                                                      |
+| `entity/Player.mt`, `PlayerController.mt`                                  | `entity/Player.ts`                                | done    | Audited (1.5), see "Audit 1.5" below                                                                                                                                                               |
+| `SpecialManager.mt`                                                        | `entity/Player.ts`                                | partial | all 118 effects, with special backgrounds; the ghost glow missing, see below                                                                                                                       |
+| `entity/Item.mt`, `item/*`                                                 | `entity/Item.ts`                                  | done    | Audited (1.6)                                                                                                                                                                                      |
+| `entity/Trigger.mt`                                                        | `entity/Entity.ts`                                | done    |                                                                                                                                                                                                    |
+| `FxManager.mt`                                                             | `src/game/FxManager.ts`                           | done    | `inGameParticles` / `inGameParticlesDir` (2.5); no low-detail mode, so particles always show                                                                                                       |
+| `entity/fx/Particle.mt`                                                    | `entity/Particle.ts`                              | done    | All 15 types (2.5). `Std.random(sub._totalframes)` with no `sub` is 0, without a draw                                                                                                              |
+| `RandomManager.mt`                                                         | `src/game/RandomManager.ts`, `src/game/Random.ts` | done    | Seeded generator (`game.rand`) replaces `Std.random` and `Math.random`. Item families are fixed to 0-2 and 1000-1002 until profiles exist (3.2)                                                    |
+| `StatsManager.mt`, `Stat.mt`, `Chrono.mt`                                  | `src/game/StatsManager.ts`, `src/game/Chrono.ts`  | done    | Extend letters per level from the best combo (2.10). `gameChrono` runs on real time (`GameSession.getTimer`); its `formatTime` is computed as in UTC+1, where the original's hour fix-up was right |
+| `Cookie.mt`, `Lang.mt`, `Loader.mt`, `GameManager.mt`, `GameParameters.mt` | `src/main.ts`, `Data.ts` (lang)                   | approx  | No menus, options or profile                                                                                                                                                                       |
 
 ## Engine
 
@@ -34,10 +34,10 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Modes
 
-| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                                                |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Bosses and bullet time (2.8, 2.9). Missing: map, StatsManager, options, score saving; game over is placeholder text |
-| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                                                         |
+| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Bosses and bullet time (2.8, 2.9). Stats and game chrono (2.10). Missing: map, options, score saving; game over is placeholder text |
+| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                                                                         |
 
 ## Levels
 
@@ -69,7 +69,7 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 - missing: `entity/WalkingBomb.mt`
 - `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
 - done (2.2): `shoot/FireRain`, `Hammer` (item 85), `BossFireBall` (used by the Bat, 2.8), `FramBall` (used by Framboise, 2.12)
-- `entity/Supa.ts` done (2.1): `entity/Supa.mt` and all of `entity/supa/*` (Arrow, Ball, Bubble, IceMeteor, Smoke, SupaItem, Tons). Not ported: `SupaItem.pick`'s `logAction` (server log) and `STAT_SUPAITEM` (StatsManager, 2.10).
+- `entity/Supa.ts` done (2.1): `entity/Supa.mt` and all of `entity/supa/*` (Arrow, Ball, Bubble, IceMeteor, Smoke, SupaItem, Tons). Not ported: `SupaItem.pick`'s `logAction` (server log).
 
 ## Interface
 
@@ -161,7 +161,8 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Not ported yet: `StatsManager` extends (2.10, the extend timer is inserted on every level with special slots), the map and its events, ninja mode (`onBadsReady`, 3.3), wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
+- `gameChrono` is only read by `Adventure.onGameOver` for the server history (`T=`), which is not ported.
+- Not ported yet: the map and its events, ninja mode (`onBadsReady`, 3.3), wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
 - `onGameOver` / end of set are placeholders (2.11).
 - `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
 - Float random draws remain in `FxManager`.
@@ -189,7 +190,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- `$e_ext` calls `GameSession.spawnExtend`, which draws the letter directly; the original picks from `StatsManager.extendList` (2.10).
 - When a trigger repeats after its nested trigger moved out, Ruffle still follows the old sibling link and adds the nested trigger again; the port adds it once. Only deepnight 184 has this.
 - Mirror mode (`SetManager.flip`, `flipPortals`) is not ported (3.3).
 - Data notes from the scan (the original ignores them too): three `$t_timer` with `repeat` instead of `$repeat` (adventure 100), `$s` instead of `$si` (adventure 102), sprites missing from every original SWF (`$jail_large`, `$mcMarioBlock`, `$doorSideRight`, not in the Adventure set).

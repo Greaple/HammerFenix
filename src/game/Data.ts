@@ -88,6 +88,17 @@ export const Data = {
   PERFECT_ITEM: 1 << 19,
   SPEAR: 1 << 20,
 
+  // Stats (`StatsManager`). The original marks STAT_KICK and every stat after it as unused.
+  STAT_MAX_COMBO: 0,
+  STAT_SUPAITEM: 1,
+  STAT_KICK: 2,
+  STAT_BOMB: 3,
+  STAT_SHOT: 4,
+  STAT_JUMP: 5,
+  STAT_ICEHIT: 6,
+  STAT_KNOCK: 7,
+  STAT_DEATH: 8,
+
   // Level cell types
   GROUND: 1,
   WALL: 2,
@@ -399,6 +410,15 @@ export const Data = {
       }
     }
     return txt;
+  },
+
+  /** `Data.leadingZeros`: pads with zeros up to `zeros` characters. */
+  leadingZeros(n: number, zeros: number): string {
+    let s = '' + n;
+    while (s.length < zeros) {
+      s = '0' + s;
+    }
+    return s;
   },
 
   formatNumberStr(raw: string | number): string {

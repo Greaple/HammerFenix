@@ -218,7 +218,13 @@ export class DebugToolkit {
     });
 
     this.panelEl.querySelector('#dbg-btn-extend')?.addEventListener('click', () => {
-      this.session.spawnExtend();
+      // The level's letters, or any letter on a level that has none (no special slots)
+      const s = this.session;
+      if (s.statsMan.extendList.length > 0) {
+        s.statsMan.attachExtend();
+      } else if (s.player) {
+        SpecialItem.attach(s, s.player.x, s.player.y - 40, 0, s.rand.random(Data.EXTENDS.length));
+      }
     });
 
     this.panelEl.querySelector('#dbg-btn-compare')?.addEventListener('click', () => {

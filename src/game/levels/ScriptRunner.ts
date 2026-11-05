@@ -320,9 +320,9 @@ export class ScriptRunner {
       }
 
       case ScriptRunner.E_EXTEND: {
-        // extend (`statsMan.attachExtend`, task 2.10)
+        // extend
         if (game.canAddItem() && !this.fl_safe) {
-          game.spawnExtend();
+          game.statsMan.attachExtend();
         }
         break;
       }

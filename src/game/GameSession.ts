@@ -18,6 +18,8 @@ import { SupaItem } from './entity/Supa';
 import { FxManager } from './FxManager';
 import { Random } from './Random';
 import { RandomManager } from './RandomManager';
+import { StatsManager } from './StatsManager';
+import { Chrono, realTimer } from './Chrono';
 import { GameHud } from './gui/GameHud';
 import type { IGameContext } from './GameContext';
 import { LevelView } from './levels/LevelView';
@@ -77,6 +79,11 @@ export class GameSession implements IGameContext {
   /** Seed of the current game, set by `initGame()`. */
   seed = 0;
   randMan: RandomManager = new RandomManager(this.rand);
+  statsMan: StatsManager = new StatsManager(this);
+  /** `Std.getTimer()` for the chronos. Tests can replace it. */
+  getTimer: () => number = realTimer;
+  /** `GameMode.gameChrono`: real play time, stopped while the game is locked. */
+  gameChrono: Chrono = new Chrono(this.getTimer);
   /** Random source of the SWF frame scripts: seeded with the game, but apart from `rand`. */
   private readonly animRand = new Random();
 
@@ -322,11 +329,13 @@ export class GameSession implements IGameContext {
     this.rand.reseed(seed);
     this.animRand.reseed(seed ^ 0x5eed);
     this.initRandMan();
+    this.statsMan = new StatsManager(this);
+    this.gameChrono = new Chrono(this.getTimer);
     this.gameLoop.resetPhase();
 
     this.fl_gameOver = false;
     this.fl_clear = false;
-    this.fl_lock = true; // Mode constructor; onLevelReady unlocks
+    this.fl_lock = true; // Mode constructor (its lock() runs before gameChrono exists)
     this.fl_pause = false;
     this.cycle = 0;
     this.gameOverMC?.removeMovieClip();
@@ -653,7 +662,7 @@ export class GameSession implements IGameContext {
 
   /** `GameMode.onLevelReady` + `Adventure.onLevelReady`: the level has scrolled in. */
   onLevelReady(): void {
-    this.fl_lock = false;
+    this.unlock();
     this.initLevel();
     this.startLevel();
     for (const e of this.getList(Data.ENTITY)) e.world = this.world;
@@ -711,6 +720,7 @@ export class GameSession implements IGameContext {
     if (!this.world.isVisited()) {
       this.addLevelItems();
     }
+    this.statsMan.reset();
     this.scriptRunner?.onPlayerBirth();
     this.world.unlock();
     this.fl_badsCallback = false;
@@ -743,10 +753,9 @@ export class GameSession implements IGameContext {
 
   /** `Adventure.addLevelItems` */
   private addLevelItems(): void {
-    // Extends: `statsMan.spreadExtend()` (StatsManager is task 2.10; it only inserts the extend
-    // timer when the player earned letters)
+    // Extends
     if (this.world.current.specialSlots.length > 0) {
-      this.scriptRunner?.insertExtend();
+      this.statsMan.spreadExtend();
     }
 
     if (this.world.current.specialSlots.length > 0) {
@@ -802,7 +811,7 @@ export class GameSession implements IGameContext {
     this.goto(this.world.currentId + 1);
     if (this.fl_warpStart) {
       this.world.currentId = 0;
-      this.fl_lock = false;
+      this.unlock();
       this.view.detach(); // level 10 shows at once, without a scroll
       this.forcedGoto(10);
     }
@@ -824,6 +833,18 @@ export class GameSession implements IGameContext {
     }
   }
 
+  /** `Mode.lock` + `GameMode.lock`: freezes the game and stops the game chrono. */
+  lock(): void {
+    this.fl_lock = true;
+    this.gameChrono.stop();
+  }
+
+  /** `Mode.unlock` + `GameMode.unlock` */
+  unlock(): void {
+    this.fl_lock = false;
+    this.gameChrono.start();
+  }
+
   /** `Adventure.goto` + `GameMode.goto` */
   goto(id: number): void {
     if (this.fl_lock || this.fl_gameOver) return;
@@ -838,7 +859,7 @@ export class GameSession implements IGameContext {
     this.world.lock();
     this.killPortals();
     this.clearLevel();
-    this.fl_lock = true;
+    this.lock();
     this.fl_clear = false;
     this.world.markVisited(); // GameMechanics.goto marks the level being left
     this.world.goto(id);
@@ -1046,7 +1067,7 @@ export class GameSession implements IGameContext {
         p.setBaseAnims(Data.ANIM_PLAYER_WALK_V, Data.ANIM_PLAYER_STOP_V);
       }
       SupaItem.attach(this, this.perfectCount - 1);
-      // statsMan.inc(Data.STAT_SUPAITEM, 1): StatsManager, task 2.10
+      this.statsMan.inc(Data.STAT_SUPAITEM, 1);
     }
   }
 
@@ -1245,18 +1266,6 @@ export class GameSession implements IGameContext {
     return SpecialItem.attach(this, x, y, id, subId);
   }
 
-  spawnExtend(): void {
-    if (this.fl_clear) return;
-    const pt = this.world.getGround(
-      this.rand.random(Data.LEVEL_WIDTH),
-      this.rand.random(Data.LEVEL_HEIGHT),
-    );
-    const x = BaseEntity.x_ctr(pt.x);
-    const y = BaseEntity.y_ctr(pt.y);
-    const id = this.randMan.draw(Data.RAND_EXTENDS_ID) ?? 0;
-    SpecialItem.attach(this, x, y, 0, id);
-  }
-
   // ----------------------------------------------------------- UI & Banners
 
   attachPop(msg: string, flTuto: boolean): void {
@@ -1446,7 +1455,7 @@ export class GameSession implements IGameContext {
     this.removeFake();
     this.world = this.dimensions[id];
     this.world.darknessFactor = this.dfactor;
-    this.fl_lock = true;
+    this.lock();
     this.fl_clear = false;
     if (pid < 0) {
       this.fl_fadeNextTransition = true;
@@ -1491,7 +1500,7 @@ export class GameSession implements IGameContext {
 
   /** `GameMode.onRestore`: players appear at the arrival portal. */
   private onRestore(): void {
-    this.fl_lock = false;
+    this.unlock();
     const pt = this.getPortalEntrance(this.portalId);
     for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
       p.moveToCase(pt.x, pt.y);
@@ -1716,6 +1725,7 @@ export class GameSession implements IGameContext {
   onPause(): void {
     if (this.fl_lock || this.fl_gameOver) return;
     this.fl_pause = true;
+    this.lock();
     this.world.lock();
     this.pauseMC?.removeMovieClip();
 
@@ -1749,6 +1759,7 @@ export class GameSession implements IGameContext {
   onUnpause(): void {
     if (!this.fl_pause) return;
     this.fl_pause = false;
+    this.unlock();
     this.world.unlock();
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
@@ -1759,6 +1770,7 @@ export class GameSession implements IGameContext {
 
   /** `GameMode.main` */
   update(): void {
+    this.gameChrono.update();
     this.input.poll();
 
     // Check pause key toggle

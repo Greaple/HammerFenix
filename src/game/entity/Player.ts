@@ -342,6 +342,7 @@ export class PlayerEntity extends PhysicsEntity {
 
   killPlayer(): void {
     this.game.fxMan.attachFx(this.x, Data.GAME_HEIGHT, 'hammer_fx_death_player');
+    this.game.statsMan.inc(Data.STAT_DEATH, 1);
     this.lives--;
     this.game.hud.setLives(this.lives);
     if (this.lives >= 0) {
@@ -538,6 +539,7 @@ export class PlayerEntity extends PhysicsEntity {
     if (!this.fl_stable) {
       this.airJump();
     }
+    this.game.statsMan.inc(Data.STAT_BOMB, 1);
     b.setOwner(this);
     this.game.audio.playSound('sound_bomb_drop', Data.CHAN_PLAYER);
     if (!this.fl_stable) {
@@ -554,6 +556,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   private shoot(s: ShootEntity): ShootEntity {
+    this.game.statsMan.inc(Data.STAT_SHOT, 1);
     this.coolDown = s.coolDown;
     if (this.dir < 0) s.moveLeft(s.shootSpeed);
     else s.moveRight(s.shootSpeed);
@@ -605,6 +608,7 @@ export class PlayerEntity extends PhysicsEntity {
 
         this.playAnim(Data.ANIM_PLAYER_KICK);
         this.game.audio.playSound('sound_kick', Data.CHAN_PLAYER);
+        this.game.statsMan.inc(Data.STAT_KICK, 1);
 
         if (this.actives[92] && b.lifeTimer > 0) {
           const b2 = b.duplicate();
@@ -646,6 +650,7 @@ export class PlayerEntity extends PhysicsEntity {
         this.recentKicks.push({ t: this.game.cycle, bid: b.uniqId });
         this.playAnim(Data.ANIM_PLAYER_KICK);
         this.game.audio.playSound('sound_kick', Data.CHAN_PLAYER);
+        this.game.statsMan.inc(Data.STAT_KICK, 1);
         if (this.actives[70]) {
           this.getScore(this, 10);
         }
@@ -903,6 +908,7 @@ export class PlayerEntity extends PhysicsEntity {
       if (this.actives[66]) {
         this.getScore(this, 10);
       }
+      this.game.statsMan.inc(Data.STAT_JUMP, 1);
       input.lock('jump');
     }
 
