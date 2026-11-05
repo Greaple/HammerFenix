@@ -1,0 +1,36 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+	<head>
+		<title>Redirection inscription</title>
+		<link rel="stylesheet" type="text/css" href="/css/main.css"/>
+		<script type="text/javascript" src="/js/flashobject.js"></script>
+	</head>
+	<body class="redirection">
+
+		<div class="redirBox">
+			<h1>Redirection <strong>inscription</strong></h1>
+			<h2>Merci de patienter...</h2>
+			<h2>(vers l&#039;infini et au delà !)</h2>
+
+			<div class="outerspace">
+				<script type="text/javascript">
+					//<![CDATA[
+					var o = new FlashObject('http://data.hammerfest.fr/loader.swf?v=91','redir',10,10,7);
+					o.addVariable('redirect', 'http://www.hammerfest.fr/subscribe.html/gm');
+					o.addParam("allowScriptAccess","always"); // flash 9 redirect fix
+					o.write();
+					//]]>
+				</script>
+			</div>
+
+			<noscript class="error">
+				Erreur: Il faut <a href="/doc/show/javascript">activer javascript</a>
+				pour votre navigateur !
+			</noscript>
+		</div>
+
+
+
+	</body>
+</html>
