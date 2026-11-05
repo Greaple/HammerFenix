@@ -45,15 +45,23 @@ export interface LoaderHost {
   readonly gameRoot: SwfMovieClip;
   /** `Loader.getLangStr`: the `$statics` texts of the lang file. */
   getLangStr(id: number): string;
+  /** `GameManager` is built and starts its mode: the end of `Loader.startGame`. */
+  startGameInstance(): void;
 }
 
 /**
  * Port of the end of a game in `Loader` (`class/hammer/Loader.mt`): `gameOver`, `exitGame`,
  * `attachLoading` and the fades of `mainGame`. The `loading` clip comes from `_loader.swf`.
  *
- * Not ported: the page start (`startGame` and its fade-out of frame 6, task 3.1b) and the
- * server side (sending the score, retries, `saveAgain`, the redirections). Where the original
- * waits for the server or leaves the page, `onResult` gets the result once the fade is over.
+ * Also the start of a game once the page has chosen the mode (3.1b): `gameReady` ("click to
+ * start", frame 2), `queryStart` (frame 3), `startGame` and the fade-out of frame 6. The SWF and
+ * music downloads before it (frames 1 and 7) are not ported: the port loads its assets before
+ * the site page shows.
+ *
+ * Not ported: the server side (the start query, sending the score, retries, `saveAgain`, the
+ * redirections). The start query answers at once, as a server that accepts the game. Where the
+ * original waits for the server or leaves the page, `onResult` gets the result once the fade is
+ * over.
  */
 export class Loader {
   private readonly host: LoaderHost;
@@ -65,6 +73,8 @@ export class Loader {
   fl_game = true;
 
   loading: SwfMovieClip | null = null;
+  /** The label `loading` was sent to by `attachLoading`. */
+  private loadingFrame = 0;
   /**
    * `loading._alpha`. Flash keeps any value (the fade counts up to 220), while the port's
    * `_alpha` stops at 100, so the count is kept here.
@@ -77,6 +87,10 @@ export class Loader {
   result: GameResult | null = null;
   /** The game has ended and its fade is over: the site would take over from here. */
   fl_done = false;
+  /** Waiting for the click on "click to start": the game is not built yet. */
+  fl_wait = false;
+  /** `_mode`: the site's `$mode` (`solo`, `tutorial`...). */
+  mode = 'solo';
 
   onResult?: (result: GameResult) => void;
 
@@ -98,12 +112,43 @@ export class Loader {
     this.uniqueItems = 0;
     this.result = null;
     this.fl_done = false;
+    this.fl_wait = false;
     this.host.gameRoot.visible = true;
   }
 
   /** `true` while `gameInst.main()` runs this frame. */
   get gameRunning(): boolean {
-    return this.fl_game && !this.fl_gameOver && !this.fl_done;
+    return this.fl_game && !this.fl_wait && !this.fl_gameOver && !this.fl_done;
+  }
+
+  /**
+   * `Loader.gameReady`: the game is loaded, "click to start" (frame 2). `mode` is the site's
+   * `$mode`. Covers the game until `onRelease` (a click on the game) calls `queryStart`.
+   */
+  gameReady(mode: string): void {
+    this.reset();
+    this.mode = mode;
+    this.fl_wait = true;
+    this.attachLoading(2);
+  }
+
+  /** `loading.onRelease`, set on frames 2 and 4 only. */
+  onRelease(): void {
+    if (this.fl_wait && this.loadingFrame === 2) this.queryStart();
+  }
+
+  /** `Loader.queryStart`: "starting the game..." (frame 3) while the server answers. */
+  private queryStart(): void {
+    this.attachLoading(3);
+    // `serverData`: the port has no server, the game is always accepted
+    this.startGame();
+  }
+
+  /** `Loader.startGame`: builds the game, then fades out frame 6 while it runs. */
+  private startGame(): void {
+    this.fl_wait = false;
+    this.host.startGameInstance();
+    this.attachLoading(6);
   }
 
   private countUniques(a: number[]): number {
@@ -147,8 +192,29 @@ export class Loader {
     mc.mcDepth = 99;
     this.host.stage.addChild(mc);
     this.loading = mc;
+    this.loadingFrame = frame;
     mc.gotoAndStop(String(frame));
     mc.getClip('bg')?.gotoAndStop('1'); // "2" is the dev mode background
+    if (frame === 2 || frame === 3) {
+      mc.avmSet('currentWeapon', 1);
+      this.setText('title', this.host.getLangStr(50));
+      this.setText('km', this.host.getLangStr(52));
+      if (frame === 2) {
+        // click to start
+        this.setText('bottom', this.host.getLangStr(53));
+        if (this.mode === 'tutorial' || this.mode === 'soccer') {
+          // free modes
+          this.setText('subBottom', this.host.getLangStr(58));
+        } else {
+          this.setText('subBottom', this.host.getLangStr(57));
+        }
+      }
+      if (frame === 3) {
+        // starting...
+        this.setText('bottom', this.host.getLangStr(54));
+        this.setText('subBottom', '');
+      }
+    }
     if (frame === 5) {
       // saving, please wait...
       this.setText('bottom', this.host.getLangStr(55));
@@ -198,6 +264,17 @@ export class Loader {
         this.finish();
       }
       return;
+    }
+
+    if (!this.fl_fade && !this.fl_exit && !this.fl_gameOver && !this.fl_wait) {
+      if (this.loading) {
+        this.setAlpha(this.alpha - 2);
+        if (this.alpha <= 0) {
+          this.loading.removeMovieClip();
+          this.loading = null;
+          this.alpha = 100;
+        }
+      }
     }
   }
 

@@ -7,6 +7,8 @@ import { GameSession } from './game/GameSession';
 import { SymbolBrowser } from './ui/SymbolBrowser';
 import { DebugToolkit } from './ui/DebugToolkit';
 import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
+import { SitePage } from './ui/SitePage';
+import './site.css';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -107,9 +109,24 @@ async function main(): Promise<void> {
   const originalCompare = new OriginalCompareDialog(compareDialog);
   (window as any).originalCompare = originalCompare;
 
-  // 5. Create GameSession (starts on Adventure Level 0)
+  // 5. Create GameSession. The site page (mode menu) shows first, as on hammerfest.fr.
   const session = await GameSession.create(app, lib, dataStore, audio, input, 'adventure');
-  session.start();
+  const gameWrapper = document.getElementById('game-wrapper') as HTMLElement;
+  const site = new SitePage(gameWrapper.parentElement!, dataStore.langId);
+  gameWrapper.hidden = true;
+  /** Leaves the site page for the game (the debug toolbar plays without the menu). */
+  const showGame = () => {
+    if (!site.visible) return;
+    site.hide();
+    gameWrapper.hidden = false;
+    session.start();
+  };
+  site.onStart = (mode) => {
+    showGame();
+    session.gameReady(mode);
+  };
+  canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
+  (window as any).sitePage = site;
   (window as any).gameSession = session;
   (window as any).pixiApp = app;
   (window as any).gameLib = lib;
@@ -145,6 +162,7 @@ async function main(): Promise<void> {
 
     levelSetSelect.addEventListener('change', async () => {
       const setName = levelSetSelect.value;
+      showGame();
       await session.changeSet(setName, 0);
       if (levelInput) {
         levelInput.value = '0';
@@ -159,6 +177,7 @@ async function main(): Promise<void> {
     levelInput.addEventListener('change', () => {
       const lvl = parseInt(levelInput.value, 10);
       if (!Number.isNaN(lvl)) {
+        showGame();
         session.changeLevel(lvl);
       }
     });
@@ -166,6 +185,7 @@ async function main(): Promise<void> {
 
   // Restart, Pause, Mute buttons
   btnRestart?.addEventListener('click', () => {
+    showGame();
     session.restartLevel();
   });
 
@@ -181,6 +201,7 @@ async function main(): Promise<void> {
   // Language selector
   langSelect?.addEventListener('change', async () => {
     await dataStore.setLang(langSelect.value);
+    site.setLang(langSelect.value);
   });
 
   // Dialog & Debug open triggers

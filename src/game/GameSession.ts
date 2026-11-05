@@ -262,6 +262,7 @@ export class GameSession implements IGameContext {
       stage: app.stage,
       gameRoot: this.gameRoot,
       getLangStr: (id) => this.dataStore.getStatic(id),
+      startGameInstance: () => this.initGame(0),
     });
     this.loader.onResult = (r) => this.onGameEnd(r);
 
@@ -2071,6 +2072,24 @@ export class GameSession implements IGameContext {
 
   start(): void {
     this.gameLoop.start();
+  }
+
+  /**
+   * The site page has chosen the mode (3.1b): the Loader shows "click to start", and the click
+   * (`clickStart`) builds a new game. `mode` is the site's `$mode`; only `solo` (Adventure) is
+   * ported.
+   */
+  gameReady(mode = 'solo'): void {
+    this.stopInputCapture();
+    this.backToMainWorld();
+    this.loader.gameReady(mode);
+    this.gameRoot.visible = false; // `game` holds no GameManager yet
+    this.onStateChange?.({ isOver: false, isPaused: false });
+  }
+
+  /** A click on the game: `loading.onRelease`. */
+  clickStart(): void {
+    this.loader.onRelease();
   }
 
   stop(): void {

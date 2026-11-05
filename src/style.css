@@ -832,3 +832,7 @@ kbd {
   padding: 16px;
   font-size: 0.85rem;
 }
+
+.game-wrapper[hidden] {
+  display: none;
+}

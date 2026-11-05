@@ -35,10 +35,10 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Modes
 
-| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                                                                                                      |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Bosses and bullet time (2.8, 2.9). Stats and game chrono (2.10). Game over and end of set hand off to the Loader (2.11). Missing: map, options, the results screen (3.1c) |
-| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                                                                                                               |
+| Original                                                                                                     | TypeScript                | Status  | Notes                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mode.mt`, `mode/GameMode.mt`, `mode/Adventure.mt`                                                           | `src/game/GameSession.ts` | partial | Audited (1.6), see "Audit 1.6". Darkness with light holes (2.7). Bosses and bullet time (2.8, 2.9). Stats and game chrono (2.10). Game over and end of set hand off to the Loader (2.11). Started from the site's mode menu through the Loader (3.1b). Missing: map, options, the results screen (3.1c) |
+| `mode/TimeAttack*.mt`, `MultiCoop.mt`, `Soccer*.mt`, `BossRush.mt`, `Tutorial.mt`, `Shareware.mt`, `Fjv*.mt` |                           | missing | Level sets load but run with Adventure rules                                                                                                                                                                                                                                                            |
 
 ## Levels
 
@@ -77,6 +77,30 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 | -------------------------------------------------------------------------------------------------------------- | ------------------------- | ------- | ------------------------------------------------------------ |
 | `gui/GameInterface.mt`                                                                                         | `src/game/gui/GameHud.ts` | partial | Single player only (no `initMulti`, `initTime`, `lightMode`) |
 | `gui/SoccerInterface.mt`, `ExtendBox.mt`, `Container.mt`, `SimpleButton.mt`, `Field.mt`, `Label.mt`, `Item.mt` |                           | missing |                                                              |
+
+## Site screens (3.1a research)
+
+The original client never showed a title, a mode menu or a results page: hammerfest.fr did, in HTML around the Flash `loader.swf`. Sources: `assets-src/site-archive/` (pages, `img/design/`, `css/main_v77.css`), `Loader.mt`, `GameParameters.mt`, `GameManager.startDefaultGame`, `xml/lang/*.xml`.
+
+**What the site passed to the client** (flash variables, read by `Loader` / `GameParameters`):
+
+- `$mode`: `solo` (Adventure), `tutorial`, `timeattack`, `multitime`, `multicoop`, `soccer`, `bossrush`. `GameManager.startDefaultGame` picks the mode from it.
+- `$options`: comma list of `Data.OPT_*` (`mirror`, `nightmare`, `ninja`, `bombexpert`, `boost`, `kickcontrol`, `bombcontrol`, `mirrormulti`, `nightmaremulti`, `lifesharing`, `soccerbomb`) and the level set choice `set_ta_N`, `set_mta_N`, `set_soc_N`.
+- `$volume`, `$sound`, `$music`, `$detail`, `$shake`: the player's settings ("Paramètres" on the site). `$music=0` skips the music download.
+- `$lang`: `fr`, `es` or `en`. `$families` came back from the server's start query (3.2).
+
+**In-client screens (ported exactly, not site):** the `loading` clip of `_loader.swf`, frames 1 "Voyage vers Hammerfest... / km" (download), 7 "Chargement des musiques...", 2 "Vous y êtes ! / Cliquez pour commencer... / Une partie vous sera décomptée." (or "Ce mode est gratuit et illimité !" for tutorial and soccer), 3 "Démarrage de la partie...", 6 the fade into the game, 5 "Sauvegarde en cours !" at the end. Texts are `Lang` statics 50 to 63.
+
+**Site screens and what is known of each:**
+
+- Home / title: the public home page (archived 2006 to 2020): header `headers/fr/header.jpg` on `stars.jpg`, `landscape.jpg`, the four `icon_*` tabs (Jouer, Réfrigérateur, Quêtes, Classement). Nothing to play there without an account.
+- Mode menu ("MENU CHOOSE GAME" in the CSS): the HTML is behind the login and was never archived; the CSS rules and images are. A 454 px box (`menu/menutop|menubg|menubot.gif`): left column of 137 px, right aligned, one link per mode with a 23 px icon (`iadv`, `itutorial`, `itatt`, `imulticoop`, `imultitime`, `isoccer`, `ibossrush`, each with `_over`); right column of 268 px with the mode's title (`h2`), its text, the option checkboxes (`.mopt`, `ul.moptl`, disabled ones `.lidis`), a level set `select` (`.slc`) and the "Commencer" button (`.button`). Under it a second box (`menub*.gif`) with bullet links (`imenub.gif`), the `.arrow` and the `igorWonder` picture. The guide (`guide.html`): "select a mode and click Commencer"; Adventure costs one game (snowflake), Apprentissage is free; other modes are unlocked by quests. An older (2006) menu used the 214x102 cards `choice_*.gif` (`_off` when locked). `choice_timeattack_off.gif` in the archive is a wrong capture (it shows the Introduction card).
+- Options ("Paramètres"): detail, shaking, sound, music, volume (guide section 8, `help_opt.gif`), i.e. the `$detail`, `$shake`, `$sound`, `$music`, `$volume` variables.
+- Results page after a game (`/play.html/<id>/result`): never archived (owner only). The CSS gives its parts: `h2.gameOver` title, `.artResult` picture, `.levelResult` (reached level and score, with an `icon_endGame.gif` when the end was reached), `ul.collected` (items found, 30 px icons, `asterisk.gif` bullets), `table.result` (quest progress: title column, progress, `.statusCompleted` in green), `.continue` box.
+- `endGame.html` (end of the set): only a 404 was archived; `icon_endGame.gif` marks a finished game on profiles.
+- Fridge (`/user.html/inventory`) and quests (`/user.html/quests`): behind the login. The CSS has `table.fridge` (item, quantity, name, `unknown` cells, per family `familyStatus` headers) and `table.quest` (`questTitle`, `notYetQuest`). Public profiles show the same data: completed quests, quests in progress, and "N objets sur 353" with one small icon per item (`a.gif` for one not found). The guide: an item needs about 10 finds to enter the fridge; the fridge has no effect on play.
+
+**Design (decided 2026-11-05):** rebuild the site pages in HTML and CSS around the game canvas, from the archived CSS rules and images, rather than drawing new screens in the canvas. Where the HTML was not archived (mode menu, results, fridge, quests) the structure follows the CSS class names above and nothing is added that they do not describe. The loader screens stay in the canvas, ported from `Loader.mt`. The site images used at run time are copied to `public/site/` by `tools/build-site.ts` (`npm run assets`).
 
 ## Item effects (`SpecialManager.execute`)
 
