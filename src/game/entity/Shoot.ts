@@ -628,7 +628,7 @@ export class BossFireBallShoot extends ShootEntity {
   }
 }
 
-/** What a FramBall needs from its owner (`entity.bad.walker.Framboise`, task 2.12). */
+/** What a FramBall needs from its owner (`entity.bad.walker.Framboise`, `FramboiseBad` in `Bad.ts`). */
 export interface FramBallOwner {
   tx: number;
   ty: number;
@@ -638,7 +638,7 @@ export interface FramBallOwner {
 
 /**
  * Port of `entity.shoot.FramBall`: a fragment of a Framboise flying to the spot where it
- * reassembles (task 2.12).
+ * reassembles.
  */
 export class FramBallShoot extends ShootEntity {
   turnSpeed: number;

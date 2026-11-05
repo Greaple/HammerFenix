@@ -56,8 +56,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 All 21 species are registered in the factory at the end of `Bad.ts`.
 
 - done: `Bad`, `Walker`, `Jumper`, `Shooter`, `Flyer`, `WallWalker`, `Spear`, `FireBall`, Pomme, Cerise, Banane, Ananas, Abricot, Poire, Bombe, Orange, Fraise, Citron, Tzongre, Crawler, Saw, Litchi, LitchiWeak, Kiwi
-- done: Baleine (a plain `Flyer` in the original too)
-- approx: Framboise (original 250 lines, task 2.12)
+- done (2.12): Baleine (a plain `Flyer` in the original too, now its own `BaleineBad` class), Framboise (bursts into `FramBall` fragments and rebuilds at the target; not audited in 1.5, ported line by line in 2.12)
 - unused: `walker/Coward.mt`, `walker/Hunter.mt` (the original's `attachBad` never creates them)
 - All classes above audited line by line in 1.5, see "Audit 1.5" below.
 - done (2.8, 2.9): `boss/Bat.mt` (level 100), `boss/Tuberculoz.mt` (level 101), in `entity/Boss.ts`. See "Bosses" below.
@@ -69,7 +68,7 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 - unused: `bomb/player/MineFrozen`, `PoireBombFrozen` (`Mine.getFrozen` and `PoireBomb.getFrozen` are commented out in the original, so nothing creates them)
 - missing: `entity/WalkingBomb.mt`
 - `entity/Shoot.ts` done (rewritten from the original in 1.6): Shoot, Pepin, Zeste, FireBall, Ball, PlayerArrow, PlayerFireBall, PlayerPearl
-- done (2.2): `shoot/FireRain`, `Hammer` (item 85), `BossFireBall` (used by the Bat, 2.8), `FramBall` (used by Framboise, 2.12)
+- done (2.2): `shoot/FireRain`, `Hammer` (item 85), `BossFireBall` (used by the Bat, 2.8), `FramBall` (used by Framboise since 2.12)
 - `entity/Supa.ts` done (2.1): `entity/Supa.mt` and all of `entity/supa/*` (Arrow, Ball, Bubble, IceMeteor, Smoke, SupaItem, Tons).
 
 ## Interface

@@ -5,7 +5,14 @@ import { type BombEntity, MineBomb, PoireBomb } from './Bomb';
 import { BaseEntity, MoverEntity, type PhysicsEntity } from './Entity';
 import { ScoreItem } from './Item';
 import type { PlayerEntity } from './Player';
-import { BallShoot, EnemyFireBallShoot, PepinShoot, ZesteShoot } from './Shoot';
+import {
+  BallShoot,
+  EnemyFireBallShoot,
+  type FramBallOwner,
+  FramBallShoot,
+  PepinShoot,
+  ZesteShoot,
+} from './Shoot';
 
 function adjustAngle(deg: number): number {
   let a = deg % 360;
@@ -2505,7 +2512,20 @@ class KiwiBad extends ShooterBad {
   }
 }
 
-class FramboiseBad extends ShooterBad {
+/**
+ * Port of `entity.bad.walker.Framboise` (`class/hammer/entity/bad/walker/Framboise.mt`): when a
+ * bomb is close, it bursts into 6 fragments (`FramBall`) that fly to a random platform and
+ * rebuild it there, one piece per fragment.
+ */
+class FramboiseBad extends ShooterBad implements FramBallOwner {
+  static FRAGS = 6;
+  static MAX_TRIES = 1000;
+  tx = 0;
+  ty = 0;
+  fl_phased: boolean;
+  arrived = 0;
+  white: number;
+
   constructor(game: IGameContext, mc: SwfMovieClip) {
     super(game, mc);
     this.setJumpUp(3);
@@ -2514,27 +2534,99 @@ class FramboiseBad extends ShooterBad {
     this.setClimb(100, 3);
     this.setFall(20);
     this.setShoot(0.7);
+
     this.initShooter(20, 12);
+
+    this.white = 0;
+    this.fl_phased = false;
   }
 
-  override onShoot(): void {
-    let tries = 0;
-    let ctx = this.cx;
-    let cty = this.cy;
-    let invalid = true;
-    while (tries < 600 && invalid) {
-      invalid = false;
-      ctx = this.game.rand.random(Data.LEVEL_WIDTH);
-      cty = this.game.rand.random(Data.LEVEL_HEIGHT);
-      tries++;
-      if (this.distanceCase(ctx, cty) <= 7) invalid = true;
-      if (!this.world.checkFlag(ctx, cty, Data.IA_TILE_TOP)) invalid = true;
-      if (this.world.checkFlag(ctx, cty, Data.IA_SMALL_SPOT)) invalid = true;
-      if (this.game.getListAt(Data.SPEAR, ctx, cty).length > 0) invalid = true;
-    }
-    if (invalid) return;
+  /** Approximative coords */
+  aroundX(base: number): number {
+    const rand = this.game.rand;
+    return base + rand.random(Data.CASE_WIDTH) * (rand.random(2) * 2 - 1);
+  }
 
-    // Framboise.phaseOut (the phasing itself is task 2.12)
+  aroundY(base: number): number {
+    return base - this.game.rand.random(Data.CASE_HEIGHT);
+  }
+
+  override isReady(): boolean {
+    return super.isReady() && !this.fl_phased;
+  }
+
+  // Bad's events
+
+  override freeze(d: number): void {
+    this.phaseIn();
+    super.freeze(d);
+  }
+
+  override knock(d: number): void {
+    this.phaseIn();
+    super.knock(d);
+  }
+
+  override killHit(dx: number | null): void {
+    this.phaseIn();
+    super.killHit(dx);
+  }
+
+  override destroy(): void {
+    this.clearFrags();
+    super.destroy();
+  }
+
+  override onHitGround(h: number): void {
+    super.onHitGround(h);
+    if (h >= Data.CASE_HEIGHT * 2) {
+      this.game.fxMan.inGameParticles(
+        Data.PARTICLE_FRAMB_SMALL,
+        this.x,
+        this.y,
+        this.game.rand.random(4) + 2,
+      );
+    }
+  }
+
+  /** A fragment has arrived */
+  onArrived(fb: FramBallShoot): void {
+    this.show();
+    this.moveTo(this.tx, this.ty);
+    fb.destroy();
+    const sub = this.sub;
+    if (fb.mc._currentframe >= 5) {
+      if (fb.mc._currentframe === 5) {
+        const o1 = sub?.getClip('o1');
+        if (o1) o1._visible = true;
+      } else {
+        const o2 = sub?.getClip('o2');
+        if (o2) o2._visible = true;
+      }
+    } else {
+      sub?.nextFrame();
+    }
+
+    this.arrived++;
+    if (this.arrived >= FramboiseBad.FRAGS) {
+      this.phaseIn();
+    }
+  }
+
+  /** Delete all frags */
+  clearFrags(): void {
+    const sl = this.game.getList(Data.SHOOT);
+    for (let i = 0; i < sl.length; i++) {
+      const s = sl[i];
+      if ((s as FramBallShoot).owner === this) {
+        s.destroy();
+      }
+    }
+  }
+
+  // Phasing
+
+  phaseOut(): void {
     this.game.fxMan.inGameParticles(
       Data.PARTICLE_FRAMB_SMALL,
       this.x,
@@ -2542,19 +2634,103 @@ class FramboiseBad extends ShooterBad {
       this.game.rand.random(3) + 2,
     );
     this.game.fxMan.attachExplosion(this.x, this.y, 40);
-    this.moveTo(BaseEntity.x_ctr(ctx), BaseEntity.y_ctr(cty));
+    this.fl_phased = true;
+    this.dx = 0;
+    this.dy = 0;
+    this.disableShooter();
+    this.disableAnimator();
+    this.mc.gotoAndStop('15');
+    const sub = this.sub;
+    sub?.stop();
+    const o1 = sub?.getClip('o1');
+    const o2 = sub?.getClip('o2');
+    if (o1) o1._visible = false;
+    if (o2) o2._visible = false;
+    this.hide();
+  }
+
+  override walk(): void {
+    if (!this.fl_phased) super.walk();
+  }
+
+  phaseIn(): void {
+    this.clearFrags();
+    this.fl_phased = false;
+    this.enableAnimator();
+    this.enableShooter();
     this.game.fxMan.attachExplosion(this.x, this.y, 40);
-    this.shootCD = Data.SECOND * 1.5;
+    // (commented out in the original: a.mc.blendMode = BlendMode.NORMAL; white = 1;)
+  }
+
+  /** Event: shot */
+  override onShoot(): void {
+    let tries = 0;
+    let ctx: number;
+    let cty: number;
+    let flInv: boolean;
+    do {
+      flInv = false;
+      ctx = this.game.rand.random(Data.LEVEL_WIDTH);
+      cty = this.game.rand.random(Data.LEVEL_HEIGHT);
+      tries++;
+      const d = this.distanceCase(ctx, cty);
+      if (d <= 7) flInv = true;
+      if (!this.world.checkFlag(ctx, cty, Data.IA_TILE_TOP)) flInv = true;
+      if (this.world.checkFlag(ctx, cty, Data.IA_SMALL_SPOT)) flInv = true;
+      if (this.game.getListAt(Data.SPEAR, ctx, cty).length > 0) flInv = true;
+    } while (tries < FramboiseBad.MAX_TRIES && flInv);
+    if (tries >= FramboiseBad.MAX_TRIES) {
+      return;
+    }
+    this.tx = BaseEntity.x_ctr(ctx);
+    this.ty = BaseEntity.y_ctr(cty);
+    this.arrived = 0;
+    this.phaseOut();
+
+    for (let i = 0; i < FramboiseBad.FRAGS; i++) {
+      const s = FramBallShoot.attach(this.game, this.aroundX(this.x), this.aroundY(this.y));
+      s.setOwner(this);
+      s.mc.gotoAndStop(String(i + 1));
+    }
+  }
+
+  /** Graphical update. `white` stays 0: the original's only `white = 1` is commented out. */
+  override endUpdate(): void {
+    super.endUpdate();
+    if (this.white > 0) {
+      this.mc.setColorHex(Math.round(100 * this.white), 0xffffff);
+      this.mc.setGlow(0xffffff, 1, 4, 4, this.white * 2);
+      this.white -= 0.1;
+      if (this.white <= 0) {
+        this.mc.clearGlow();
+      }
+    }
   }
 
   override update(): void {
-    const bombs = this.game.getClose(Data.PLAYER_BOMB, this.x, this.y, 90, false);
-    if (this.isReady() && this.shootCD <= 0 && bombs.length >= 1) {
-      this.startShoot();
+    if (!this.mc._visible) {
+      this.moveTo(100, -200);
+      if (!this.isHealthy()) {
+        this.show();
+        this.moveTo(this.tx, this.ty);
+        this.phaseIn();
+      }
+    } else {
+      const bl = this.game.getClose(Data.PLAYER_BOMB, this.x, this.y, 90, false);
+      if (this.isReady() && bl.length >= 1) {
+        this.startShoot();
+      }
     }
+
     super.update();
   }
 }
+
+/**
+ * Port of `entity.bad.flyer.Baleine` (`class/hammer/entity/bad/flyer/Baleine.mt`): a plain
+ * `Flyer`.
+ */
+class BaleineBad extends FlyerBad {}
 
 /**
  * Factory creating any of the 21 Hammerfest enemy species (`Data.BAD_POMME` .. `Data.BAD_FRAMBOISE`).
@@ -2604,7 +2780,7 @@ export function createBad(game: IGameContext, id: number, x: number, y: number):
       bad = new CitronBad(game, mc);
       break;
     case Data.BAD_BALEINE:
-      bad = new FlyerBad(game, mc);
+      bad = new BaleineBad(game, mc);
       break;
     case Data.BAD_SPEAR:
       bad = new SpearBad(game, mc);
