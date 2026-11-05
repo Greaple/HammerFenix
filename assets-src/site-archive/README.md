@@ -30,6 +30,13 @@ It is slow on purpose (one file every ~7 s): the Wayback Machine refuses connect
   a quest flowchart), from image hosts that are gone
 - `wiki/`: WikiTeam dump (2022) of hammerfest.fandom.com, the small English player wiki
 
+## Other sources
+
+- [hamm4all.net](https://hamm4all.net/) (open source: gitlab.com/BlessedRaccoon/hamm4all): French
+  player help site, still maintained. Quests with requirements and rewards, families,
+  coefficients, keys, crystals, letters, known bugs of the original, and player screenshots of
+  every level. A guide written later, not a copy of the site: it has none of the site screens.
+
 ## What could not be found
 
 - **The results page after a game** (`/play.html/<id>/result`): about 27,000 captures exist on the
