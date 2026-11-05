@@ -17,6 +17,9 @@ import { BatBoss, type BossEntity, TuberculozBoss } from './entity/Boss';
 import { SupaItem } from './entity/Supa';
 import { FxManager } from './FxManager';
 import { Random } from './Random';
+import { PersistCodec } from '../engine/codec/PersistCodec';
+import packageJson from '../../package.json';
+import { type GameResult, Loader } from './Loader';
 import { RandomManager } from './RandomManager';
 import { StatsManager } from './StatsManager';
 import { Chrono, realTimer } from './Chrono';
@@ -84,6 +87,19 @@ export class GameSession implements IGameContext {
   getTimer: () => number = realTimer;
   /** `GameMode.gameChrono`: real play time, stopped while the game is locked. */
   gameChrono: Chrono = new Chrono(this.getTimer);
+  /** `GameManager.history`: the game log. Only its "illegal" mark survives the game over. */
+  history: string[] = [];
+  /** `GameManager.KEY`: hides the players' scores from memory editors (`Player.scoreCS`). */
+  scoreKey = 0;
+  /** `GameMode.duration`: frames played (not counted while the game is locked). */
+  duration = 0;
+  /** `GameMode.savedScores`: each player's final score, by pid. */
+  savedScores: number[] = [];
+  /** The page around the game: the fades at the end of a game and the hand-off to the site. */
+  readonly loader: Loader;
+  /** The last game's result, once the Loader is done with it. */
+  lastResult: GameResult | null = null;
+  onGameResult?: (result: GameResult) => void;
   /** Random source of the SWF frame scripts: seeded with the game, but apart from `rand`. */
   private readonly animRand = new Random();
 
@@ -185,6 +201,7 @@ export class GameSession implements IGameContext {
   private pointerMC: SwfMovieClip | null = null;
   private itemNameMC: SwfMovieClip | null = null;
   private pauseMC: SwfMovieClip | null = null;
+  /** Placeholder shown once the game has ended, until the results screen (3.1c). */
   private gameOverMC: SwfMovieClip | null = null;
   private darknessMC: SwfMovieClip | null = null;
   /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
@@ -239,6 +256,14 @@ export class GameSession implements IGameContext {
     this.view = new LevelView(this.world, this.depthMan);
     this.fxMan = new FxManager(this);
     this.hud = new GameHud(this, 0, 2, 0);
+
+    this.loader = new Loader({
+      lib,
+      stage: app.stage,
+      gameRoot: this.gameRoot,
+      getLangStr: (id) => this.dataStore.getStatic(id),
+    });
+    this.loader.onResult = (r) => this.onGameEnd(r);
 
     this.gameLoop = new FixedGameLoop({
       onLogicStep: () => this.update(),
@@ -340,6 +365,15 @@ export class GameSession implements IGameContext {
     this.cycle = 0;
     this.gameOverMC?.removeMovieClip();
     this.gameOverMC = null;
+    // A new GameManager and Loader: the original loads a new page for each game
+    this.loader.reset();
+    this.lastResult = null;
+    this.history = [];
+    const keyRand = new Random();
+    keyRand.reseed(seed ^ 0x4b4559);
+    this.scoreKey = keyRand.random(999999) * keyRand.random(999999);
+    this.duration = 0;
+    this.savedScores = [];
 
     // Adventure.initGame
     this.playMusicTrack(0);
@@ -887,9 +921,9 @@ export class GameSession implements IGameContext {
     this.audio.playSound('sound_level_clear', Data.CHAN_INTERF);
   }
 
-  /** `Adventure.onEndOfSet`: the original leaves the game (`exitGame`). */
+  /** `Adventure.onEndOfSet` */
   onEndOfSet(): void {
-    this.onGameOver();
+    this.exitGame();
   }
 
   clearLevel(): void {
@@ -1229,22 +1263,110 @@ export class GameSession implements IGameContext {
     this.scriptRunner?.onPlayerDeath();
   }
 
+  /** `GameMode.onGameOver` + `Adventure.onGameOver` */
   onGameOver(): void {
     this.fl_gameOver = true;
-    this.audio.stopMusic();
-    this.saveGame();
+    this.logAction('$t=' + Math.round(this.duration / Data.SECOND));
 
-    this.gameOverMC?.removeMovieClip();
-    this.gameOverMC = this.depthMan.attach('hammer_interf_pop', Data.DP_TOP);
-    this.gameOverMC._x = Data.GAME_WIDTH * 0.5;
-    this.gameOverMC.gotoAndStop('1');
+    const fl_illegal = this.history.join('|').indexOf('!', 0) >= 0;
 
-    const tf = this.gameOverMC.getClip('sub')?.getText('field');
-    if (tf) {
-      tf.text = 'GAME OVER\nClick or press Space to Restart';
+    // `F=` is the site's `$version` parameter: the port's version here
+    this.history = ['F=' + packageJson.version, 'T=' + this.gameChrono.get()];
+    if (fl_illegal) {
+      this.history.push('$illegal'.substring(1));
     }
 
+    this.audio.stopMusic();
+    this.saveGame(); // the port's local high score, until the profile (3.2b)
+
+    this.saveScore();
     this.onStateChange?.({ isOver: true, isPaused: false });
+  }
+
+  /**
+   * `Adventure.saveScore`: hands the score to the Loader. The original first checks the set's
+   * checksum, and stops with a fatal error for any set but the adventure; the port's set picker
+   * plays every set in this mode, so they all send their score.
+   */
+  saveScore(): void {
+    this.loader.gameOver(this.savedScores[0], null, {
+      reachedLevel: this.dimensions[0].currentId,
+      item2: this.getPicks2(),
+      data: this.history,
+    });
+  }
+
+  /** `GameMode.registerScore`: keeps the first non-zero final score of a player. */
+  registerScore(pid: number, score: number): void {
+    if (this.savedScores[pid] == null || this.savedScores[pid] <= 0) {
+      this.savedScores[pid] = score;
+    }
+  }
+
+  /** `GameMode.getPicks2`: pick count per item id, the score items at id + 1000. */
+  getPicks2(): number[] {
+    const s: number[] = [];
+    for (let i = 0; i < this.specialPicks.length; i++) {
+      if (this.specialPicks[i] != null) {
+        s[i] = this.specialPicks[i];
+      }
+    }
+    for (let i = 0; i < this.scorePicks.length; i++) {
+      if (this.scorePicks[i] != null) {
+        s[i + 1000] = this.scorePicks[i];
+      }
+    }
+    return s;
+  }
+
+  /** `GameMode.exitGame`: the end of the set sends the item picks to `endGame.html`. */
+  exitGame(): void {
+    const codec = new PersistCodec();
+    const out = codec.encode(codec.encode(this.specialPicks) + ':' + codec.encode(this.scorePicks));
+    this.redirect('endGame.html', out);
+  }
+
+  /** `GameManager.redirect` */
+  private redirect(url: string, params: string): void {
+    this.lock();
+    this.loader.exitGame(url, params);
+  }
+
+  /** `GameManager.logAction`: adds an entry to the game log. */
+  logAction(str: string): void {
+    str = str.split('$').join('');
+    str = str.split(':').join('.');
+    this.history.push(str);
+  }
+
+  /** `GameManager.logIllegal`: marks the game as cheated. */
+  logIllegal(str: string): void {
+    this.logAction('$!' + str);
+  }
+
+  /**
+   * The Loader has covered the game: the original's site takes over here. Shows a placeholder
+   * until the results screen (3.1c).
+   */
+  private onGameEnd(result: GameResult): void {
+    this.lastResult = result;
+    this.gameOverMC?.removeMovieClip();
+    this.gameOverMC = this.lib.attach('hammer_interf_pop');
+    this.app.stage.addChild(this.gameOverMC);
+    this.gameOverMC._x = this.xOffset + Data.GAME_WIDTH * 0.5;
+
+    // Shown like `attachPop`: the clip plays its fade-in, its `sub` stays on frame 1
+    const sub = this.gameOverMC.getClip('sub');
+    if (sub) {
+      sub.gotoAndStop('1');
+      const field = sub.getText('field');
+      if (field) {
+        const title = result.kind === 'gameOver' ? 'GAME OVER' : 'THE END';
+        field.text = `${title}\nClick or press Space to Restart`;
+        field._y = -field.textHeight * 0.5 - 2;
+      }
+    }
+    this.onGameResult?.(result);
   }
 
   /** `Adventure.attachBad` + `GameMode.attachBad` */
@@ -1770,6 +1892,21 @@ export class GameSession implements IGameContext {
 
   /** `GameMode.main` */
   update(): void {
+    // `Loader.mainGame` stops calling the game's main at the game over, and for good once the
+    // game's clip is removed
+    if (!this.loader.gameRunning) {
+      this.input.poll();
+      // Placeholder until the results screen (3.1c): restart once the Loader is done.
+      // The seed is drawn from the game, so a replay that restarts stays in sync.
+      if (
+        this.loader.fl_done &&
+        (this.input.consumePress('attack') || this.input.consumePress('jump'))
+      ) {
+        this.initGame(0, (this.rand.next() * 0x100000000) >>> 0);
+      }
+      return;
+    }
+
     this.gameChrono.update();
     this.input.poll();
 
@@ -1782,14 +1919,6 @@ export class GameSession implements IGameContext {
     if (this.fl_bullet && this.bulletTimer > 0) {
       this.bulletTimer -= 1 / BULLET_TMOD;
       this.gameLoop.bulletScale = this.bulletTimer > 0 ? BULLET_TMOD : 1;
-    }
-
-    if (this.fl_gameOver) {
-      if (this.input.consumePress('attack') || this.input.consumePress('jump')) {
-        // Seed drawn from the game, so a replay that restarts after a game over stays in sync.
-        this.initGame(0, (this.rand.next() * 0x100000000) >>> 0);
-      }
-      return;
     }
 
     if (this.fl_pause) {
@@ -1829,10 +1958,15 @@ export class GameSession implements IGameContext {
       }
     }
 
-    // Automatic end of the mode (scores are registered by the game over, task 2.11)
+    this.duration += 1;
+
+    // Automatic end of the mode
     if (this.endModeTimer > 0) {
       this.endModeTimer -= 1;
       if (this.endModeTimer <= 0) {
+        for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
+          this.registerScore(p.pid, p.score);
+        }
         this.onGameOver();
       }
     }
@@ -1928,8 +2062,11 @@ export class GameSession implements IGameContext {
   private onBadsReady(): void {}
 
   stepAnimation(): void {
+    // `Loader.mainGame` runs once per Flash frame (40 Hz)
+    this.loader.main();
     // 40 Hz MovieClip timeline stepper
-    this.gameRoot.stepAnimation();
+    if (this.loader.fl_game) this.gameRoot.stepAnimation();
+    this.gameOverMC?.stepAnimation();
   }
 
   start(): void {

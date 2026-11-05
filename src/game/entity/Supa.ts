@@ -289,7 +289,7 @@ export class SupaItem extends SupaEntity {
     this.game.fxMan.inGameParticles(Data.PARTICLE_ICE, this.x, this.y, 15);
     this.game.fxMan.attachExplodeZone(this.x, this.y, 50);
     const score = Data.getCrystalValue(this.supaId) * 5;
-    // game.manager.logAction("$SU"+supaId): server log, not ported
+    this.game.logAction('$SU' + this.supaId);
     pl.getScore(this, score);
     this.game.audio.playSound('sound_item_supa', Data.CHAN_ITEM);
 

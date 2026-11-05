@@ -146,6 +146,9 @@ export class SpecialItem extends ItemEntity {
   }
 
   override execute(player: PlayerEntity): void {
+    if (this.id > 0) {
+      this.game.logAction('$S' + this.id);
+    }
     this.game.pickUpSpecial(this.id);
     player.executeSpecialItem(this);
     this.game.audio.playSound('sound_item_special', Data.CHAN_ITEM);

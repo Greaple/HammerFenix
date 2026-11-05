@@ -2,7 +2,7 @@
  * Build-time SWF asset & audio extractor.
  *
  * Parses the original Hammerfest SWF bundles (`_gfx.swf`, `_editor.swf`,
- * `_anims.swf`, `_ending.swf`, `_sounds.swf`) and emits:
+ * `_anims.swf`, `_ending.swf`, `_loader.swf`, `_sounds.swf`) and emits:
  *   - `public/sfx/*.mp3`          (21 extracted sound effects + 3 music tracks)
  *   - `public/gfx/bitmaps/*`      (all 199 embedded bitmaps decoded to PNG/JPG)
  *   - `public/gfx/library.json`   (vector shapes, texts, and MovieClip timelines)
@@ -350,6 +350,8 @@ function buildSwfLibrary(): void {
     ['_editor.swf', 10000],
     ['_anims.swf', 20000],
     ['_ending.swf', 30000],
+    // The Loader's own clips (`loading`: the fades and the save screen after a game over)
+    ['_loader.swf', 40000],
   ];
 
   let bmpCount = 0;

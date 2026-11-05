@@ -45,6 +45,8 @@ export class PlayerEntity extends PhysicsEntity {
   fl_entering = false;
 
   score = 0;
+  /** `scoreCS`: the score hidden with `GameManager.KEY`, to catch a score changed from outside. */
+  scoreCS = 0;
   lives = 1;
   extraLifeCurrent = 0;
 
@@ -123,6 +125,7 @@ export class PlayerEntity extends PhysicsEntity {
     this.fl_upKick = game.hasFamily(101);
 
     this.register(Data.PLAYER);
+    game.logAction('$P:' + this.lives);
   }
 
   static attach(game: IGameContext, x: number, y: number): PlayerEntity {
@@ -194,9 +197,14 @@ export class PlayerEntity extends PhysicsEntity {
     if (step !== undefined && this.score < step && this.score + value >= step) {
       this.lives++;
       this.game.hud.setLives(this.lives);
+      this.game.logAction('$EL' + this.extraLifeCurrent);
       this.extraLifeCurrent++;
     }
+    if (this.score !== 0 && (this.scoreCS ^ this.game.scoreKey) !== this.score) {
+      this.game.logIllegal('$SCS');
+    }
     this.score += value;
+    this.scoreCS = this.score ^ this.game.scoreKey;
     this.game.hud.setScore(this.score);
   }
 
@@ -229,6 +237,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   private executeExtend(flPerfect: boolean): void {
+    this.game.logAction('$ext');
     const a = this.game.fxMan.attachFx(
       Data.GAME_WIDTH * 0.5,
       Data.GAME_HEIGHT * 0.5,
@@ -348,6 +357,10 @@ export class PlayerEntity extends PhysicsEntity {
     if (this.lives >= 0) {
       this.resurrect();
     } else {
+      // Single player: the other players' lives (and the life sharing option) never matter
+      for (const p of this.game.getList(Data.PLAYER) as PlayerEntity[]) {
+        this.game.registerScore(p.pid, p.score);
+      }
       this.game.onGameOver();
       this.destroy();
     }
@@ -355,6 +368,7 @@ export class PlayerEntity extends PhysicsEntity {
 
   override resurrect(): void {
     super.resurrect();
+    this.game.logAction('$R' + this.lives);
     const sx = this.game.flipCoordCase(this.world.current.playerX);
     this.moveTo(BaseEntity.x_ctr(sx), BaseEntity.y_ctr(this.world.current.playerY));
     this.dx = 0;
@@ -428,6 +442,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   override destroy(): void {
+    this.game.registerScore(this.pid, this.score);
     this.shieldMC?.destroy();
     this.shieldMC = null;
     this.clearPerm();
@@ -749,6 +764,7 @@ export class PlayerEntity extends PhysicsEntity {
 
   onStartLevel(isMainWorld = true): void {
     this.show();
+    this.game.logAction(this.world.currentId + ',' + Math.floor(this.score / 1000));
     if (isMainWorld) {
       this.game.hud.setLevel(this.world.currentId);
     } else if (this.game.fakeLevelId === null) {
@@ -1223,6 +1239,7 @@ export class PlayerEntity extends PhysicsEntity {
   private warpZone(w: number): void {
     const game = this.game;
     let arrival = this.world.currentId + w;
+    game.logAction('$WZ>' + arrival);
     let i = this.world.currentId + 1;
     while (i <= arrival) {
       if (game.isBossLevel(i)) {

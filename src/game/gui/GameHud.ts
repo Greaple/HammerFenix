@@ -71,6 +71,9 @@ export class GameHud {
 
   setLives(v: number): void {
     const target = Math.max(0, v);
+    if (this.currentLives > v) {
+      this.game.logAction('$LL');
+    }
     while (this.currentLives > target) {
       const icon = this.lifeIcons.pop();
       icon?.removeMovieClip();

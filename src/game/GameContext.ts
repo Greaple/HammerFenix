@@ -66,6 +66,8 @@ export interface IGameContext {
   fl_flipY: boolean;
   endLevelStack: (() => void)[];
   perfectItemCpt: number;
+  /** `GameManager.KEY` */
+  readonly scoreKey: number;
 
   /** `GameManager.CONFIG.hasFamily`: whether the player has unlocked this item family. */
   hasFamily(id: number): boolean;
@@ -101,6 +103,11 @@ export interface IGameContext {
   resetHurry(): void;
   onResurrect(): void;
   onGameOver(): void;
+  registerScore(pid: number, score: number): void;
+  /** `GameManager.logAction` */
+  logAction(str: string): void;
+  /** `GameManager.logIllegal` */
+  logIllegal(str: string): void;
 
   attachBad(id: number, x: number, y: number): BaseEntity;
   spawnScoreItem(x: number, y: number, id: number, subId: number | null): BaseEntity;
