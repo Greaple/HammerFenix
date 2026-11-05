@@ -143,22 +143,19 @@ describe('game over', () => {
     expect(session.savedScores[0]).toBe(777);
   });
 
-  it('restarts on a key once the Loader is done (placeholder until 3.1c)', () => {
+  it('says the save worked, hands over once, and leaves the next game to the site', () => {
     start();
     die();
+    step(FADE_TICKS);
+    expect(session.loader.fl_done).toBe(true);
+    expect(results).toHaveLength(1);
+    expect(session.loader.loading?.getText('bottom')?.text).toBe(session.dataStore.getStatic(73));
+    // No restart in the game: the results page (`SitePage`) goes back to the menu
     session.input.setTouch('attack', true);
     step(5);
     session.input.setTouch('attack', false);
-    expect(session.fl_gameOver).toBe(true); // too early: ignored
-    step(FADE_TICKS);
-    expect(session.loader.fl_done).toBe(true);
-    session.input.setTouch('attack', true);
-    step(1);
-    session.input.setTouch('attack', false);
-    expect(session.fl_gameOver).toBe(false);
-    expect(session.loader.loading).toBeNull();
-    expect(session.gameRoot.visible).toBe(true);
-    expect(session.world.currentId).toBe(0);
+    expect(session.fl_gameOver).toBe(true);
+    expect(results).toHaveLength(1);
   });
 });
 

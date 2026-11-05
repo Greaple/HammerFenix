@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   // 5. Create GameSession. The site page (mode menu) shows first, as on hammerfest.fr.
   const session = await GameSession.create(app, lib, dataStore, audio, input, 'adventure');
   const gameWrapper = document.getElementById('game-wrapper') as HTMLElement;
-  const site = new SitePage(gameWrapper.parentElement!, dataStore.langId);
+  const site = new SitePage(gameWrapper.parentElement!, dataStore.langId, dataStore);
   gameWrapper.hidden = true;
   /** Leaves the site page for the game (the debug toolbar plays without the menu). */
   const showGame = () => {
@@ -126,6 +126,12 @@ async function main(): Promise<void> {
     session.gameReady(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
+  // The Loader is done (score saved, or the end of the set): the site shows the results
+  session.onGameResult = (result) => {
+    session.stop();
+    gameWrapper.hidden = true;
+    site.showResult(result);
+  };
   (window as any).sitePage = site;
   (window as any).gameSession = session;
   (window as any).pixiApp = app;

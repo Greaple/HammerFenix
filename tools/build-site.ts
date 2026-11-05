@@ -3,7 +3,7 @@
  * from `assets-src/site-archive/` to `public/site/`, keeping the site's own paths
  * (`img/design/...`), so the CSS rules port with only their root changed.
  */
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const SRC = 'assets-src/site-archive';
@@ -27,6 +27,13 @@ const FILES = [
   'hammerfest.fr/img/design/icon_score_on.png',
   'hammerfest.fr/img/design/snow_flake_blue.gif',
   'hammerfest.fr/img/design/pixel.gif',
+  // Results page (`.levelResult`, `ul.collected`)
+  'hammerfest.fr/img/design/icon_endGame.gif',
+  'hammerfest.fr/img/design/asterisk.gif',
+  // Item icons by item id, 30 px (`ul.collected img`)
+  ...readdirSync(join(SRC, 'hammerfest.fr/img/items'))
+    .filter((f) => f.endsWith('.gif'))
+    .map((f) => `hammerfest.fr/img/items/${f}`),
   // Mode menu ("MENU CHOOSE GAME")
   ...[
     'menutop',

@@ -242,3 +242,79 @@
 .hf-site .lidis {
   color: #c6cae2;
 }
+
+/* RESULT */
+.hf-site h4 {
+  margin: 0px;
+  padding: 0px;
+  padding-top: 6px;
+  font-size: 10pt;
+  font-weight: bold;
+  border-bottom: 1px dashed #a8c7ec;
+}
+.hf-site p span {
+  color: #5591d9;
+  font-weight: bold;
+}
+.hf-site h2.gameOver {
+  text-align: left;
+}
+.hf-site .continue {
+  width: 280px;
+  height: 20px;
+  font-size: 9pt;
+  border: 2px dotted #769bad;
+  text-align: center;
+  padding: 2px;
+  margin-left: 115px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+.hf-site .continue a {
+  color: #3833a6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.hf-site .continue a:hover {
+  color: #6a9cf0;
+}
+.hf-site .levelResult {
+  float: left;
+  position: relative;
+  display: inline;
+  margin: 15px 0px 10px 20px;
+}
+.hf-site .levelResult p span {
+  font-size: 12pt;
+}
+.hf-site .levelResult p img {
+  vertical-align: top;
+}
+.hf-site .lineResult {
+  height: 2px;
+  border-top: 2px dotted #d0bbdf;
+  padding-top: 5px;
+}
+.hf-site ul.collected {
+  margin: 0px 0px 0px 20px;
+  padding: 0px;
+  list-style-type: none;
+  color: #5591d9;
+}
+.hf-site ul.collected li {
+  margin-bottom: 7px;
+  background-image: url(/site/img/design/asterisk.gif);
+  background-repeat: no-repeat;
+  background-position: 1px 15px;
+  padding: 0px 0px 0px 10px;
+}
+.hf-site ul.collected img {
+  width: 30px;
+  height: 30px;
+}
+.hf-site ul.collected li span {
+  vertical-align: 50%;
+}
+.hf-site .iconPlay a {
+  cursor: pointer;
+}

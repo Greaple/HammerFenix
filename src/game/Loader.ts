@@ -259,8 +259,10 @@ export class Loader {
       }
     }
     if (this.fl_gameOver) {
-      // The original waits for the server's answer, then loads the results page
+      // The original waits for the server's answer ("$ok"), then loads the results page
       if (!this.fl_fade && this.result) {
+        this.setText('bottom', this.host.getLangStr(73)); // "Sauvegarde réussie ! :)"
+        this.setText('subBottom', '');
         this.finish();
       }
       return;

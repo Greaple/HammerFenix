@@ -202,7 +202,6 @@ export class GameSession implements IGameContext {
   private itemNameMC: SwfMovieClip | null = null;
   private pauseMC: SwfMovieClip | null = null;
   /** Placeholder shown once the game has ended, until the results screen (3.1c). */
-  private gameOverMC: SwfMovieClip | null = null;
   private darknessMC: SwfMovieClip | null = null;
   /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
   private darknessHoles: SwfMovieClip[] = [];
@@ -364,8 +363,6 @@ export class GameSession implements IGameContext {
     this.fl_lock = true; // Mode constructor (its lock() runs before gameChrono exists)
     this.fl_pause = false;
     this.cycle = 0;
-    this.gameOverMC?.removeMovieClip();
-    this.gameOverMC = null;
     // A new GameManager and Loader: the original loads a new page for each game
     this.loader.reset();
     this.lastResult = null;
@@ -1349,24 +1346,9 @@ export class GameSession implements IGameContext {
    * The Loader has covered the game: the original's site takes over here. Shows a placeholder
    * until the results screen (3.1c).
    */
+  /** The Loader is done: the site takes over with its results page (3.1c, `SitePage`). */
   private onGameEnd(result: GameResult): void {
     this.lastResult = result;
-    this.gameOverMC?.removeMovieClip();
-    this.gameOverMC = this.lib.attach('hammer_interf_pop');
-    this.app.stage.addChild(this.gameOverMC);
-    this.gameOverMC._x = this.xOffset + Data.GAME_WIDTH * 0.5;
-
-    // Shown like `attachPop`: the clip plays its fade-in, its `sub` stays on frame 1
-    const sub = this.gameOverMC.getClip('sub');
-    if (sub) {
-      sub.gotoAndStop('1');
-      const field = sub.getText('field');
-      if (field) {
-        const title = result.kind === 'gameOver' ? 'GAME OVER' : 'THE END';
-        field.text = `${title}\nClick or press Space to Restart`;
-        field._y = -field.textHeight * 0.5 - 2;
-      }
-    }
     this.onGameResult?.(result);
   }
 
@@ -1897,14 +1879,6 @@ export class GameSession implements IGameContext {
     // game's clip is removed
     if (!this.loader.gameRunning) {
       this.input.poll();
-      // Placeholder until the results screen (3.1c): restart once the Loader is done.
-      // The seed is drawn from the game, so a replay that restarts stays in sync.
-      if (
-        this.loader.fl_done &&
-        (this.input.consumePress('attack') || this.input.consumePress('jump'))
-      ) {
-        this.initGame(0, (this.rand.next() * 0x100000000) >>> 0);
-      }
       return;
     }
 
@@ -2067,7 +2041,6 @@ export class GameSession implements IGameContext {
     this.loader.main();
     // 40 Hz MovieClip timeline stepper
     if (this.loader.fl_game) this.gameRoot.stepAnimation();
-    this.gameOverMC?.stepAnimation();
   }
 
   start(): void {
