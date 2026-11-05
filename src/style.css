@@ -836,3 +836,90 @@ kbd {
 .game-wrapper[hidden] {
   display: none;
 }
+
+/* ========================================================
+   Hammerfest scenery around the game frame: the hammerfest.fr sky (`stars.jpg`) and hills
+   (`landscape.jpg`), copied to public/site by tools/build-site.ts.
+   ======================================================== */
+
+html,
+body {
+  background: #64aae5 url('/site/img/design/stars.jpg') repeat-x top left;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 257px;
+  background: url('/site/img/design/landscape.jpg') repeat-x left bottom;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app-container {
+  position: relative;
+  z-index: 1;
+}
+
+.app-header {
+  background: rgba(30, 58, 110, 0.35);
+  border-bottom: none;
+  backdrop-filter: blur(2px);
+}
+
+.logo-text {
+  background: none;
+  -webkit-text-fill-color: #ffffff;
+  color: #ffffff;
+  text-shadow: 0 2px 0 #3b5f9e;
+}
+
+.app-header .btn,
+.app-header .select-field,
+.app-header .input-number {
+  background-color: rgba(20, 40, 80, 0.55);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+#btn-dev[aria-pressed='true'] {
+  background-color: rgba(251, 191, 36, 0.45);
+}
+
+body:not(.dev) .dev-only {
+  display: none !important;
+}
+
+.app-main {
+  background: transparent;
+}
+
+.game-canvas-container {
+  width: min(100%, 480px, calc((100dvh - 150px) * 420 / 520));
+  max-height: none;
+  border: 5px solid #5f452c;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 2px #e6c592,
+    0 10px 30px rgba(20, 30, 60, 0.55);
+}
+
+.app-footer {
+  background: transparent;
+  border-top: none;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.app-footer .link-btn {
+  color: #fff3c4;
+}
+
+/* Pixi sets the canvas size inline (autoDensity): fill the frame instead */
+.game-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}

@@ -299,6 +299,12 @@ export class SwfLibrary {
     }
   }
 
+  /** The texture of bitmap character `id` (alpha merged), or `null` if it is not a bitmap. */
+  bitmapTexture(id: number): Texture | null {
+    const def = this.data.characters[id];
+    return def?.kind === 'bitmap' ? this.getBitmapTexture(id, def) : null;
+  }
+
   private getBitmapTexture(id: number, def: BitmapDef): Texture | null {
     const existing = this.bitmapTextures.get(id);
     if (existing) return existing;

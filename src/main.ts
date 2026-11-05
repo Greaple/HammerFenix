@@ -7,8 +7,7 @@ import { GameSession } from './game/GameSession';
 import { SymbolBrowser } from './ui/SymbolBrowser';
 import { DebugToolkit } from './ui/DebugToolkit';
 import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
-import { SitePage } from './ui/SitePage';
-import './site.css';
+import { Shell } from './ui/Shell';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -109,30 +108,32 @@ async function main(): Promise<void> {
   const originalCompare = new OriginalCompareDialog(compareDialog);
   (window as any).originalCompare = originalCompare;
 
-  // 5. Create GameSession. The site page (mode menu) shows first, as on hammerfest.fr.
+  // 5. Create GameSession. The mode menu shows first, in the game frame (it replaces the
+  // hammerfest.fr pages, roadmap 3.1).
   const session = await GameSession.create(app, lib, dataStore, audio, input, 'adventure');
-  const gameWrapper = document.getElementById('game-wrapper') as HTMLElement;
-  const site = new SitePage(gameWrapper.parentElement!, dataStore.langId, dataStore);
-  gameWrapper.hidden = true;
-  /** Leaves the site page for the game (the debug toolbar plays without the menu). */
+  const shell = new Shell(lib, input, dataStore);
+  await shell.load(baseUrl);
+  app.stage.addChild(shell.root);
+  session.gameRoot.visible = false;
+  shell.showMenu();
+  app.ticker.add(() => shell.update());
+  /** Leaves the menu for the game (the debug toolbar plays without the menu). */
   const showGame = () => {
-    if (!site.visible) return;
-    site.hide();
-    gameWrapper.hidden = false;
+    if (!shell.visible) return;
+    shell.hide();
     session.start();
   };
-  site.onStart = (mode) => {
+  shell.onStart = (mode) => {
     showGame();
     session.gameReady(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
-  // The Loader is done (score saved, or the end of the set): the site shows the results
+  // The Loader is done (score saved, or the end of the set): the results replace the game
   session.onGameResult = (result) => {
     session.stop();
-    gameWrapper.hidden = true;
-    site.showResult(result);
+    shell.showResult(result);
   };
-  (window as any).sitePage = site;
+  (window as any).shell = shell;
   (window as any).gameSession = session;
   (window as any).pixiApp = app;
   (window as any).gameLib = lib;
@@ -140,6 +141,27 @@ async function main(): Promise<void> {
   // Initialize Debug Toolkit
   const debugToolkit = new DebugToolkit(session, document.body);
   (window as any).debugToolkit = debugToolkit;
+
+  // Developer tools (level select, restart, debug, Flash comparison) stay hidden unless
+  // switched on with the gear button or `?dev`; the choice is remembered.
+  const btnDev = document.getElementById('btn-dev') as HTMLButtonElement | null;
+  const setDev = (on: boolean) => {
+    document.body.classList.toggle('dev', on);
+    btnDev?.setAttribute('aria-pressed', String(on));
+    try {
+      localStorage.setItem('hammerfenix.dev', on ? '1' : '0');
+    } catch {
+      // storage blocked: the choice lasts for this page only
+    }
+  };
+  let devOn = new URLSearchParams(location.search).has('dev');
+  try {
+    devOn ||= localStorage.getItem('hammerfenix.dev') === '1';
+  } catch {
+    // ignore
+  }
+  setDev(devOn);
+  btnDev?.addEventListener('click', () => setDev(!document.body.classList.contains('dev')));
 
   // 6. Connect UI Toolbar Controls
   const levelSetSelect = document.getElementById('levelset-select') as HTMLSelectElement;
@@ -207,7 +229,7 @@ async function main(): Promise<void> {
   // Language selector
   langSelect?.addEventListener('change', async () => {
     await dataStore.setLang(langSelect.value);
-    site.setLang(langSelect.value);
+    shell.refresh();
   });
 
   // Dialog & Debug open triggers

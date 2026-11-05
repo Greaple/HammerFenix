@@ -19,11 +19,11 @@
       <header class="app-header">
         <div class="header-brand">
           <h1 class="logo-text">HammerFenix</h1>
-          <span class="badge">v0.1</span>
+          <span class="badge dev-only">v0.1</span>
         </div>
 
         <div class="header-controls">
-          <div class="control-group">
+          <div class="control-group dev-only">
             <label for="levelset-select" class="sr-only">Level Set</label>
             <select id="levelset-select" class="select-field" title="Select Level Set">
               <option value="adventure">Adventure</option>
@@ -53,11 +53,11 @@
           </div>
 
           <div class="control-group action-buttons">
-            <button id="btn-restart" class="btn btn-icon" title="Restart Game (R)">
+            <button id="btn-restart" class="btn btn-icon dev-only" title="Restart Game (R)">
               <span class="icon">↻</span>
               <span class="btn-text">Restart</span>
             </button>
-            <button id="btn-pause" class="btn btn-icon" title="Pause Game (P)">
+            <button id="btn-pause" class="btn btn-icon dev-only" title="Pause Game (P)">
               <span class="icon">⏸</span>
               <span class="btn-text">Pause</span>
             </button>
@@ -77,24 +77,32 @@
 
             <button
               id="btn-open-debug"
-              class="btn btn-secondary"
+              class="btn btn-secondary dev-only"
               title="Open Testing & Debug Toolkit (~)"
             >
               🛠️ Debug
             </button>
             <button
               id="btn-open-compare"
-              class="btn btn-secondary"
+              class="btn btn-secondary dev-only"
               title="Compare with Original Flash Game (Ruffle)"
             >
               ⚡ Flash
             </button>
             <button
               id="btn-open-symbols"
-              class="btn btn-secondary"
+              class="btn btn-secondary dev-only"
               title="Inspect SWF Vector Assets"
             >
               Assets
+            </button>
+            <button
+              id="btn-dev"
+              class="btn btn-icon"
+              title="Developer tools (level select, debug, Flash comparison)"
+              aria-pressed="false"
+            >
+              <span class="icon">⚙</span>
             </button>
             <button
               id="btn-open-about"

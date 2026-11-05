@@ -1346,7 +1346,7 @@ export class GameSession implements IGameContext {
    * The Loader has covered the game: the original's site takes over here. Shows a placeholder
    * until the results screen (3.1c).
    */
-  /** The Loader is done: the site takes over with its results page (3.1c, `SitePage`). */
+  /** The Loader is done: the results screen takes over (3.1c, `Shell`). */
   private onGameEnd(result: GameResult): void {
     this.lastResult = result;
     this.onGameResult?.(result);

@@ -150,7 +150,7 @@ describe('game over', () => {
     expect(session.loader.fl_done).toBe(true);
     expect(results).toHaveLength(1);
     expect(session.loader.loading?.getText('bottom')?.text).toBe(session.dataStore.getStatic(73));
-    // No restart in the game: the results page (`SitePage`) goes back to the menu
+    // No restart in the game: the results screen (`Shell`) goes back to the menu
     session.input.setTouch('attack', true);
     step(5);
     session.input.setTouch('attack', false);
