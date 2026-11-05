@@ -35,6 +35,11 @@ for (const e of entries) {
   for (let attempt = 0; attempt < 4 && !ok; attempt++) {
     try {
       const res = await fetch(src);
+      // Not archived: retrying will not help
+      if (res.status === 404) {
+        console.warn(`missing ${e.path}`);
+        break;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       mkdirSync(dirname(dest), { recursive: true });
       writeFileSync(dest, Buffer.from(await res.arrayBuffer()));
