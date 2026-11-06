@@ -47,6 +47,8 @@ export class SwfTextField extends Container {
   private readonly boxWidth: number;
   private readonly align: DynamicTextDef['align'];
   private readonly fontSize: number;
+  /** The variable the field shows (`DynamicTextDef.variable`). */
+  readonly variable: string | undefined;
   /** Without a canvas, text size is estimated instead of measured (headless runs). */
   private readonly headless: boolean;
   private rawText = '';
@@ -54,6 +56,7 @@ export class SwfTextField extends Container {
   constructor(def: DynamicTextDef, headless = false) {
     super();
     this.fontSize = def.size;
+    this.variable = def.variable;
     this.headless = headless;
     const [x0, y0, x1] = def.bounds;
     this.boxX0 = x0;
@@ -79,7 +82,9 @@ export class SwfTextField extends Container {
     this.pixiText = new Text({ text: '', style });
     this.pixiText.position.set(x0, y0);
     this.addChild(this.pixiText);
-    this.text = def.text;
+    // An HTML field's text is its markup (`<p align="center"></p>`): show only the text
+    if (def.html) this.htmlText = def.text;
+    else this.text = def.text;
   }
 
   get text(): string {
@@ -881,6 +886,56 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     } else {
       this.avmVars.set(name, value);
     }
+    this.updateBoundFields(name);
+  }
+
+  /**
+   * Sets a variable of this clip, as `mc.label = text` in the original: the text fields bound
+   * to it (`DynamicTextDef.variable`) show it, now and when the timeline places them later.
+   */
+  setVariable(name: string, value: unknown): void {
+    this.avmSet(name, value);
+  }
+
+  /** Shows variable `name` of this clip in the fields of its subtree bound to it. */
+  private updateBoundFields(name: string): void {
+    const value = this.avmGet(name);
+    if (value === undefined || value instanceof Container) return;
+    const visit = (c: Container) => {
+      for (const child of c.children) {
+        if (child instanceof SwfTextField) {
+          if (child.variable && child.parent instanceof SwfMovieClip) {
+            const b = child.parent.resolveVariable(child.variable);
+            if (b && b[0] === this && b[1] === name) child.text = String(value);
+          }
+        } else if (child instanceof Container) {
+          visit(child);
+        }
+      }
+    };
+    visit(this);
+  }
+
+  /**
+   * The clip and name of variable `path` seen from this clip: `label` is this clip's,
+   * `_parent.label` its parent's. Null for a path the game's clips do not use.
+   */
+  private resolveVariable(path: string): [SwfMovieClip, string] | null {
+    const parts = path.split('.');
+    let target: SwfMovieClip = this;
+    while (parts.length > 1 && parts[0] === '_parent') {
+      parts.shift();
+      if (!(target.parent instanceof SwfMovieClip)) return null;
+      target = target.parent;
+    }
+    return parts.length === 1 ? [target, parts[0]] : null;
+  }
+
+  /** A field just placed shows its variable, if set; else it keeps its own text. */
+  private bindField(field: SwfTextField): void {
+    const b = this.resolveVariable(field.variable!);
+    const value = b?.[0].avmGet(b[1]);
+    if (value !== undefined && !(value instanceof Container)) field.text = String(value);
   }
 
   avmGetProp(index: number): unknown {
@@ -1078,6 +1133,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     this.depthSlots.set(cmd.d, slot);
     this.addChild(node);
     if (cmd.n) this.registerName(cmd.n, node);
+    if (node instanceof SwfTextField && node.variable) this.bindField(node);
     if (this.live && node instanceof SwfMovieClip) node.goLive();
   }
 

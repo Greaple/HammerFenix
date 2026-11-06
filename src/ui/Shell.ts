@@ -19,6 +19,7 @@ import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
 import type { GameResult } from '../game/Loader';
 import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
+import { LANGS, type Lang } from './Language';
 
 /** The game's lang texts the screens reuse. */
 export interface ShellTexts {
@@ -34,7 +35,13 @@ export interface ShellTexts {
   getQuestDesc(id: number): string;
 }
 
-type Lang = 'fr' | 'en' | 'es';
+/**
+ * The site's logo banner in language `l`: "Les Cavernes de Hammerfest" on hammerfest.fr, "The
+ * Caverns of Hammerfest" on hfest.net, "Las Cavernas de Hammerfest" on hammerfest.es.
+ */
+export function headerFile(l: Lang): string {
+  return `img/design/headers/${l}/header.jpg`;
+}
 type Screen = 'menu' | 'result' | 'quests' | 'fridge';
 
 interface ModeEntry {
@@ -241,7 +248,7 @@ export class Shell {
   /** Loads the site images the screens use. */
   async load(baseUrl: string): Promise<void> {
     const files = [
-      'img/design/headers/fr/header.jpg',
+      ...LANGS.map(headerFile),
       'img/items/small/a.gif',
       ...MODES.map((m) => `img/design/menu/${m.icon}.gif`),
       ...TABS.flatMap((t) => [`img/design/${t.icon}.png`, `img/design/${t.icon}_on.png`]),
@@ -406,9 +413,13 @@ export class Shell {
     this.render();
   }
 
-  private get t(): Record<string, string> {
+  private get lang(): Lang {
     const l = this.texts.langId;
-    return TEXT[l === 'en' || l === 'es' ? l : 'fr'];
+    return l === 'en' || l === 'es' ? l : 'fr';
+  }
+
+  private get t(): Record<string, string> {
+    return TEXT[this.lang];
   }
 
   private clear(): void {
@@ -434,11 +445,11 @@ export class Shell {
     bg.scale.set(W / b.width, H / b.height);
     bg.position.set(-b.x * bg.scale.x, -b.y * bg.scale.y);
     this.root.addChild(bg);
-    // The banner: the site's logo with Tuberculoz, without its purple bar
-    const tex = this.images.get('img/design/headers/fr/header.jpg');
+    // The banner: the site's logo with Tuberculoz, without its purple bar (from row 180)
+    const tex = this.images.get(headerFile(this.lang));
     if (tex) {
       const banner = new Sprite(
-        new Texture({ source: tex.source, frame: new Rectangle(0, 0, 762, 176) }),
+        new Texture({ source: tex.source, frame: new Rectangle(0, 0, 762, 180) }),
       );
       banner.scale.set(W / 762);
       banner.y = 4;

@@ -120,8 +120,7 @@ export class FxManager {
     const mc = this.game.depthMan.attach('hurryUp', Data.DP_INTERF);
     mc._x = Data.GAME_WIDTH * 0.5;
     mc._y = Data.GAME_HEIGHT * 0.5;
-    const tf = mc.findFirstText();
-    if (tf) tf.text = str;
+    mc.setVariable('label', str);
     this.mcList.push(mc);
     this.lastAlert = mc;
     return mc;
@@ -147,8 +146,8 @@ export class FxManager {
     const mc = this.game.depthMan.attach('hammer_fx_exit', Data.DP_INTERF);
     mc._x = Data.GAME_WIDTH * 0.5;
     mc._y = Data.GAME_HEIGHT;
-    const tf = mc.findFirstText();
-    if (tf) tf.text = this.game.dataStore.getStatic(3) || 'EXIT';
+    // The "next level" field appears on frame 8 and shows `label`
+    mc.setVariable('label', this.game.dataStore.getStatic(3));
     this.mc_exitArrow = mc;
   }
 
@@ -178,11 +177,9 @@ export class FxManager {
     if (!anim) return;
     anim.fl_loop = false;
     const formatted = Data.formatNumberStr(txt);
-    const tf = anim.mc.getClip('label')?.getText('field') ?? anim.mc.findFirstText();
-    if (tf) {
-      tf.textColor = color;
-      tf.text = formatted;
-    }
+    const tf = anim.mc.getClip('label')?.getText('field');
+    if (tf) tf.textColor = color;
+    anim.mc.setVariable('value', formatted);
   }
 
   attachExplodeZone(x: number, y: number, radius: number): FxAnim | null {

@@ -57,6 +57,11 @@ export interface DynamicTextDef {
   text: string;
   html?: boolean;
   multiline?: boolean;
+  /**
+   * The variable the field shows (`DefineEditText` `variableName`), read from the clip it is
+   * placed in, e.g. `label`, or `_parent.label` for the clip above.
+   */
+  variable?: string;
 }
 
 export type FrameAction =

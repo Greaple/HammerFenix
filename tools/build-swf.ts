@@ -298,6 +298,7 @@ function compileDynamicText(tag: any, fonts: Map<number, any>): DynamicTextDef {
     text: tag.text ?? '',
     ...(tag.html ? { html: true } : {}),
     ...(tag.multiline ? { multiline: true } : {}),
+    ...(tag.variableName ? { variable: tag.variableName } : {}),
   };
 }
 

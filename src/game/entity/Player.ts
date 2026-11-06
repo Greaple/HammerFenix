@@ -263,10 +263,8 @@ export class PlayerEntity extends PhysicsEntity {
       const mc = this.game.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
       mc._x = Data.GAME_WIDTH * 0.5;
       mc._y = Data.GAME_HEIGHT * 0.2;
-      const lbl = mc.getText('label');
-      if (lbl) lbl.text = this.game.dataStore.getStatic(11) || 'PERFECT!';
-      const bon = mc.getText('bonus');
-      if (bon) bon.text = this.actives[95] ? '300000' : '150000';
+      mc.setVariable('label', this.game.dataStore.getStatic(11));
+      mc.setVariable('bonus', this.actives[95] ? '300000' : '150000');
       this.getScoreHidden(150000);
     }
   }
@@ -1229,10 +1227,8 @@ export class PlayerEntity extends PhysicsEntity {
     const mc = this.game.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
     mc._x = Data.GAME_WIDTH * 0.5;
     mc._y = Data.GAME_HEIGHT * 0.5;
-    const lbl = mc.getText('label');
-    if (lbl) lbl.text = this.game.dataStore.getStatic(11) || 'PERFECT!';
-    const bon = mc.getText('bonus');
-    if (bon) bon.text = this.actives[95] ? String(bonus * 2) : String(bonus);
+    mc.setVariable('label', this.game.dataStore.getStatic(11));
+    mc.setVariable('bonus', this.actives[95] ? String(bonus * 2) : String(bonus));
     const pl = this.game.getList(Data.PLAYER) as PlayerEntity[];
     for (const p of pl) {
       p.getScoreHidden(Math.floor(bonus / pl.length));

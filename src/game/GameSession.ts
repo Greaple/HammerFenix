@@ -133,6 +133,8 @@ export class GameSession implements IGameContext {
   fl_clear = false;
   fl_gameOver = false;
   fl_pause = false;
+  /** The next pause screen tip, `Lang` text `301 + tipId`. */
+  tipId = 0;
   fl_ice = false;
   fl_aqua = false;
   fl_wind = false;
@@ -324,6 +326,27 @@ export class GameSession implements IGameContext {
 
   // ------------------------------------------------------------- Persistence
 
+  /** The language the last session saved, or null (read before the data loads). */
+  static savedLang(): string | null {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      const lang = raw ? (JSON.parse(raw) as Partial<GameSaveData>).preferredLang : null;
+      return typeof lang === 'string' ? lang : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Saves the current language as the next session's. */
+  saveLang(): void {
+    try {
+      this.savedData.preferredLang = this.dataStore.langId;
+      localStorage.setItem(SAVE_KEY, JSON.stringify(this.savedData));
+    } catch {
+      // ignore storage quota / sandbox write errors
+    }
+  }
+
   private loadSave(): GameSaveData {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
@@ -382,6 +405,7 @@ export class GameSession implements IGameContext {
     this.fl_clear = false;
     this.fl_lock = true; // Mode constructor (its lock() runs before gameChrono exists)
     this.fl_pause = false;
+    this.tipId = 0;
     this.cycle = 0;
     // A new GameManager and Loader: the original loads a new page for each game
     this.loader.reset();
@@ -1883,29 +1907,36 @@ export class GameSession implements IGameContext {
     this.world.lock();
     this.pauseMC?.removeMovieClip();
 
-    this.pauseMC = this.depthMan.attach('hammer_interf_instructions', Data.DP_INTERF);
-    this.pauseMC._x = Data.GAME_WIDTH * 0.5;
-    this.pauseMC._y = Data.GAME_HEIGHT * 0.5;
+    const mc = this.depthMan.attach('hammer_interf_instructions', Data.DP_INTERF);
+    this.pauseMC = mc;
+    mc.gotoAndStop('1');
+    mc._x = Data.GAME_WIDTH * 0.5;
+    mc._y = Data.GAME_HEIGHT * 0.5;
+    const lang = (id: number) => this.dataStore.getLangText(id);
+    const setText = (name: string, text: string) => {
+      const field = mc.getText(name);
+      if (field) field.text = text;
+    };
+    // AS2 writes "null" for a missing text
+    setText('click', '');
+    setText('title', `${lang(5)}`);
+    setText('move', `${lang(7)}`);
+    setText('attack', `${lang(8)}`);
+    setText('pause', `${lang(9)}`);
+    setText('space', `${lang(10)}`);
+    setText(
+      'sector',
+      `${lang(14)}«${this.dataStore.getSectorName(this.currentDim, this.world.currentId)}»`,
+    );
 
-    const title = this.pauseMC.getText('title');
-    if (title) title.text = this.dataStore.getStatic(5) || 'PAUSE';
-
-    const move = this.pauseMC.getText('move');
-    if (move) move.text = this.dataStore.getStatic(7) || 'Move: Arrows / WASD';
-
-    const attack = this.pauseMC.getText('attack');
-    if (attack) attack.text = this.dataStore.getStatic(8) || 'Place Bomb: Space / Ctrl';
-
-    const sector = this.pauseMC.getText('sector');
-    if (sector) {
-      const sName = this.dataStore.getSectorName(this.currentDim, this.world.currentId);
-      sector.text = sName ? `« ${sName} »` : '';
+    // Tool tip
+    let tip = lang(301 + this.tipId++);
+    if (tip === null) {
+      this.tipId = 0;
+      tip = lang(301 + this.tipId++);
     }
-
-    const tip = this.pauseMC.getText('tip');
-    if (tip) {
-      tip.text = `${this.dataStore.getStatic(300)} ${this.dataStore.getStatic(301)}`;
-    }
+    const tipField = mc.getText('tip');
+    if (tipField) tipField.htmlText = `<b>${lang(300)}</b>${tip}`;
 
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: true });
   }

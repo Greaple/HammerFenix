@@ -10,6 +10,7 @@ import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
 import { Profile } from './game/Profile';
 import { QuestEngine } from './game/Quests';
 import { Shell } from './ui/Shell';
+import { pickLang } from './ui/Language';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
 
   // 2. Load game data and assets in parallel
   const [dataStore, lib] = await Promise.all([
-    GameDataStore.load(baseUrl, 'en'),
+    GameDataStore.load(baseUrl, pickLang(GameSession.savedLang(), navigator.languages ?? [])),
     SwfLibrary.load(baseUrl),
   ]);
 
@@ -236,8 +237,12 @@ async function main(): Promise<void> {
   });
 
   // Language selector
+  document.documentElement.lang = dataStore.langId;
+  if (langSelect) langSelect.value = dataStore.langId;
   langSelect?.addEventListener('change', async () => {
     await dataStore.setLang(langSelect.value);
+    document.documentElement.lang = dataStore.langId;
+    session.saveLang();
     shell.refresh();
   });
 
