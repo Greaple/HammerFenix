@@ -337,7 +337,7 @@ export class DebugToolkit {
       if (e.code === 'Backquote' || e.key === '`') {
         e.preventDefault();
         this.toggle();
-      } else if (e.code === 'KeyK' && this.isVisible) {
+      } else if (e.code === 'KeyK' && !e.ctrlKey && this.isVisible) {
         this.killAllBads();
       } else if (e.code === 'KeyG' && this.isVisible) {
         const godBtn = this.panelEl?.querySelector('#dbg-btn-god') as HTMLButtonElement;

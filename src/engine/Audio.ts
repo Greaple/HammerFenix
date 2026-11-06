@@ -17,6 +17,8 @@ export class AudioEngine {
   private muted = false;
   private sfxVol = 0.7;
   private musicVol = 0.45;
+  /** `Mode.setMusicVolume`: the game's own music level (0 muted by M, 0.5 paused, 1). */
+  private musicLevel = 1;
 
   constructor(sounds: Record<string, string>, baseUrl = './') {
     for (const [name, rel] of Object.entries(sounds)) {
@@ -43,9 +45,19 @@ export class AudioEngine {
   setVolumes(sfx: number, music: number): void {
     this.sfxVol = Math.max(0, Math.min(1, sfx));
     this.musicVol = Math.max(0, Math.min(1, music));
+    this.applyVolumes();
+  }
+
+  /** The music's level from the game (`Mode.setMusicVolume`), times the music volume. */
+  setMusicLevel(n: number): void {
+    this.musicLevel = Math.max(0, Math.min(1, n));
+    this.applyVolumes();
+  }
+
+  private applyVolumes(): void {
     if (this.ctx && this.sfxGain && this.musicGain) {
       this.sfxGain.gain.setValueAtTime(this.sfxVol, this.ctx.currentTime);
-      this.musicGain.gain.setValueAtTime(this.musicVol, this.ctx.currentTime);
+      this.musicGain.gain.setValueAtTime(this.musicVol * this.musicLevel, this.ctx.currentTime);
     }
   }
 
@@ -127,7 +139,7 @@ export class AudioEngine {
     this.sfxGain.connect(this.masterGain);
 
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.value = this.musicVol;
+    this.musicGain.gain.value = this.musicVol * this.musicLevel;
     this.musicGain.connect(this.masterGain);
     return this.ctx;
   }

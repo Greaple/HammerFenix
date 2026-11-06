@@ -8,6 +8,8 @@ export const ACTION_BITS: Record<ControlAction, number> = {
   down: 1 << 3,
   attack: 1 << 4,
   pause: 1 << 5,
+  music: 1 << 6,
+  suicide: 1 << 7,
 };
 
 /**

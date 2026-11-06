@@ -4,14 +4,14 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phases 1, 2 and 3 are done. Phase 3 (the site screens, quests and profile, game options and localization; see PORT_STATUS.md "Site screens", "Quests and profile", "Game options" and "Localization (3.4)") was done before Phase 2B. Next is Phase 2B, starting with the automated data pass and the level jump for Ruffle (2B.0), then the small dimensions (2B.12) and the Adventure batches (2B.1 to 2B.11); the larger dimensions (2B.13 to 2B.28) come with Phase 4 (see "Order" in Phase 2B). For 2B comparisons, start games from the debug toolbar: they use the no-site families and no options, as the Ruffle side-by-side does. The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
+Current work: the UI and UX polish batches (U.2 to U.4, section below), U.1 done. Phases 1, 2 and 3 are done. Phase 3 (the site screens, quests and profile, game options and localization; see PORT_STATUS.md "Site screens", "Quests and profile", "Game options" and "Localization (3.4)") was done before Phase 2B. Next is Phase 2B, starting with the automated data pass and the level jump for Ruffle (2B.0), then the small dimensions (2B.12) and the Adventure batches (2B.1 to 2B.11); the larger dimensions (2B.13 to 2B.28) come with Phase 4 (see "Order" in Phase 2B). For 2B comparisons, start games from the debug toolbar: they use the no-site families and no options, as the Ruffle side-by-side does. The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7").
 
 ## Bugs (found in play)
 
 Logged during play, not yet investigated in depth. Check each against the Ruffle side-by-side before fixing.
 
 - [ ] Shield animation seems to loop (invincibility after losing a life, or from an item). `Player.shield()` and `onShieldOut()` in `src/game/entity/Player.ts` match the original (`hammer/entity/Player.mt` `shield()`, which also sets `shieldMC.fl_loop = true`), so first compare with Ruffle. If the original only plays an intro once, look at the `hammer_player_shield` symbol's timeline (frame scripts, `stop()`) and at how `FxAnim` handles `fl_loop` and `lifeTimer`.
-- [ ] Pause screen (P key) flickers fast between two frames of `hammer_interf_instructions`: the controls page and a "time label 999:00" page (the time attack page). Every text shows its placeholder ("Title Label", "moveLabel", "SPACE LABEL", "click label", "Sector label"), and the tip shows raw `<p><font …>tips...</font></p>` HTML. Compare `GameSession.onPause()` (`src/game/GameSession.ts`) with `mode/GameMode.mt` `onPause()`:
+- [x] Fixed in 3.4 (the screen) and the UI batch U.1 (its music volume). Pause screen (P key) flickers fast between two frames of `hammer_interf_instructions`: the controls page and a "time label 999:00" page (the time attack page). Every text shows its placeholder ("Title Label", "moveLabel", "SPACE LABEL", "click label", "Sector label"), and the tip shows raw `<p><font …>tips...</font></p>` HTML. Compare `GameSession.onPause()` (`src/game/GameSession.ts`) with `mode/GameMode.mt` `onPause()`:
   - The port never calls `pauseMC.gotoAndStop("1")`, so the clip plays through its frames.
   - Texts not set: `click` (to `""`), `pause` (Lang 9), `space` (Lang 10). `sector` is missing the Lang 14 prefix. `title`, `move` and `attack` still show placeholders, so either `getText` doesn't find the fields or `dataStore.getStatic()` returns nothing; the port's English fallbacks (`'PAUSE'`, `'Move: Arrows / WASD'`...) are invented and should go.
   - Tip: the original sets `tip.html = true` and `htmlText = "<b>" + Lang 300 + "</b>" + tip`, cycling `tipId` through Lang 301+ until one is missing. The port writes plain text and always uses 301. Needs HTML text support in the SWF text field (or check if it exists) and a `tipId` field on the session.
@@ -118,6 +118,15 @@ Time Attack and two-player co-op are unlocked by quests (`give mode=` in `quests
 - [ ] 4.4 Soccer (`Soccer.mt`, `SoccerSelector.mt`, `gui/SoccerInterface.mt`)
 - [ ] 4.5 Boss Rush (`BossRush.mt`)
 - [ ] 4.6 Tutorial, Shareware, Fjv / FjvEnd
+
+## UI and UX polish (audit of 2026-11-06)
+
+The page around the game frame and the site screens, from an audit of every screen on desktop and phones. Changes inside the frame follow the original; the page around it is the port's own.
+
+- [x] U.1 Help and keys. The page's background is a new landscape (`public/scenery/landscape.jpg`, given by the maintainer) with a floating header (name, credit, sound, language, help) and no footer; the frame grows to the window and is drawn at its size on screen (sharp vector art); the help dialog uses the parchment colors, with the story from the site guide and the right controls; the dev switch moved into it. The header, help and touch buttons are in FR/EN/ES (`src/ui/PageText.ts`). Keys of `GameMode.main` added: M (music, `fl_mute`, `Mode.setMusicVolume`, also the pause's 0.5 volume) and Ctrl+Shift+K (give up: game over, saved); Esc already paused. Port addition: the space bar passes "click to start". The sound switch is saved. Tested in `tests/pagetext.test.ts`.
+- [ ] U.2 Frame readability: load the game's fonts (`Satans`, `Franklin Gothic Heavy`, now Arial Black), make the brown screen titles and faint labels readable, hint how locked options are unlocked.
+- [ ] U.3 Mobile: check the phone landscape layout on a real device (controls on each side of the frame, CSS only so far), drop the D-pad's up button (same as JUMP), "SPACE" labels on touch screens.
+- [ ] U.4 Loading and interaction: a loading screen instead of the black frame (`gfx/library.json` is 9 MB), hover on the menu entries (one click instead of two), mouse wheel in the quest list, pause when the tab is hidden, results screen's "SPACE / Click to continue" mix.
 
 ## Phase 5: Polish
 

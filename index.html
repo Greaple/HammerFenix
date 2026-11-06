@@ -6,138 +6,104 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>HammerFenix — Hammerfest Modern Remake</title>
+    <title>HammerFenix — The Caverns of Hammerfest</title>
     <meta
       name="description"
-      content="A faithful high-performance recreation of Motion Twin's classic 2D platformer Hammerfest (2006) using TypeScript, PixiJS v8, and Web Audio."
+      content="Play The Caverns of Hammerfest (Motion Twin, 2006) in your browser: a faithful remake of the Flash platformer."
     />
+    <meta name="theme-color" content="#3a86d8" />
     <link rel="icon" type="image/png" href="./gfx/bitmaps/0023.png" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app" class="app-container">
-      <header class="app-header">
-        <div class="header-brand">
-          <h1 class="logo-text">HammerFenix</h1>
-          <span class="badge dev-only">v0.1</span>
+      <header class="topbar">
+        <div class="brand">
+          <h1 class="logo">HammerFenix</h1>
+          <p class="credit">
+            <span data-i18n="credit">Hammerfest © Motion Twin</span> ·
+            <button type="button" class="link-btn" id="footer-about-link">CC BY-NC-SA 4.0</button>
+          </p>
         </div>
 
-        <div class="header-controls">
-          <div class="control-group dev-only">
-            <label for="levelset-select" class="sr-only">Level Set</label>
-            <select id="levelset-select" class="select-field" title="Select Level Set">
-              <option value="adventure">Adventure</option>
-              <option value="basicAdventure">Basic Adventure</option>
-              <option value="tutorial">Tutorial</option>
-              <option value="deepnight">Deepnight</option>
-              <option value="timeAttack">Time Attack</option>
-              <option value="ayame">Ayame</option>
-              <option value="bumdum">Bumdum</option>
-              <option value="dev">Dev</option>
-              <option value="soccer">Soccer</option>
-            </select>
+        <div class="dev-toolbar dev-only">
+          <label for="levelset-select" class="sr-only">Level Set</label>
+          <select id="levelset-select" class="select-field" title="Select Level Set">
+            <option value="adventure">Adventure</option>
+          </select>
+          <label for="level-input" class="sr-only">Level Number</label>
+          <div class="level-input-box">
+            <span class="level-prefix">Lvl</span>
+            <input
+              id="level-input"
+              type="number"
+              min="0"
+              max="103"
+              value="0"
+              class="input-number"
+              title="Level Number"
+            />
+          </div>
+          <button id="btn-restart" class="btn" title="Restart level">↻ Restart</button>
+          <button id="btn-pause" class="btn" title="Pause (P)">
+            <span class="btn-text">Pause</span>
+          </button>
+          <button id="btn-open-debug" class="btn" title="Debug toolkit (`)">Debug</button>
+          <button id="btn-open-compare" class="btn" title="Original game in Ruffle">Flash</button>
+          <button id="btn-open-symbols" class="btn" title="SWF symbol browser">Assets</button>
+        </div>
 
-            <label for="level-input" class="sr-only">Level Number</label>
-            <div class="level-input-box">
-              <span class="level-prefix">Lvl</span>
-              <input
-                id="level-input"
-                type="number"
-                min="0"
-                max="103"
-                value="0"
-                class="input-number"
-                title="Level Number"
+        <nav class="top-actions">
+          <button id="btn-mute" class="round-btn" type="button" data-i18n-label="soundOn">
+            <svg class="icon icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4z" />
+              <path class="stroke" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />
+            </svg>
+            <svg class="icon icon-sound-off" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 9v6h4l5 4V5L8 9H4z" />
+              <path class="stroke" d="M16.5 9.5l5 5M21.5 9.5l-5 5" />
+            </svg>
+          </button>
+          <label class="lang-pill" data-i18n-label="language">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                class="stroke"
+                d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3.5 12h17M12 3c2.5 2.6 3.6 5.6 3.6 9s-1.1 6.4-3.6 9c-2.5-2.6-3.6-5.6-3.6-9S9.5 5.6 12 3z"
               />
-            </div>
-          </div>
-
-          <div class="control-group action-buttons">
-            <button id="btn-restart" class="btn btn-icon dev-only" title="Restart Game (R)">
-              <span class="icon">↻</span>
-              <span class="btn-text">Restart</span>
-            </button>
-            <button id="btn-pause" class="btn btn-icon dev-only" title="Pause Game (P)">
-              <span class="icon">⏸</span>
-              <span class="btn-text">Pause</span>
-            </button>
-            <button id="btn-mute" class="btn btn-icon" title="Mute Audio (M)">
-              <span class="icon" id="mute-icon">🔊</span>
-              <span class="btn-text">Audio</span>
-            </button>
-          </div>
-
-          <div class="control-group meta-buttons">
-            <label for="lang-select" class="sr-only">Language</label>
-            <select id="lang-select" class="select-field lang-select" title="Change Language">
-              <option value="en">EN</option>
+            </svg>
+            <select id="lang-select">
               <option value="fr">FR</option>
+              <option value="en">EN</option>
               <option value="es">ES</option>
             </select>
-
-            <button
-              id="btn-open-debug"
-              class="btn btn-secondary dev-only"
-              title="Open Testing & Debug Toolkit (~)"
-            >
-              🛠️ Debug
-            </button>
-            <button
-              id="btn-open-compare"
-              class="btn btn-secondary dev-only"
-              title="Compare with Original Flash Game (Ruffle)"
-            >
-              ⚡ Flash
-            </button>
-            <button
-              id="btn-open-symbols"
-              class="btn btn-secondary dev-only"
-              title="Inspect SWF Vector Assets"
-            >
-              Assets
-            </button>
-            <button
-              id="btn-dev"
-              class="btn btn-icon"
-              title="Developer tools (level select, debug, Flash comparison)"
-              aria-pressed="false"
-            >
-              <span class="icon">⚙</span>
-            </button>
-            <button
-              id="btn-open-about"
-              class="btn btn-primary"
-              title="About HammerFenix & Controls"
-            >
-              Help &amp; About
-            </button>
-          </div>
-        </div>
+          </label>
+          <button id="btn-open-about" class="round-btn" type="button" data-i18n-label="help">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path class="stroke" d="M9.2 9a2.9 2.9 0 1 1 4.1 2.6c-.8.4-1.3 1.1-1.3 2v.6" />
+              <circle cx="12" cy="17.6" r="1.2" />
+            </svg>
+          </button>
+        </nav>
       </header>
 
       <main class="app-main">
         <div id="game-wrapper" class="game-wrapper">
-          <div id="game-canvas-container" class="game-canvas-container">
+          <div id="game-canvas-container" class="game-canvas-container" role="application">
             <!-- PixiJS canvas injected dynamically -->
           </div>
 
-          <!-- On-screen responsive touch controls for mobile / tablet -->
-          <div id="touch-controls" class="touch-controls" aria-label="Touch Game Controls">
+          <!-- On-screen touch controls for phones and tablets -->
+          <div id="touch-controls" class="touch-controls">
             <div class="touch-dpad">
-              <button
-                type="button"
-                id="touch-up"
-                class="touch-btn dpad-btn dpad-up"
-                aria-label="Up / Jump"
-              >
+              <button type="button" id="touch-up" class="touch-btn dpad-btn" data-i18n-label="jump">
                 ▲
               </button>
               <div class="dpad-middle">
                 <button
                   type="button"
                   id="touch-left"
-                  class="touch-btn dpad-btn dpad-left"
-                  aria-label="Left"
+                  class="touch-btn dpad-btn"
+                  data-i18n-label="left"
                 >
                   ◀
                 </button>
@@ -145,8 +111,8 @@
                 <button
                   type="button"
                   id="touch-right"
-                  class="touch-btn dpad-btn dpad-right"
-                  aria-label="Right"
+                  class="touch-btn dpad-btn"
+                  data-i18n-label="right"
                 >
                   ▶
                 </button>
@@ -154,113 +120,77 @@
               <button
                 type="button"
                 id="touch-down"
-                class="touch-btn dpad-btn dpad-down"
-                aria-label="Down"
+                class="touch-btn dpad-btn"
+                data-i18n-label="down"
               >
                 ▼
               </button>
             </div>
 
             <div class="touch-actions">
-              <button
-                type="button"
-                id="touch-jump"
-                class="touch-btn action-btn btn-jump"
-                aria-label="Jump"
-              >
-                JUMP
+              <button type="button" id="touch-jump" class="touch-btn action-btn btn-jump">
+                <span data-i18n="jumpShort">JUMP</span>
               </button>
-              <button
-                type="button"
-                id="touch-bomb"
-                class="touch-btn action-btn btn-bomb"
-                aria-label="Bomb"
-              >
-                BOMB
+              <button type="button" id="touch-bomb" class="touch-btn action-btn btn-bomb">
+                <span data-i18n="bombShort">BOMB</span>
               </button>
             </div>
           </div>
         </div>
       </main>
-
-      <footer class="app-footer">
-        <p>
-          HammerFenix — Hammerfest remake. Original game © Motion Twin (CC BY-NC-SA 4.0).
-          <button type="button" class="link-btn" id="footer-about-link">
-            Credits &amp; License
-          </button>
-        </p>
-      </footer>
     </div>
 
-    <!-- About & Controls Dialog: native dialog with closedby="any" -->
-    <dialog id="about-dialog" closedby="any" aria-labelledby="about-dialog-title">
+    <!-- Help: the story, the controls and the credits -->
+    <dialog
+      id="about-dialog"
+      class="parchment-dialog"
+      closedby="any"
+      aria-labelledby="about-dialog-title"
+    >
       <div class="dialog-content">
         <header class="dialog-header">
-          <h2 id="about-dialog-title">About HammerFenix</h2>
+          <h2 id="about-dialog-title" data-i18n="helpTitle">How to play</h2>
           <form method="dialog">
-            <button class="btn btn-close" aria-label="Close dialog">✕</button>
+            <button class="btn-close" data-i18n-label="close">✕</button>
           </form>
         </header>
 
         <div class="dialog-body">
           <section class="about-section">
-            <h3>🎮 How to Play</h3>
-            <p>
-              Guide Igor the snowman through treacherous caverns! Collect lost items, stun and
-              defeat fruit monsters with bombs, and find the portal to reach the next level before
-              the Hurry-Up timer summons Tubby!
-            </p>
+            <h3 data-i18n="storyTitle">The story</h3>
+            <p data-i18n="story"></p>
           </section>
 
           <section class="about-section">
-            <h3>⌨️ Controls</h3>
-            <div class="controls-grid">
-              <div><kbd>◀</kbd> <kbd>▶</kbd> / <kbd>A</kbd> <kbd>D</kbd></div>
-              <div>Walk Left / Right</div>
-              <div><kbd>▲</kbd> / <kbd>W</kbd></div>
-              <div>Jump</div>
-              <div><kbd>▼</kbd> / <kbd>S</kbd></div>
-              <div>Crouch / Drop through one-way platforms</div>
-              <div><kbd>Space</kbd></div>
-              <div>Drop Bomb / Detonate</div>
-              <div><kbd>P</kbd></div>
-              <div>Pause / Resume</div>
-              <div><kbd>R</kbd></div>
-              <div>Restart Level</div>
-              <div><kbd>M</kbd></div>
-              <div>Toggle Sound / Mute</div>
-            </div>
+            <h3 data-i18n="controlsTitle">Controls</h3>
+            <dl class="controls-grid">
+              <dt><kbd>←</kbd> <kbd>→</kbd> <span class="alt">· A D · Q D</span></dt>
+              <dd data-i18n="move">Move</dd>
+              <dt><kbd>↑</kbd> <span class="alt">· W · Z</span></dt>
+              <dd data-i18n="jumpKey">Jump</dd>
+              <dt><kbd class="wide" data-i18n="spaceKey">Space</kbd></dt>
+              <dd data-i18n="bombKey">Place a bomb, or kick one you stand next to</dd>
+              <dt><kbd>P</kbd> <span class="alt">· Esc</span></dt>
+              <dd data-i18n="pauseKey">Pause</dd>
+              <dt><kbd>M</kbd></dt>
+              <dd data-i18n="musicKey">Music on / off</dd>
+              <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd></dt>
+              <dd data-i18n="quitKey">Give up the game (it is saved)</dd>
+            </dl>
           </section>
 
           <section class="about-section">
-            <h3>📜 Credits &amp; Attribution</h3>
-            <p>
-              <strong>Hammerfest</strong> was originally created and released in 2006 by
-              <strong>Motion Twin</strong>.
-            </p>
-            <p>
-              In 2020, Motion Twin open-sourced the original Flash/ActionScript assets and codebase
-              under the
-              <strong
-                >Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC
-                BY-NC-SA 4.0)</strong
-              >
-              license.
-            </p>
-            <p>
-              HammerFenix is an independent open-source recreation created for digital preservation,
-              archival, and non-commercial educational use. All original graphics, sounds, and game
-              designs remain the intellectual property of Motion Twin.
-            </p>
+            <h3 data-i18n="creditsTitle">Credits</h3>
+            <p data-i18n-html="credits"></p>
             <ul class="credits-links">
               <li>
                 <a
                   href="https://github.com/motion-twin/hammerfest"
                   target="_blank"
                   rel="noopener noreferrer"
+                  data-i18n="linkOriginal"
                 >
-                  Original Motion Twin Repository (GitHub)
+                  Original source code (Motion Twin)
                 </a>
               </li>
               <li>
@@ -268,8 +198,9 @@
                   href="https://github.com/Greaple/HammerFenix"
                   target="_blank"
                   rel="noopener noreferrer"
+                  data-i18n="linkPort"
                 >
-                  HammerFenix Source Code (GitHub)
+                  HammerFenix source code
                 </a>
               </li>
               <li>
@@ -277,8 +208,9 @@
                   href="https://creativecommons.org/licenses/by-nc-sa/4.0/"
                   target="_blank"
                   rel="noopener noreferrer"
+                  data-i18n="linkLicense"
                 >
-                  CC BY-NC-SA 4.0 License Deed
+                  CC BY-NC-SA 4.0 license
                 </a>
               </li>
             </ul>
@@ -286,8 +218,12 @@
         </div>
 
         <footer class="dialog-footer">
+          <label class="dev-switch">
+            <input type="checkbox" id="dev-toggle" />
+            <span data-i18n="devTools">Developer tools</span>
+          </label>
           <form method="dialog">
-            <button class="btn btn-primary">Got it!</button>
+            <button class="parchment-btn" data-i18n="ok">Got it!</button>
           </form>
         </footer>
       </div>

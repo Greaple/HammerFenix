@@ -11,6 +11,7 @@ import { Profile } from './game/Profile';
 import { QuestEngine } from './game/Quests';
 import { Shell } from './ui/Shell';
 import { pickLang } from './ui/Language';
+import { applyPageText, pageText } from './ui/PageText';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -81,6 +82,18 @@ async function main(): Promise<void> {
   const canvasContainer = document.getElementById('game-canvas-container');
   if (canvasContainer) {
     canvasContainer.appendChild(app.canvas);
+    app.canvas.setAttribute('aria-label', 'Hammerfest');
+    // The game is vector art: draw it at the frame's size on screen, so it stays sharp at
+    // any scale (the stage keeps its 420 x 520 coordinates)
+    let lastRes = 0;
+    new ResizeObserver(() => {
+      const w = canvasContainer.clientWidth;
+      if (w <= 0) return;
+      const res = Math.min(4, Math.max(1, (w * (window.devicePixelRatio || 1)) / 420));
+      if (Math.abs(res - lastRes) < 0.01) return;
+      lastRes = res;
+      app.renderer.resize(420, 520, res);
+    }).observe(canvasContainer);
   }
 
   // 2. Load game data and assets in parallel
@@ -153,11 +166,11 @@ async function main(): Promise<void> {
   (window as any).debugToolkit = debugToolkit;
 
   // Developer tools (level select, restart, debug, Flash comparison) stay hidden unless
-  // switched on with the gear button or `?dev`; the choice is remembered.
-  const btnDev = document.getElementById('btn-dev') as HTMLButtonElement | null;
+  // switched on in the help dialog or with `?dev`; the choice is remembered.
+  const devToggle = document.getElementById('dev-toggle') as HTMLInputElement | null;
   const setDev = (on: boolean) => {
     document.body.classList.toggle('dev', on);
-    btnDev?.setAttribute('aria-pressed', String(on));
+    if (devToggle) devToggle.checked = on;
     try {
       localStorage.setItem('hammerfenix.dev', on ? '1' : '0');
     } catch {
@@ -171,7 +184,7 @@ async function main(): Promise<void> {
     // ignore
   }
   setDev(devOn);
-  btnDev?.addEventListener('click', () => setDev(!document.body.classList.contains('dev')));
+  devToggle?.addEventListener('change', () => setDev(devToggle.checked));
 
   // 6. Connect UI Toolbar Controls
   const levelSetSelect = document.getElementById('levelset-select') as HTMLSelectElement;
@@ -179,7 +192,6 @@ async function main(): Promise<void> {
   const btnRestart = document.getElementById('btn-restart') as HTMLButtonElement;
   const btnPause = document.getElementById('btn-pause') as HTMLButtonElement;
   const btnMute = document.getElementById('btn-mute') as HTMLButtonElement;
-  const muteIcon = document.getElementById('mute-icon') as HTMLElement;
   const langSelect = document.getElementById('lang-select') as HTMLSelectElement;
   const btnOpenSymbols = document.getElementById('btn-open-symbols') as HTMLButtonElement;
   const btnOpenDebug = document.getElementById('btn-open-debug') as HTMLButtonElement;
@@ -231,18 +243,30 @@ async function main(): Promise<void> {
     session.togglePause();
   });
 
+  /** The page's texts and the sound button, in the current language. */
+  const lang = () => pickLang(dataStore.langId, []);
+  const showMute = () => {
+    const muted = audio.isMuted;
+    btnMute?.classList.toggle('muted', muted);
+    btnMute?.setAttribute('aria-pressed', String(muted));
+    btnMute?.setAttribute('data-i18n-label', muted ? 'soundOff' : 'soundOn');
+    applyPageText(lang());
+  };
+  audio.setMuted(session.savedMuted);
+  showMute();
+
   btnMute?.addEventListener('click', () => {
-    const isMuted = audio.toggleMute();
-    if (muteIcon) muteIcon.textContent = isMuted ? '🔇' : '🔊';
+    audio.toggleMute();
+    session.saveSettings();
+    showMute();
   });
 
   // Language selector
-  document.documentElement.lang = dataStore.langId;
   if (langSelect) langSelect.value = dataStore.langId;
   langSelect?.addEventListener('change', async () => {
     await dataStore.setLang(langSelect.value);
-    document.documentElement.lang = dataStore.langId;
-    session.saveLang();
+    session.saveSettings();
+    applyPageText(lang());
     shell.refresh();
   });
 
@@ -273,7 +297,9 @@ async function main(): Promise<void> {
     if (levelSetSelect && levelSetSelect.value !== setName) {
       levelSetSelect.value = setName;
     }
-    document.title = `Level ${lvl} (${setName}) — HammerFenix`;
+    document.title = document.body.classList.contains('dev')
+      ? `Level ${lvl} (${setName}) — HammerFenix`
+      : pageText(lang(), 'pageTitle');
   };
 
   session.onStateChange = (state) => {

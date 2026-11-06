@@ -1,3 +1,8 @@
+/*
+ * The page around the game frame: a sunny Hammerfest landscape (public/scenery/landscape.jpg)
+ * with a floating header and no footer. The help dialog uses the game's parchment and wood
+ * colors; the developer dialogs and panels keep the dark theme below.
+ */
 :root {
   --bg-dark: #0a0e17;
   --bg-card: #141b2d;
@@ -18,7 +23,29 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
   --font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-display:
+    ui-rounded, 'SF Pro Rounded', 'Arial Rounded MT Bold', 'Nunito', 'Trebuchet MS', sans-serif;
   --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
+  /* Scenery and game colors */
+  --sky: #3a86d8;
+  --sky-deep: #2a63b0;
+  --wood: #5f452c;
+  --wood-dark: #3f2c1b;
+  --parchment: #f6e7c6;
+  --parchment-edge: #e6c592;
+  --ink: #4a3520;
+  --ink-soft: #7a5f44;
+  --gold-light: #fff3c4;
+  --glass: rgba(255, 255, 255, 0.16);
+  --glass-hover: rgba(255, 255, 255, 0.3);
+  --glass-border: rgba(255, 255, 255, 0.5);
+
+  /* Layout */
+  --gutter: 16px;
+  --topbar-h: 64px;
+  /* Room below the frame: none with a keyboard, the touch controls on a touch screen */
+  --below-frame: 0px;
 }
 
 *,
@@ -29,11 +56,14 @@
   padding: 0;
 }
 
+html {
+  background-color: var(--sky);
+}
+
 html,
 body {
   width: 100%;
   min-height: 100dvh;
-  background-color: var(--bg-dark);
   color: var(--text-main);
   font-family: var(--font-family);
   font-size: 14px;
@@ -41,6 +71,16 @@ body {
   overflow-x: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* The landscape stays put behind everything (a fixed layer: `background-attachment: fixed`
+   is ignored by iOS) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--sky) url('/scenery/landscape.jpg') center bottom / cover no-repeat;
 }
 
 .sr-only {
@@ -54,64 +94,204 @@ body {
   border: 0;
 }
 
-/* App Layout */
+:focus-visible {
+  outline: 3px solid var(--gold-light);
+  outline-offset: 2px;
+}
+
+/* ========================================================
+   Layout
+   ======================================================== */
+
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
 }
 
-/* Header & Navigation */
-.app-header {
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
-  padding: 8px 16px;
+/* Floating header: the name on the left, round buttons on the right, no bar behind them */
+.topbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  z-index: 10;
+  gap: 8px 16px;
+  min-height: var(--topbar-h);
+  padding: 10px max(var(--gutter), env(safe-area-inset-right)) 0
+    max(var(--gutter), env(safe-area-inset-left));
 }
 
-.header-brand {
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.logo {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 1.05rem + 1vw, 1.75rem);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: #fff;
+  text-shadow:
+    0 2px 0 var(--sky-deep),
+    0 4px 14px rgba(10, 40, 90, 0.35);
+}
+
+.credit {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 2px rgba(10, 40, 90, 0.7);
+  white-space: nowrap;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--gold-light);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 243, 196, 0.55);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration-color: currentColor;
+}
+
+.top-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.logo-text {
-  font-size: clamp(1.1rem, 0.9rem + 1vw, 1.4rem);
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.round-btn,
+.lang-pill {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(10, 40, 90, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.1s ease;
 }
 
-.badge {
-  background-color: var(--border-color);
-  color: var(--accent-cyan);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+.round-btn {
+  width: 40px;
 }
 
-.header-controls {
+.round-btn:hover,
+.lang-pill:hover {
+  background: var(--glass-hover);
+}
+
+.round-btn:active {
+  transform: scale(0.94);
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  flex: none;
+}
+
+.icon .stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.round-btn .icon-sound-off,
+.round-btn.muted .icon-sound-on {
+  display: none;
+}
+
+.round-btn.muted .icon-sound-off {
+  display: block;
+}
+
+.lang-pill {
+  position: relative;
+  gap: 2px;
+  padding: 0 10px;
+}
+
+.lang-pill .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.lang-pill select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  font: 700 0.85rem/1 var(--font-family);
+  letter-spacing: 0.04em;
+  padding: 0 14px 0 4px;
+  cursor: pointer;
+  outline: none;
+}
+
+.lang-pill select option {
+  color: #111;
+}
+
+/* The select's caret */
+.lang-pill::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.lang-pill:focus-within {
+  outline: 3px solid var(--gold-light);
+  outline-offset: 2px;
+}
+
+/* ========================================================
+   Developer toolbar (gear switch in the help dialog, or ?dev)
+   ======================================================== */
+
+body:not(.dev) .dev-only {
+  display: none !important;
+}
+
+.dev-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-}
-
-.control-group {
-  display: flex;
-  align-items: center;
   gap: 6px;
+  padding: 6px;
+  background: rgba(15, 30, 60, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
-/* Input & Select Controls */
 .select-field,
 .input-number {
   background-color: var(--bg-dark);
@@ -154,7 +334,6 @@ body {
   padding: 6px 4px;
 }
 
-/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -168,7 +347,6 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  outline: none;
   transition: all 0.15s ease;
 }
 
@@ -208,106 +386,108 @@ body {
   font-size: 1.2rem;
   cursor: pointer;
   padding: 4px 8px;
+  border-radius: var(--radius-sm);
 }
 
 .btn-close:hover {
   color: var(--text-main);
 }
 
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent-cyan);
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: inherit;
-  font-family: inherit;
-}
+/* ========================================================
+   Game frame
+   ======================================================== */
 
-/* Main Game Area */
 .app-main {
   flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 12px;
-  background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+  padding: 12px max(var(--gutter), env(safe-area-inset-right))
+    calc(24px + env(safe-area-inset-bottom)) max(var(--gutter), env(safe-area-inset-left));
 }
 
 .game-wrapper {
-  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 14px;
   width: 100%;
-  max-width: 600px;
 }
 
+/* As large as the window allows, keeping the game's 420 x 520 shape, framed in wood */
 .game-canvas-container {
+  --frame-h: calc(100dvh - var(--topbar-h) - 48px - var(--below-frame));
+  width: min(100%, 760px, max(240px, var(--frame-h) * 420 / 520));
   aspect-ratio: 420 / 520;
-  width: 100%;
-  max-width: 480px;
-  max-height: calc(100dvh - 140px);
   background-color: #000;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow:
-    var(--shadow-lg),
-    0 0 20px rgba(56, 189, 248, 0.15);
+  border: 6px solid var(--wood);
+  border-radius: 14px;
   overflow: hidden;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  box-shadow:
+    0 0 0 2px var(--parchment-edge),
+    0 0 0 5px rgba(63, 44, 27, 0.35),
+    0 22px 50px rgba(10, 30, 70, 0.45),
+    0 6px 14px rgba(10, 30, 70, 0.3);
 }
 
+/* Pixi sizes the canvas inline (autoDensity); the frame decides. Its resolution follows the
+   frame's size (main.ts), so no pixel scaling is needed. */
 .game-canvas-container canvas {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
-  image-rendering: pixelated;
   display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-/* On-Screen Touch Controls */
+/* ========================================================
+   Touch controls (touch screens only)
+   ======================================================== */
+
 .touch-controls {
-  display: flex;
+  display: none;
   justify-content: space-between;
   align-items: center;
   width: 100%;
   max-width: 480px;
-  margin-top: 12px;
-  padding: 4px 8px;
+  padding: 0 4px;
   gap: 16px;
 }
 
-@media (hover: hover) and (pointer: fine) {
+@media (hover: none) and (pointer: coarse) {
+  :root {
+    --below-frame: 170px;
+  }
+
   .touch-controls {
-    display: none;
+    display: flex;
   }
 }
 
 .touch-btn {
-  background: rgba(30, 41, 59, 0.85);
-  border: 1px solid var(--border-color);
-  color: var(--text-main);
-  border-radius: var(--radius-md);
-  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 800;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(10, 40, 90, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
   touch-action: manipulation;
-  transition: background-color 0.1s ease;
+  transition:
+    background-color 0.1s ease,
+    transform 0.1s ease;
 }
 
 .touch-btn:active,
 .touch-btn.active {
-  background: rgba(56, 189, 248, 0.4);
-  border-color: var(--accent-cyan);
+  background: var(--glass-hover);
+  transform: scale(0.95);
 }
 
 .touch-dpad {
@@ -324,47 +504,97 @@ body {
 }
 
 .dpad-center {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
 }
 
 .dpad-btn {
-  width: 48px;
-  height: 48px;
-  font-size: 1.2rem;
+  width: 50px;
+  height: 50px;
+  font-size: 1.1rem;
 }
 
 .touch-actions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
 .action-btn {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
+  border-width: 2px;
   font-size: 0.85rem;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .btn-bomb {
-  background: rgba(220, 38, 38, 0.7);
-  border-color: #ef4444;
+  background: rgba(214, 56, 44, 0.85);
+  border-color: rgba(255, 220, 210, 0.85);
 }
 
 .btn-jump {
-  background: rgba(14, 165, 233, 0.7);
-  border-color: #38bdf8;
+  background: rgba(36, 132, 214, 0.85);
+  border-color: rgba(210, 236, 255, 0.85);
 }
 
-/* Footer */
-.app-footer {
-  text-align: center;
-  padding: 10px 16px;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-color);
-  background-color: var(--bg-card);
+/* Phone held sideways: the controls go on each side of the frame */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  :root {
+    --topbar-h: 0px;
+    --below-frame: 0px;
+  }
+
+  .topbar {
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .topbar > * {
+    pointer-events: auto;
+  }
+
+  .credit {
+    display: none;
+  }
+
+  .logo {
+    font-size: 1.05rem;
+  }
+
+  .app-main {
+    padding-top: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .game-canvas-container {
+    --frame-h: calc(100dvh - 16px);
+  }
+
+  .game-wrapper {
+    flex-direction: row;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .touch-controls {
+    display: contents;
+  }
+
+  .touch-dpad {
+    order: -1;
+    align-self: flex-end;
+    margin-bottom: 12px;
+  }
+
+  .touch-actions {
+    flex-direction: column-reverse;
+    align-self: flex-end;
+    margin-bottom: 12px;
+  }
 }
 
 /* ========================================================
@@ -838,88 +1068,179 @@ kbd {
 }
 
 /* ========================================================
-   Hammerfest scenery around the game frame: the hammerfest.fr sky (`stars.jpg`) and hills
-   (`landscape.jpg`), copied to public/site by tools/build-site.ts.
+   Help dialog: the game's parchment and wood
    ======================================================== */
 
-html,
-body {
-  background: #64aae5 url('/site/img/design/stars.jpg') repeat-x top left;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 257px;
-  background: url('/site/img/design/landscape.jpg') repeat-x left bottom;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.app-container {
-  position: relative;
-  z-index: 1;
-}
-
-.app-header {
-  background: rgba(30, 58, 110, 0.35);
-  border-bottom: none;
-  backdrop-filter: blur(2px);
-}
-
-.logo-text {
-  background: none;
-  -webkit-text-fill-color: #ffffff;
-  color: #ffffff;
-  text-shadow: 0 2px 0 #3b5f9e;
-}
-
-.app-header .btn,
-.app-header .select-field,
-.app-header .input-number {
-  background-color: rgba(20, 40, 80, 0.55);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #ffffff;
-}
-
-#btn-dev[aria-pressed='true'] {
-  background-color: rgba(251, 191, 36, 0.45);
-}
-
-body:not(.dev) .dev-only {
-  display: none !important;
-}
-
-.app-main {
-  background: transparent;
-}
-
-.game-canvas-container {
-  width: min(100%, 480px, calc((100dvh - 150px) * 420 / 520));
-  max-height: none;
-  border: 5px solid #5f452c;
-  border-radius: 10px;
+dialog.parchment-dialog {
+  width: min(560px, calc(100vw - 2 * var(--gutter)));
+  max-width: none;
+  background: var(--parchment);
+  color: var(--ink);
+  border: 4px solid var(--wood);
+  border-radius: 16px;
   box-shadow:
-    0 0 0 2px #e6c592,
-    0 10px 30px rgba(20, 30, 60, 0.55);
+    0 0 0 2px var(--parchment-edge),
+    0 24px 60px rgba(10, 30, 70, 0.5);
 }
 
-.app-footer {
-  background: transparent;
-  border-top: none;
-  color: #ffffff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+dialog.parchment-dialog::backdrop {
+  background-color: rgba(20, 50, 100, 0.35);
+  backdrop-filter: blur(3px);
 }
 
-.app-footer .link-btn {
-  color: #fff3c4;
+.parchment-dialog .dialog-header,
+.parchment-dialog .dialog-footer {
+  border-color: rgba(95, 69, 44, 0.2);
 }
 
-/* Pixi sets the canvas size inline (autoDensity): fill the frame instead */
-.game-canvas-container canvas {
-  width: 100% !important;
-  height: 100% !important;
+.parchment-dialog .dialog-header h2 {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: var(--wood);
+}
+
+.parchment-dialog .btn-close {
+  color: var(--ink-soft);
+}
+
+.parchment-dialog .btn-close:hover {
+  color: var(--ink);
+  background: rgba(95, 69, 44, 0.1);
+}
+
+.parchment-dialog .about-section h3 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--wood);
+  margin-bottom: 8px;
+}
+
+.parchment-dialog .about-section p {
+  color: var(--ink);
+  line-height: 1.55;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.parchment-dialog .controls-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px 18px;
+  padding: 14px 16px;
+  background: rgba(95, 69, 44, 0.07);
+  border: 1px solid rgba(95, 69, 44, 0.18);
+  border-radius: 10px;
+}
+
+.parchment-dialog .controls-grid dt {
+  white-space: nowrap;
+}
+
+.parchment-dialog kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 3px 7px;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+  background: #fffaf0;
+  border: 1px solid #c8a878;
+  border-radius: 6px;
+  box-shadow: 0 2px 0 #c8a878;
+}
+
+.parchment-dialog kbd.wide {
+  min-width: 84px;
+}
+
+.parchment-dialog .alt {
+  margin-left: 4px;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
+
+.parchment-dialog .credits-links a {
+  color: #8a4b12;
+}
+
+.parchment-dialog .dialog-footer {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.dev-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.dev-switch input {
+  accent-color: var(--wood);
+}
+
+.parchment-btn {
+  background: var(--wood);
+  color: var(--gold-light);
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 20px;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--wood-dark);
+  transition: transform 0.1s ease;
+}
+
+.parchment-btn:hover {
+  background: #6f5236;
+}
+
+.parchment-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--wood-dark);
+}
+
+/* Narrow phones: the name and buttons share one line */
+@media (max-width: 420px) {
+  :root {
+    --gutter: 12px;
+    --topbar-h: 58px;
+  }
+
+  .round-btn,
+  .lang-pill {
+    height: 38px;
+  }
+
+  .round-btn {
+    width: 38px;
+  }
+
+  /* One line: the credit wraps under the name, the language keeps only its code */
+  .topbar {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+
+  .credit {
+    white-space: normal;
+  }
+
+  .top-actions {
+    gap: 6px;
+  }
+
+  .lang-pill .icon {
+    display: none;
+  }
 }

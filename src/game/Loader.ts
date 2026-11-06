@@ -132,6 +132,11 @@ export class Loader {
     this.attachLoading(2);
   }
 
+  /** Frame 2 waits for the click that starts the game. */
+  get waitingStart(): boolean {
+    return this.fl_wait && this.loadingFrame === 2;
+  }
+
   /** `loading.onRelease`, set on frames 2 and 4 only. */
   onRelease(): void {
     if (this.fl_wait && this.loadingFrame === 2) this.queryStart();

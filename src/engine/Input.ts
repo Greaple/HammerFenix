@@ -1,6 +1,11 @@
 import { ACTION_BITS, type InputPlayer, type InputRecorder } from './InputRecording';
 
-export type ControlAction = 'left' | 'right' | 'jump' | 'down' | 'attack' | 'pause';
+/**
+ * `music` is M and `suicide` Ctrl+Shift+K, the keys `GameMode.main` reads besides the controls
+ * (the music switch and giving up the game).
+ */
+export type ControlAction =
+  'left' | 'right' | 'jump' | 'down' | 'attack' | 'pause' | 'music' | 'suicide';
 
 const KEY_MAP: Record<string, ControlAction> = {
   ArrowLeft: 'left',
@@ -20,7 +25,14 @@ const KEY_MAP: Record<string, ControlAction> = {
   KeyJ: 'attack',
   KeyP: 'pause',
   Escape: 'pause',
+  KeyM: 'music',
 };
+
+/** The action of key event `e`: Ctrl+Shift+K gives up the game (`GameMode.main`). */
+function actionOf(e: KeyboardEvent): ControlAction | undefined {
+  if (e.code === 'KeyK') return e.ctrlKey && e.shiftKey ? 'suicide' : undefined;
+  return KEY_MAP[e.code];
+}
 
 /**
  * Unified input controller combining Keyboard (QWERTY + AZERTY + Arrows),
@@ -50,13 +62,14 @@ export class InputController {
     if (document.querySelector('dialog[open]')) return;
 
     this.onAnyGesture?.();
-    const act = KEY_MAP[e.code];
+    const act = actionOf(e);
     if (!act) return;
     if (act !== 'pause') e.preventDefault();
     this.keyHeld.add(act);
   };
 
   private readonly handleKeyUp = (e: KeyboardEvent) => {
+    if (e.code === 'KeyK') this.keyHeld.delete('suicide');
     const act = KEY_MAP[e.code];
     if (!act) return;
     this.keyHeld.delete(act);

@@ -133,6 +133,10 @@ export class GameSession implements IGameContext {
   fl_clear = false;
   fl_gameOver = false;
   fl_pause = false;
+  /** `Mode.fl_music`: a music track is playing. */
+  fl_music = false;
+  /** `GameMode.fl_mute`: the music was switched off with M. */
+  fl_mute = false;
   /** The next pause screen tip, `Lang` text `301 + tipId`. */
   tipId = 0;
   fl_ice = false;
@@ -337,10 +341,16 @@ export class GameSession implements IGameContext {
     }
   }
 
-  /** Saves the current language as the next session's. */
-  saveLang(): void {
+  /** Whether the last session left the sound off. */
+  get savedMuted(): boolean {
+    return this.savedData.muted === true;
+  }
+
+  /** Saves the current language and sound switch as the next session's. */
+  saveSettings(): void {
     try {
       this.savedData.preferredLang = this.dataStore.langId;
+      this.savedData.muted = this.audio.isMuted;
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.savedData));
     } catch {
       // ignore storage quota / sandbox write errors
@@ -405,6 +415,7 @@ export class GameSession implements IGameContext {
     this.fl_clear = false;
     this.fl_lock = true; // Mode constructor (its lock() runs before gameChrono exists)
     this.fl_pause = false;
+    this.fl_mute = false;
     this.tipId = 0;
     this.cycle = 0;
     // A new GameManager and Loader: the original loads a new page for each game
@@ -1347,7 +1358,7 @@ export class GameSession implements IGameContext {
       this.history.push('$illegal'.substring(1));
     }
 
-    this.audio.stopMusic();
+    this.stopMusic();
     this.saveGame(); // the port's local high score, until the profile (3.2b)
 
     this.saveScore();
@@ -1873,6 +1884,20 @@ export class GameSession implements IGameContext {
     if (MUSIC_TRACKS[trackId] === undefined) return;
     this.currentTrack = trackId;
     this.audio.playMusic(MUSIC_TRACKS[trackId]);
+    this.fl_music = true;
+    this.setMusicVolume(this.fl_mute ? 0 : 1);
+  }
+
+  /** `Mode.stopMusic` */
+  stopMusic(): void {
+    this.audio.stopMusic();
+    this.fl_music = false;
+  }
+
+  /** `Mode.setMusicVolume`: `n` times the player's music volume. */
+  setMusicVolume(n: number): void {
+    if (!this.fl_music) return;
+    this.audio.setMusicLevel(n);
   }
 
   setWarpStart(): void {
@@ -1938,6 +1963,8 @@ export class GameSession implements IGameContext {
     const tipField = mc.getText('tip');
     if (tipField) tipField.htmlText = `<b>${lang(300)}</b>${tip}`;
 
+    if (!this.fl_mute) this.setMusicVolume(0.5);
+
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: true });
   }
 
@@ -1948,6 +1975,7 @@ export class GameSession implements IGameContext {
     this.world.unlock();
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
+    if (!this.fl_mute) this.setMusicVolume(1);
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: false });
   }
 
@@ -1959,15 +1987,33 @@ export class GameSession implements IGameContext {
     // game's clip is removed
     if (!this.loader.gameRunning) {
       this.input.poll();
+      // Port addition: the space bar starts the game as a click does, since the menu is left
+      // with it ("click to start" alone sent keyboard players to the mouse)
+      if (this.loader.waitingStart && this.input.consumePress('attack')) this.clickStart();
       return;
     }
 
     this.gameChrono.update();
     this.input.poll();
 
-    // Check pause key toggle
+    // Check pause key toggle (P, and Escape: `GameMode.main` pauses with it on the site)
     if (this.input.consumePress('pause')) {
       this.togglePause();
+    }
+
+    // Music (M)
+    if (!this.fl_lock && this.fl_music && this.input.consumePress('music')) {
+      this.fl_mute = !this.fl_mute;
+      this.setMusicVolume(this.fl_mute ? 0 : 1);
+    }
+
+    // Suicide (Ctrl+Shift+K): the way to give up a game. The original also waits for
+    // `fl_switch`, which only `ModeSwitcher` sets (never in the Adventure).
+    if (this.input.isDown('suicide')) {
+      if (!this.fl_lock && this.countList(Data.PLAYER) > 0) {
+        this.destroyList(Data.PLAYER);
+        this.onGameOver();
+      }
     }
 
     // Bullet time: the original counts it in real frames, each moving the game by 0.3
