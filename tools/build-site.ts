@@ -10,6 +10,8 @@ import { dirname } from 'node:path';
 
 const FILES: [string, string][] = [
   ['assets-src/upscaled/mainTitle.webp', 'public/images/mainTitle.webp'],
+  // The results page's game over picture (`.artResult`), never archived: given by the maintainer
+  ['assets-src/upscaled/gameOver.webp', 'public/images/gameOver.webp'],
 ];
 
 for (const [src, out] of FILES) {

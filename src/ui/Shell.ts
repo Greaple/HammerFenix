@@ -53,6 +53,12 @@ export interface ShellTexts {
  */
 export const TITLE_FILE = 'images/mainTitle.webp';
 
+/**
+ * The game over picture of the results page (a melted Igor), the site's `.artResult`: never
+ * archived, given by the maintainer (1216 x 877, `assets-src/upscaled/`).
+ */
+export const GAME_OVER_FILE = 'images/gameOver.webp';
+
 type Screen = 'menu' | 'result' | 'quests' | 'fridge';
 
 /** An item clip used as an icon: special items below 1000, score items from 1000. */
@@ -305,6 +311,7 @@ export class Shell {
   private readonly texts: ShellTexts;
   private readonly profile: Profile;
   private title: Texture | null = null;
+  private gameOverArt: Texture | null = null;
   private readonly grey = new ColorMatrixFilter();
   private screen: Screen | null = null;
   private result: GameResult | null = null;
@@ -330,19 +337,12 @@ export class Shell {
     this.root.on('wheel', (e: FederatedWheelEvent) => this.onWheel(e.deltaY));
   }
 
-  /** Loads the title logo. */
+  /** Loads the title logo and the game over picture. */
   async load(baseUrl: string): Promise<void> {
-    try {
-      const img = new Image();
-      img.src = `${baseUrl}${TITLE_FILE}`;
-      await img.decode();
-      // Mipmaps: the logo shows at about half its size, smaller on phones
-      this.title = new Texture({
-        source: new ImageSource({ resource: img, autoGenerateMipmaps: true }),
-      });
-    } catch {
-      // no logo: the screens show the game's name in text
-    }
+    [this.title, this.gameOverArt] = await Promise.all([
+      loadTexture(`${baseUrl}${TITLE_FILE}`),
+      loadTexture(`${baseUrl}${GAME_OVER_FILE}`),
+    ]);
   }
 
   get visible(): boolean {
@@ -1218,14 +1218,28 @@ export class Shell {
    */
   private drawResult(r: GameResult): void {
     const t = this.t;
-    this.drawTitle(4, 250);
-    const top = 112;
-    this.panel(26, top, 368, H - 8 - top);
-    this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
-      color: '#5f452c',
-    });
-
-    let y = top + 50;
+    // A game over shows its picture, which says "GAME OVER", spilling onto the panel; the end
+    // of the set shows the logo and its title
+    const art = r.kind === 'gameOver' ? this.gameOverArt : null;
+    let y: number;
+    if (art) {
+      const top = 150;
+      this.panel(26, top, 368, H - 8 - top);
+      const s = new Sprite(art);
+      s.scale.set(250 / art.width);
+      s.anchor.set(0.5, 0);
+      s.position.set(W / 2, -4);
+      this.root.addChild(s);
+      y = top + 30;
+    } else {
+      this.drawTitle(4, 250);
+      const top = 112;
+      this.panel(26, top, 368, H - 8 - top);
+      this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
+        color: '#5f452c',
+      });
+      y = top + 50;
+    }
     if (r.kind === 'gameOver') {
       const lvl = r.stats.reachedLevel;
       this.text(`${this.texts.getStatic(1)} ${lvl}`, 'label', W / 2, y, { size: 17 });
@@ -1303,4 +1317,16 @@ function formatScore(n: number): string {
 /** A keyboard is likely: not a touch screen (`html.touch`, set by main.ts). */
 function hasKeyboard(): boolean {
   return typeof document === 'undefined' || !document.documentElement.classList.contains('touch');
+}
+
+/** An image as a mipmapped texture (it shows smaller than its size), or null if it fails. */
+async function loadTexture(url: string): Promise<Texture | null> {
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
+  } catch {
+    return null;
+  }
 }
