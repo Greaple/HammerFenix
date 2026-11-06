@@ -2230,6 +2230,14 @@ export class GameSession implements IGameContext {
     this.onStateChange?.({ isOver: false, isPaused: false });
   }
 
+  /**
+   * The level is drawn: a new game first reads the level's map (about 17 frames) with no view
+   * attached, which shows black. The menu waits for this before fading out.
+   */
+  get levelShown(): boolean {
+    return this.loader.gameRunning && this.view.fl_attach;
+  }
+
   /** A click on the game: `loading.onRelease`. */
   clickStart(): void {
     this.loader.onRelease();

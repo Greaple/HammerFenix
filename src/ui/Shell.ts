@@ -317,6 +317,9 @@ export class Shell {
   /** When `fadeOut` started (`performance.now()`), while it runs. */
   private fadeFrom: number | null = null;
   private fadeMs = 700;
+  /** Set by `fadeOut` until the level is drawn and the fade can start. */
+  private fadeReady: (() => boolean) | null = null;
+  private fadeAsked = 0;
   private result: GameResult | null = null;
   private record: GameRecord | null = null;
   /** Index in `menuEntries()`. */
@@ -392,6 +395,7 @@ export class Shell {
   hide(): void {
     this.screen = null;
     this.fadeFrom = null;
+    this.fadeReady = null;
     this.root.visible = false;
     this.root.alpha = 1;
     this.root.eventMode = 'static';
@@ -400,12 +404,15 @@ export class Shell {
 
   /**
    * Fades the screen out over the game starting under it, then hides it. The menu's village
-   * is the first level's, so it dissolves into the level.
+   * is the first level's, so it dissolves into the level. The fade waits until `ready()` says
+   * the level is drawn (at most 2 s), so it never shows the black of the level being read.
    */
-  fadeOut(ms = 700): void {
+  fadeOut(ready: () => boolean = () => true, ms = 700): void {
     this.screen = null;
     this.root.eventMode = 'none';
-    this.fadeFrom = performance.now();
+    this.fadeReady = ready;
+    this.fadeAsked = performance.now();
+    this.fadeFrom = null;
     this.fadeMs = ms;
   }
 
@@ -416,6 +423,14 @@ export class Shell {
 
   /** Keys, once per frame while a screen shows: arrows choose, space confirms. */
   update(): void {
+    if (this.fadeReady) {
+      const now = performance.now();
+      if (this.fadeReady() || now - this.fadeAsked > 2000) {
+        this.fadeReady = null;
+        this.fadeFrom = now;
+      }
+      return;
+    }
     if (this.fadeFrom !== null) {
       const a = 1 - (performance.now() - this.fadeFrom) / this.fadeMs;
       if (a <= 0) this.hide();
@@ -561,6 +576,7 @@ export class Shell {
   private render(): void {
     this.clear();
     this.fadeFrom = null;
+    this.fadeReady = null;
     this.root.alpha = 1;
     this.root.eventMode = 'static';
     this.root.visible = true;

@@ -53,7 +53,10 @@ describe('game start from the site (Loader.gameReady / startGame)', () => {
     expect(session.loader.loading).toBeNull();
     expect(session.gameRoot.visible).toBe(true);
     expect(session.siteMode).toBe('solo');
+    // The level is read first, with nothing drawn: the menu waits for `levelShown`
+    expect(session.levelShown).toBe(false);
     step(20);
+    expect(session.levelShown).toBe(true);
     expect(session.player).not.toBeNull();
   });
 

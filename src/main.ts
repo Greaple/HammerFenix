@@ -155,7 +155,7 @@ async function main(): Promise<void> {
   };
   shell.onStart = (mode) => {
     // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
-    shell.fadeOut();
+    shell.fadeOut(() => session.levelShown);
     session.start();
     // The site's start query answers with the profile's families; the page sent the options
     session.setParameters(profile.familiesParam, profile.optionsParam(mode));
