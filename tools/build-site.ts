@@ -1,14 +1,15 @@
 /**
  * Copies the images the site screens use that are not in the SWFs (`src/ui/Shell.ts`): the
- * game's title logo, `assets-src/original/images/mainTitle.png`. The screens draw everything
- * else from the SWFs (UI batch U.2), and the page around the frame has its own picture
- * (`public/scenery/`).
+ * game's title logo. The original is `assets-src/original/images/mainTitle.png` (420 x 180);
+ * the screens use its upscale (2000 x 857, transparent), made by the maintainer and kept in
+ * `assets-src/upscaled/`. The screens draw everything else from the SWFs (UI batch U.2), and the
+ * page around the frame has its own picture (`public/scenery/`).
  */
 import { copyFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname } from 'node:path';
 
 const FILES: [string, string][] = [
-  ['assets-src/original/images/mainTitle.png', 'public/images/mainTitle.png'],
+  ['assets-src/upscaled/mainTitle.webp', 'public/images/mainTitle.webp'],
 ];
 
 for (const [src, out] of FILES) {

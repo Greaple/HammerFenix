@@ -2,7 +2,7 @@
  * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d): the mode menu, the
  * results page after a game, the quests and the fridge. They are drawn inside the game frame
  * with the game's own graphics: the village scene (`menu`, vector), the game's title logo
- * (`assets-src/original/images/mainTitle.png`, the only raster), item clips as icons, the
+ * (`mainTitle.png` of the original, upscaled: the only raster), item clips as icons, the
  * pause screen's space key, and the game's fonts (Satans titles, Franklin Gothic Heavy labels,
  * extracted from `_gfx.swf` by `tools/build-fonts.ts`). Panels are drawn as vectors in the
  * parchment and wood colors, so they stay sharp at any size (UI batch U.2).
@@ -19,6 +19,7 @@ import {
   Container,
   type FederatedWheelEvent,
   Graphics,
+  ImageSource,
   Rectangle,
   Sprite,
   Text,
@@ -46,8 +47,11 @@ export interface ShellTexts {
   getQuestDesc(id: number): string;
 }
 
-/** The game's title logo (420 x 180, transparent), the one image not in the SWFs. */
-export const TITLE_FILE = 'images/mainTitle.png';
+/**
+ * The game's title logo, the one image not in the SWFs: `mainTitle.png` of the original
+ * (420 x 180) upscaled to 2000 x 857 by the maintainer (`assets-src/upscaled/`).
+ */
+export const TITLE_FILE = 'images/mainTitle.webp';
 
 type Screen = 'menu' | 'result' | 'quests' | 'fridge';
 
@@ -332,7 +336,10 @@ export class Shell {
       const img = new Image();
       img.src = `${baseUrl}${TITLE_FILE}`;
       await img.decode();
-      this.title = Texture.from(img);
+      // Mipmaps: the logo shows at about half its size, smaller on phones
+      this.title = new Texture({
+        source: new ImageSource({ resource: img, autoGenerateMipmaps: true }),
+      });
     } catch {
       // no logo: the screens show the game's name in text
     }
