@@ -129,8 +129,8 @@ async function main(): Promise<void> {
   };
   shell.onStart = (mode) => {
     showGame();
-    // The site's start query answers with the profile's families
-    session.setParameters(profile.familiesParam);
+    // The site's start query answers with the profile's families; the page sent the options
+    session.setParameters(profile.familiesParam, profile.optionsParam(mode));
     session.gameReady(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());

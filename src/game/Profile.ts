@@ -1,4 +1,5 @@
 import { PersistCodec, type PersistValue } from '../engine/codec/PersistCodec';
+import { Data } from './Data';
 import type { GameResult } from './Loader';
 import { newProfile, type ProfileData, type QuestEngine } from './Quests';
 
@@ -12,6 +13,14 @@ export interface GameRecord {
   /** Items that entered the fridge with this game. */
   fridge: number[];
 }
+
+/**
+ * The options each mode offers on the menu, in the menu's order. The quest texts say which mode
+ * each is for (quests 63, 64, 72, 74); the multiplayer ones come with their modes (Phase 4).
+ */
+export const MODE_OPTIONS: Record<string, readonly string[]> = {
+  solo: [Data.OPT_MIRROR, Data.OPT_NIGHTMARE, Data.OPT_NINJA, Data.OPT_BOMB_EXPERT],
+};
 
 /** The part of `Storage` the profile uses, so tests can pass their own. */
 export type ProfileStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -56,6 +65,33 @@ export class Profile {
     return this.data.families.join(',');
   }
 
+  hasOption(oid: string): boolean {
+    return this.data.options.includes(oid);
+  }
+
+  isChosen(oid: string): boolean {
+    return this.hasOption(oid) && this.data.chosen.includes(oid);
+  }
+
+  /** Ticks or unticks an unlocked option on the menu, and saves. */
+  toggleOption(oid: string): void {
+    if (!this.hasOption(oid)) return;
+    const c = this.data.chosen;
+    if (c.includes(oid)) c.splice(c.indexOf(oid), 1);
+    else c.push(oid);
+    this.save();
+  }
+
+  /**
+   * `$options` for a game of `mode`: the mode's options ticked on the menu, and the Tornade
+   * boost once unlocked, which applies "quelles que soient les options choisies" (quest 62).
+   */
+  optionsParam(mode: string): string {
+    const out = (MODE_OPTIONS[mode] ?? []).filter((o) => this.isChosen(o));
+    if (this.hasOption(Data.OPT_BOOST)) out.push(Data.OPT_BOOST);
+    return out.join(',');
+  }
+
   /**
    * The server's part of the end of an Adventure game: counts the items the game sent, checks
    * the quests and saves.
@@ -93,6 +129,7 @@ export function decodeProfile(raw: string): ProfileData | null {
   if (nums(v.quests)) p.quests = v.quests!;
   if (nums(v.families)) p.families = v.families!;
   if (strs(v.options)) p.options = v.options!;
+  if (strs(v.chosen)) p.chosen = v.chosen!;
   if (strs(v.modes)) p.modes = v.modes!;
   if (typeof v.tokens === 'number') p.tokens = v.tokens;
   if (typeof v.bank === 'number') p.bank = v.bank;

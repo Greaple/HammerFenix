@@ -9,13 +9,16 @@
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
  * the quest and fridge pages show the profile (3.2b) as the site's pages did: quests done and
- * in progress with their items, and the items found with their count.
+ * in progress with their items, and the items found with their count. The selected mode's
+ * options are checkboxes under its text, the locked ones greyed, as the site's `.mopt` box
+ * and `.lidis` rule drew them (3.3).
  */
 import { Container, Graphics, Rectangle, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import type { InputController } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
+import { Data } from '../game/Data';
 import type { GameResult } from '../game/Loader';
-import { type GameRecord, type Profile, resultPicks } from '../game/Profile';
+import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
 
 /** The game's lang texts the screens reuse. */
 export interface ShellTexts {
@@ -48,16 +51,29 @@ const MODES: ModeEntry[] = [
   { icon: 'itutorial', mode: 'tutorial', enabled: false },
 ];
 
+interface TabEntry {
+  screen: 'quests' | 'fridge';
+  icon: string;
+}
+
 /** The site's tabs under the mode menu: its "Quêtes" and "Réfrigérateur" icons. */
-const TABS: { screen: 'quests' | 'fridge'; icon: string }[] = [
+const TABS: TabEntry[] = [
   { screen: 'quests', icon: 'icon_quests' },
   { screen: 'fridge', icon: 'icon_inventory' },
 ];
 
+/** What the menu's arrows move through: the modes, each with its unlocked options, the tabs. */
+type MenuEntry =
+  | { kind: 'mode'; mode: ModeEntry }
+  | { kind: 'option'; mode: ModeEntry; oid: string }
+  | { kind: 'tab'; tab: TabEntry };
+
 /**
  * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
  * (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), "N objets sur 353" and
- * "Aucune ! Il va falloir jouer plus !" the public profile's; the others are the port's own.
+ * "Aucune ! Il va falloir jouer plus !" the public profile's, the option names those of the
+ * quests that unlock them (`xml/lang`, quests 62 to 74; "Tornado" is the port's own, as only
+ * the French text names it); the others are the port's own.
  */
 const TEXT: Record<Lang, Record<string, string>> = {
   fr: {
@@ -87,6 +103,12 @@ const TEXT: Record<Lang, Record<string, string>> = {
     unknown: 'Objet inconnu',
     found: 'Trouvé {0} fois',
     back: 'Retour',
+    options: 'Options',
+    mirror: 'Miroir',
+    nightmare: 'Cauchemar',
+    ninja: 'Ninjutsu',
+    bombexpert: 'Explosifs instables',
+    boost: 'Tornade',
   },
   en: {
     modes: 'Game modes',
@@ -114,6 +136,12 @@ const TEXT: Record<Lang, Record<string, string>> = {
     unknown: 'Unknown item',
     found: 'Found {0} times',
     back: 'Back',
+    options: 'Options',
+    mirror: 'Mirror',
+    nightmare: 'Nightmare',
+    ninja: 'Ninjutsu',
+    bombexpert: 'Unstable explosives',
+    boost: 'Tornado',
   },
   es: {
     modes: 'Modos de juego',
@@ -142,6 +170,12 @@ const TEXT: Record<Lang, Record<string, string>> = {
     unknown: 'Objeto desconocido',
     found: 'Encontrado {0} veces',
     back: 'Volver',
+    options: 'Opciones',
+    mirror: 'Espejo',
+    nightmare: 'Pesadilla',
+    ninja: 'Ninjutsu',
+    bombexpert: 'Explosivos inestables',
+    boost: 'Tornado',
   },
 };
 
@@ -186,7 +220,7 @@ export class Shell {
   private screen: Screen | null = null;
   private result: GameResult | null = null;
   private record: GameRecord | null = null;
-  /** Menu entry: the modes, then the tabs. */
+  /** Index in `menuEntries()`. */
   private selected = 0;
   private questSel = 0;
   private questTop = 0;
@@ -233,6 +267,7 @@ export class Shell {
 
   showMenu(): void {
     this.screen = 'menu';
+    this.selected = Math.min(this.selected, this.menuEntries().length - 1);
     this.result = null;
     this.record = null;
     this.render();
@@ -286,11 +321,13 @@ export class Shell {
     const esc = inp.consumePress('pause');
     switch (this.screen) {
       case 'menu': {
-        const tab = this.selected >= MODES.length;
+        const entries = this.menuEntries();
         if (up) this.select(this.selected - 1);
         if (down) this.select(this.selected + 1);
-        if (tab && (left || right)) {
-          this.select(this.selected === MODES.length ? MODES.length + 1 : MODES.length);
+        if (entries[this.selected].kind === 'tab' && (left || right)) {
+          // the two tabs side by side, last in the list
+          const first = entries.length - TABS.length;
+          this.select(this.selected === first ? first + 1 : first);
         }
         if (ok) this.confirm();
         break;
@@ -313,8 +350,21 @@ export class Shell {
     }
   }
 
+  private menuEntries(): MenuEntry[] {
+    const out: MenuEntry[] = [];
+    for (const mode of MODES) {
+      out.push({ kind: 'mode', mode });
+      if (!mode.enabled) continue;
+      for (const oid of MODE_OPTIONS[mode.mode] ?? []) {
+        if (this.profile.hasOption(oid)) out.push({ kind: 'option', mode, oid });
+      }
+    }
+    for (const tab of TABS) out.push({ kind: 'tab', tab });
+    return out;
+  }
+
   private select(i: number): void {
-    const count = MODES.length + TABS.length;
+    const count = this.menuEntries().length;
     const n = (i + count) % count;
     if (n === this.selected) return;
     this.selected = n;
@@ -322,13 +372,22 @@ export class Shell {
   }
 
   private confirm(): void {
-    if (this.selected >= MODES.length) {
-      if (TABS[this.selected - MODES.length].screen === 'quests') this.showQuests();
+    const e = this.menuEntries()[this.selected];
+    if (e.kind === 'tab') {
+      if (e.tab.screen === 'quests') this.showQuests();
       else this.showFridge();
-      return;
+    } else if (e.kind === 'option') {
+      this.profile.toggleOption(e.oid);
+      this.render();
+    } else if (e.mode.enabled) {
+      this.onStart?.(e.mode.mode);
     }
-    const m = MODES[this.selected];
-    if (m.enabled) this.onStart?.(m.mode);
+  }
+
+  /** Selects menu entry `i`, or confirms it when it is already selected (a click). */
+  private clickEntry(i: number): void {
+    if (this.selected === i) this.confirm();
+    else this.select(i);
   }
 
   private selectQuest(i: number): void {
@@ -481,10 +540,16 @@ export class Shell {
     (parent ?? this.root).addChild(s);
   }
 
-  private highlight(x: number, y: number, w: number, h: number, on: boolean, parent?: Container) {
-    const g = new Graphics()
-      .roundRect(x, y, w, h, 6)
-      .fill({ color: 0x5f452c, alpha: on ? 0.55 : 0 });
+  private highlight(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    on: boolean | number,
+    parent?: Container,
+  ) {
+    const alpha = on === true ? 0.55 : on === false ? 0 : on;
+    const g = new Graphics().roundRect(x, y, w, h, 6).fill({ color: 0x5f452c, alpha });
     (parent ?? this.root).addChild(g);
   }
 
@@ -492,17 +557,19 @@ export class Shell {
 
   private drawMenu(): void {
     const t = this.t;
-    this.parchment(W / 2, 296, 380, 280);
+    const entries = this.menuEntries();
+    const cur = entries[this.selected];
+    this.parchment(W / 2, 300, 380, 296);
     this.text(t.modes, 'title', W / 2, 172);
 
     MODES.forEach((m, i) => {
       const y = 212 + i * 36;
-      const sel = i === this.selected;
-      const row = this.button(() => {
-        if (this.selected === i) this.confirm();
-        else this.select(i);
-      });
-      this.highlight(70, y - 4, 280, 31, sel, row);
+      const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
+      const sel = n === this.selected;
+      // An option of the mode is selected: the mode stays lit, less
+      const lit = sel ? true : cur.kind === 'option' && cur.mode === m ? 0.3 : false;
+      const row = this.button(() => this.clickEntry(n));
+      this.highlight(70, y - 4, 280, 31, lit, row);
       const icon = this.images.get(`img/design/menu/${m.icon}.gif`);
       if (icon) {
         const s = new Sprite(icon);
@@ -518,35 +585,75 @@ export class Shell {
       });
     });
 
-    const tab = this.selected >= MODES.length ? TABS[this.selected - MODES.length] : null;
-    const m = MODES[this.selected];
-    const desc = tab ? this.tabSummary(tab.screen) : t[m.mode + 'Desc'];
-    this.text(desc, 'tip', W / 2, 288, { width: 300, size: 11 });
+    const mode = cur.kind === 'tab' ? null : cur.mode;
+    const desc = cur.kind === 'tab' ? this.tabSummary(cur.tab.screen) : t[cur.mode.mode + 'Desc'];
+    this.text(desc, 'tip', W / 2, 284, { width: 300, size: 11 });
+    if (mode) this.drawOptions(mode, entries);
 
-    if (tab) this.keyButton(t[tab.screen], 458, () => this.confirm());
-    else if (m.enabled) this.keyButton(t.start, 458, () => this.confirm());
+    if (cur.kind === 'tab') this.keyButton(t[cur.tab.screen], 458, () => this.confirm());
+    else if (cur.mode.enabled) {
+      this.keyButton(t.start, 458, () => this.onStart?.(cur.mode.mode));
+    }
 
     // The site's tabs, its quest and fridge icons
     TABS.forEach((tb, i) => {
-      const n = MODES.length + i;
+      const n = entries.findIndex((e) => e.kind === 'tab' && e.tab === tb);
       const sel = n === this.selected;
       const x = W / 2 + (i === 0 ? -62 : 62);
-      const btn = this.button(() => {
-        if (this.selected === n) this.confirm();
-        else this.select(n);
-      });
+      const btn = this.button(() => this.clickEntry(n));
       const tex = this.images.get(`img/design/${tb.icon}${sel ? '_on' : ''}.png`);
       if (tex) {
         const s = new Sprite(tex);
         s.anchor.set(0.5, 0);
-        s.scale.set(0.8);
-        s.position.set(x, 330);
+        s.scale.set(0.6);
+        s.position.set(x, 384);
         btn.addChild(s);
       }
-      this.text(t[tb.screen], 'click', x, 376, {
+      this.text(t[tb.screen], 'click', x, 418, {
         size: 12,
         color: sel ? '#ffffff' : STYLE.click.color,
         parent: btn,
+      });
+    });
+  }
+
+  /**
+   * The mode's options (the site's `.mopt` box): a checkbox each, greyed while locked. The
+   * Tornade boost has no box to untick: once unlocked it applies to every game (quest 62).
+   */
+  private drawOptions(mode: ModeEntry, entries: MenuEntry[]): void {
+    const list = MODE_OPTIONS[mode.mode];
+    if (!mode.enabled || !list) return;
+    const t = this.t;
+    this.text(t.options.toUpperCase(), 'tip', W / 2, 318, { size: 9, color: STYLE.click.color });
+    [...list, Data.OPT_BOOST].forEach((oid, k) => {
+      const x = k < 3 ? 76 : 226;
+      const y = 334 + (k % 3) * 16;
+      const unlocked = this.profile.hasOption(oid);
+      const fixed = oid === Data.OPT_BOOST;
+      const ticked = fixed ? unlocked : this.profile.isChosen(oid);
+      const n = entries.findIndex((e) => e.kind === 'option' && e.oid === oid);
+      const sel = n >= 0 && n === this.selected;
+      const row = n >= 0 ? this.button(() => this.clickEntry(n)) : this.root;
+      this.highlight(x - 6, y - 2, 140, 16, sel, row);
+      const box = new Graphics().rect(x, y + 2, 9, 9).stroke({
+        color: 0xe6c592,
+        width: 1,
+        alpha: unlocked ? 1 : 0.35,
+      });
+      if (ticked) {
+        box
+          .moveTo(x + 1.5, y + 6.5)
+          .lineTo(x + 4, y + 9)
+          .lineTo(x + 8.5, y + 3)
+          .stroke({ color: sel ? 0xffffff : 0xe6c592, width: 2 });
+      }
+      row.addChild(box);
+      this.text(t[oid], 'click', x + 15, y, {
+        align: 'left',
+        size: 11,
+        color: !unlocked ? 'rgb(140,112,80)' : sel ? '#ffffff' : STYLE.click.color,
+        parent: row,
       });
     });
   }

@@ -13,6 +13,8 @@ export interface ProfileData {
   families: number[];
   /** Game options unlocked by quests (`Data.OPT_*`, and the level set choices `set_ta_N`). */
   options: string[];
+  /** Options ticked on the mode menu, sent with the next games (3.3). */
+  chosen: string[];
   /** Unlocked game modes (`$mode` values). */
   modes: string[];
   /** Extra games won by quests (`give tokens`). The port has no game cost, so they do nothing. */
@@ -44,6 +46,7 @@ export function newProfile(): ProfileData {
     quests: [],
     families: [...START_FAMILIES],
     options: [],
+    chosen: [],
     modes: [...START_MODES],
     tokens: 0,
     bank: 0,

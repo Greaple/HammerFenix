@@ -140,6 +140,13 @@ export class PlayerEntity extends PhysicsEntity {
     if (this.game.fl_nightmare) {
       this.speedFactor = 1.3;
     }
+    // The Tornade option, the game pads quest's gift
+    if (this.game._name !== '$time' && this.game.hasOption(Data.OPT_BOOST)) {
+      this.speedFactor = 1.3;
+      if (this.game.fl_nightmare) {
+        this.speedFactor = 1.6;
+      }
+    }
     this.endUpdate();
   }
 
@@ -369,8 +376,10 @@ export class PlayerEntity extends PhysicsEntity {
   override resurrect(): void {
     super.resurrect();
     this.game.logAction('$R' + this.lives);
-    const sx = this.game.flipCoordCase(this.world.current.playerX);
-    this.moveTo(BaseEntity.x_ctr(sx), BaseEntity.y_ctr(this.world.current.playerY));
+    this.moveTo(
+      BaseEntity.x_ctr(this.world.current.playerX),
+      BaseEntity.y_ctr(this.world.current.playerY),
+    );
     this.dx = 0;
     this.dy = 0;
     this.shield(null);
@@ -388,6 +397,13 @@ export class PlayerEntity extends PhysicsEntity {
 
     if (this.game.fl_nightmare) {
       this.speedFactor = 1.3;
+    }
+    // The Tornade option, the game pads quest's gift
+    if (this.game._name !== '$time' && this.game.hasOption(Data.OPT_BOOST)) {
+      this.speedFactor = 1.3;
+      if (this.game.fl_nightmare) {
+        this.speedFactor = 1.6;
+      }
     }
     this.game.onResurrect();
   }

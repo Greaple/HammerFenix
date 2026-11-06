@@ -44,10 +44,10 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 | Original                                                     | TypeScript                               | Status  | Notes                                                                                                                                                            |
 | ------------------------------------------------------------ | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). No mirror mode (3.3). IA map parsed 30 cases per frame (2.7). Editor and serialization skipped on purpose                                         |
+| `levels/SetManager.mt`, `GameMechanics.mt`                   | `levels/LevelWorld.ts`                   | done    | Audited (1.7). Mirror mode (`flip`, 3.3). IA map parsed 30 cases per frame (2.7). Editor and serialization skipped on purpose                                    |
 | `levels/ScriptEngine.mt`                                     | `levels/ScriptRunner.ts`                 | done    | Audited (1.7). `tools/scan-scripts.ts` checks every level script                                                                                                 |
 | `levels/View.mt`                                             | `levels/LevelView.ts`                    | partial | Audited (1.7). Special backgrounds hide `_bg` (same picture as the Flash 8 cache path). Snapshots via Pixi `generateTexture` (2.7). No bitmap cache, editor grid |
-| `levels/ViewManager.mt`                                      | `GameSession.ts` ("ViewManager")         | done    | Level scroll, portal side scroll and fade (2.7), with the old view as a snapshot (`fake`); no snapshot when headless. No `flipPortals` (3.3)                     |
+| `levels/ViewManager.mt`                                      | `GameSession.ts` ("ViewManager")         | done    | Level scroll, portal side scroll and fade (2.7), with the old view as a snapshot (`fake`); no snapshot when headless. `flipPortals` in mirror mode (3.3)         |
 | `levels/ViewLight.mt`                                        |                                          | skipped | Wireframe level preview used only by the `Browser` dev tool (out of scope). The darkness is `GameMode.updateDarkness`, ported in 2.7                             |
 | `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in, side scroll or fade). Map events (`EVENT_EXIT_*`) not ported                 |
 
@@ -124,7 +124,18 @@ The original client never runs quests: the hammerfest.fr server counted the item
 - Games marked illegal (`$!` in the history) still count: what the server did with them is unknown.
 - `tokens` and `bank` are kept in the profile but do nothing: the port has no game cost and no shop.
 
-**Built (3.2b to 3.2d):** the profile (items, quests, families, options, modes, tokens, bank, games) is saved in `localStorage` under `hammerfenix_profile_v1`, encoded with `PersistCodec` and its CRC; a damaged save starts a new profile. Games started from the menu send the profile's families (`GameSession.setParameters`), and only those Adventure games are recorded (`GameSession.siteMode`). The menu has the site's "Quêtes" and "Réfrigérateur" tabs (`icon_quests`, `icon_inventory`): the quest screen lists quests done and in progress with their items ("found / needed") and, once done, the description; the fridge shows the 353 items in `items.xml` order, 60 per page, with their count, family and the site's `a.gif` for an item not in it yet. The results screen adds the quests completed and the new fridge items. The options unlocked are saved but not offered yet (3.3). Tested in `tests/quests.test.ts`.
+**Built (3.2b to 3.2d):** the profile (items, quests, families, options, modes, tokens, bank, games) is saved in `localStorage` under `hammerfenix_profile_v1`, encoded with `PersistCodec` and its CRC; a damaged save starts a new profile. Games started from the menu send the profile's families (`GameSession.setParameters`), and only those Adventure games are recorded (`GameSession.siteMode`). The menu has the site's "Quêtes" and "Réfrigérateur" tabs (`icon_quests`, `icon_inventory`): the quest screen lists quests done and in progress with their items ("found / needed") and, once done, the description; the fridge shows the 353 items in `items.xml` order, 60 per page, with their count, family and the site's `a.gif` for an item not in it yet. The results screen adds the quests completed and the new fridge items. The options unlocked are offered on the mode menu (3.3, see "Game options"). Tested in `tests/quests.test.ts`.
+
+## Game options (3.3)
+
+The site sent the options ticked on its mode menu as `$options`; `GameMode`'s constructor reads them through `GameManager.CONFIG.hasOption`. The port does the same at each new game (`GameSession.initOptions`, from `config`), and the menu (`Shell.drawOptions`) sends the profile's ones (`Profile.optionsParam`). Tested in `tests/options.test.ts`.
+
+- **Ported:** mirror (`SetManager.flip` of the map and the start case, `flipPortals` after each transition; enemies, slots and scripts were already placed through `flipCoordCase`), nightmare, ninja (`GameMode.onBadsReady`: one foe, friends by depth), unstable explosives (`fl_bombExpert`), the Tornade boost (`Player.initPlayer`, `resurrect`).
+- **Fixed:** the player's start and respawn went through `flipCoordCase`, which would have flipped them twice: the original reads the start case of the flipped level as is.
+- **Menu:** Adventure lists Miroir, Cauchemar, Ninjutsu and Explosifs instables as checkboxes, the locked ones greyed (the site's CSS: `.mopt` box with an uppercase title, `ul.moptl`, `.lidis` for disabled items; the HTML was never archived). The ticks are saved in the profile (`chosen`). The names are the quests' (`xml/lang`, quests 63, 64, 72, 74); the quest texts say these four are for the Adventure mode.
+- **Tornade** has no checkbox: quest 62 says it applies "quelles que soient les options choisies", so once unlocked it is always sent (in every mode; `Player` skips it in Time Attack). It is shown ticked. "Tornado" in English and Spanish is the port's own name: only the French text names it.
+- Multiplayer options (`mirrormulti`, `nightmaremulti`, `lifesharing`, `bombcontrol`), `kickcontrol` (Soccer) and the level set choices come with their modes in Phase 4.
+- Not checked in Ruffle: the side-by-side runs `game.swf` with no site, so no `$options`.
 
 ## Item effects (`SpecialManager.execute`)
 
@@ -165,7 +176,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - Litchi's weak child spawns at the original position.
 - Kicks no longer set the bomb's `fl_stable`; a jump no longer clears the player's `fl_stable` (physics does it).
 - The attack and down keys are read (and locked) before the cooldown and down-kick checks, as `keyIsDown` does.
-- `resurrect()` keeps `speedFactor` unless in nightmare mode.
+- `resurrect()` keeps `speedFactor` unless in nightmare mode or with the Tornade boost.
 - `Bad.killHit`, `burn` and `knock` had invented `fl_kill` guards; `checkHits` re-checked `fl_kill` between the two `hit` calls.
 - `Physics.calcSteps` could not return 0 steps; the stair patch reset `fallStart`; `shockWave` clamped its ratio; `killHit(null)` drew a random `dx`.
 - `Animator`: invented blink fallback timer; `disableAnimator` now lets the clip play.
@@ -178,7 +189,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Options (task 3.3): `OPT_BOOST`, `fl_bombControl` (`WalkingBomb`), life sharing.
+- Options for the multiplayer modes (Phase 4): `fl_bombControl` (`WalkingBomb`, `MultiCoop`), life sharing, kick control (`Soccer`).
 - Player: debug keys (`getDebugControls`) are not ported.
 - Key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked).
 - `Jumper.checkClimb` skips a null or zero climb height; the original would jump with a NaN speed.
@@ -209,7 +220,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 
 ### Open
 
-- Not ported yet: the map and its events, ninja mode (`onBadsReady`, 3.3), wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
+- Not ported yet: the map and its events, wind timer, aqua screen wobble. X/Y flips are ported (items 30, 31).
 - Game over and end of set (2.11): the Loader hands a `GameResult` to `GameSession.onGameResult` once its fade is over, where the original waited for the server or left the page. A placeholder ("GAME OVER" or "THE END", restart on a key) then shows until the results screen (3.1c).
 - `Adventure.saveScore` skips the set checksum and the fatal error for sets other than the adventure: the port's set picker plays every set in this mode.
 - `F=` in the history is the port's version (`package.json`); the original sent the site's `$version` parameter. The two `GameManager` constructor entries (`$B` build time, `$using sysfam`) are not logged; they are dropped at the game over anyway.
@@ -241,5 +252,4 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 ### Open
 
 - When a trigger repeats after its nested trigger moved out, Ruffle still follows the old sibling link and adds the nested trigger again; the port adds it once. Only deepnight 184 has this.
-- Mirror mode (`SetManager.flip`, `flipPortals`) is not ported (3.3).
 - Data notes from the scan (the original ignores them too): three `$t_timer` with `repeat` instead of `$repeat` (adventure 100), `$s` instead of `$si` (adventure 102), sprites missing from every original SWF (`$jail_large`, `$mcMarioBlock`, `$doorSideRight`, not in the Adventure set).

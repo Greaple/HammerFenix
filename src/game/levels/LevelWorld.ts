@@ -92,13 +92,13 @@ function cloneLevel(src: LevelData): LevelData {
  * the views are built from. The level script engine and the view are kept on `GameSession`
  * (`scriptRunner`, `view`); `GameSession.updateWorld()` is `GameMechanics.update`.
  *
- * Not ported: the mirror mode (`flip`, `flipPortals`, option, task 3.3) and the editor functions
- * (`overwrite`, `rollback`, `insert`, `delete`, cookies).
+ * Not ported: the editor functions (`overwrite`, `rollback`, `insert`, `delete`, cookies).
  */
 export class LevelWorld {
   set: LevelSet;
   currentId = 0;
   current!: LevelData;
+  /** Mirror option: levels are read flipped (`flip`). Set by `GameSession` before a game. */
   fl_mirror = false;
   fl_mainWorld = true;
   darknessFactor = 0;
@@ -218,10 +218,47 @@ export class LevelWorld {
 
   /** Reads a level: `SetManager.unserialize` (walls converted) + `GameMechanics.parseWalls`. */
   private unserialize(id: number): LevelData {
-    const l = cloneLevel(this.set.levels[id]);
+    let l = cloneLevel(this.set.levels[id]);
+    if (this.fl_mirror) {
+      l = LevelWorld.flip(l);
+    }
     this.convertWalls(l);
     this.parseWalls(l);
     return l;
+  }
+
+  /**
+   * `SetManager.flip`: the level mirrored for good. Only the map and the player's start move;
+   * enemies, item slots and scripts keep their data and are flipped when placed
+   * (`GameSession.flipCoordCase`), as the original's own flip of them is commented out.
+   */
+  private static flip(l: LevelData): LevelData {
+    return {
+      ...l,
+      playerX: Data.LEVEL_WIDTH - l.playerX - 1,
+      map: Array.from({ length: Data.LEVEL_WIDTH }, (_, x) =>
+        Array.from({ length: Data.LEVEL_HEIGHT }, (_, y) => l.map[Data.LEVEL_WIDTH - x - 1][y]),
+      ),
+    };
+  }
+
+  /**
+   * `SetManager.flipPortals`: in each row, the portals in reverse order, so a portal keeps its
+   * id (its link in `portalLinks`) once the level is mirrored.
+   */
+  flipPortals(): void {
+    const ylist: PortalData[][] = [];
+    for (const p of this.portalList) {
+      (ylist[p.cy] ??= []).push(p);
+    }
+    const list: PortalData[] = [];
+    for (let y = 0; y < ylist.length; y++) {
+      const row = ylist[y];
+      if (row !== undefined) {
+        for (let i = row.length - 1; i >= 0; i--) list.push(row[i]);
+      }
+    }
+    this.portalList = list;
   }
 
   private convertWalls(l: LevelData): void {

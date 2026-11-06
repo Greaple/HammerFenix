@@ -137,11 +137,16 @@ export class GameSession implements IGameContext {
   fl_aqua = false;
   fl_wind = false;
   windSpeed = 0;
+  /** Game options (`GameMode` constructor): set from `config` at each new game. */
   fl_mirror = false;
   fl_nightmare = false;
   fl_ninja = false;
   fl_bombExpert = false;
+  /** Only `MultiCoop` turns it on (`OPT_BOMB_CONTROL`, Phase 4). */
+  fl_bombControl = false;
   fl_warpStart = false;
+  /** `GameMode._name`: the mode's name, which `Player` checks against `$time`. */
+  readonly _name = '$adventure';
 
   forcedDarkness: number | null = null;
   fakeLevelId: number | null = null;
@@ -360,6 +365,7 @@ export class GameSession implements IGameContext {
     this.clearLevel();
     this.fxMan.clear(); // a new GameMode starts with no effects
 
+    this.initOptions();
     this.resetGameState();
     this.backToMainWorld(); // a new GameMode starts in dimensions[0]
     this.fakeLevelId = null;
@@ -394,10 +400,9 @@ export class GameSession implements IGameContext {
     this.world.fl_entered = true;
     this.onWorldRead();
     // insertPlayer: attached hidden; onLevelReady shows it
-    const sx = this.flipCoordCase(this.world.current.playerX);
     this.player = PlayerEntity.attach(
       this,
-      BaseEntity.x_ctr(sx),
+      BaseEntity.x_ctr(this.world.current.playerX),
       BaseEntity.y_ctr(this.world.current.playerY),
     );
     this.player.hide();
@@ -455,6 +460,24 @@ export class GameSession implements IGameContext {
 
   hasFamily(id: number): boolean {
     return this.config.hasFamily(id);
+  }
+
+  /** `GameManager.CONFIG.hasOption` */
+  hasOption(oid: string): boolean {
+    return this.config.hasOption(oid);
+  }
+
+  /**
+   * `GameMode` constructor: the options of the new game, and `addWorld`, which gives each
+   * dimension the mirror flag (its levels are read flipped, `SetManager.flip`).
+   */
+  private initOptions(): void {
+    this.fl_mirror = this.config.hasOption(Data.OPT_MIRROR);
+    this.fl_nightmare = this.config.hasOption(Data.OPT_NIGHTMARE);
+    this.fl_ninja = this.config.hasOption(Data.OPT_NINJA);
+    this.fl_bombExpert = this.config.hasOption(Data.OPT_BOMB_EXPERT);
+    this.fl_bombControl = false;
+    for (const w of this.dimensions) w.fl_mirror = this.fl_mirror;
   }
 
   /** The `$families` and `$options` of the next games, as the site sent them. */
@@ -569,10 +592,13 @@ export class GameSession implements IGameContext {
     this.view.detach();
   }
 
-  /** `ViewManager.onTransitionDone`. The mirror mode's `flipPortals` is task 3.3. */
+  /** `ViewManager.onTransitionDone` */
   private onTransitionDone(): void {
     this.view.moveTo(0, 0);
     this.removeFake();
+    if (this.world.fl_mirror) {
+      this.world.flipPortals();
+    }
   }
 
   /** `ViewManager.onScrollDone` */
@@ -2056,8 +2082,39 @@ export class GameSession implements IGameContext {
     }
   }
 
-  /** `GameMode.onBadsReady`: ninja mode picks a foe and its friends (option, task 3.3). */
-  private onBadsReady(): void {}
+  /**
+   * `GameMode.onBadsReady`: in ninja mode, one enemy is the foe (killing it first clears the
+   * level) and some others are friends (killing one kills the player), more of them deeper in.
+   */
+  private onBadsReady(): void {
+    if (this.fl_ninja && this.getList(Data.BAD_CLEAR).length > 1) {
+      const foe = this.getOne(Data.BAD_CLEAR) as BadEntity;
+      foe.fl_ninFoe = true;
+
+      let friendsLimit: number;
+      if (
+        this.fl_nightmare ||
+        !this.world.fl_mainWorld ||
+        (this.world.fl_mainWorld && this.world.currentId >= 20)
+      ) {
+        const lid = this.dimensions[0].currentId;
+        friendsLimit = Math.floor(Math.max(2, Math.floor((lid - 20) / 10)));
+      } else {
+        friendsLimit = 1;
+      }
+      if (this.fl_nightmare) {
+        friendsLimit++;
+      }
+      friendsLimit = Math.round(Math.min(this.getList(Data.BAD_CLEAR).length - 1, friendsLimit));
+      while (friendsLimit > 0) {
+        const b = this.getAnotherOne(Data.BAD_CLEAR, foe) as BadEntity;
+        if (!b.fl_ninFriend) {
+          b.fl_ninFriend = true;
+          friendsLimit--;
+        }
+      }
+    }
+  }
 
   stepAnimation(): void {
     // `Loader.mainGame` runs once per Flash frame (40 Hz)

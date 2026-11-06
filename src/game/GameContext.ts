@@ -54,6 +54,9 @@ export interface IGameContext {
   fl_nightmare: boolean;
   fl_ninja: boolean;
   fl_bombExpert: boolean;
+  fl_bombControl: boolean;
+  /** `GameMode._name`, e.g. `$adventure`, `$time`. */
+  readonly _name: string;
   forcedDarkness: number | null;
   fakeLevelId: number | null;
   huTimer: number;
@@ -71,6 +74,8 @@ export interface IGameContext {
 
   /** `GameManager.CONFIG.hasFamily`: whether the player has unlocked this item family. */
   hasFamily(id: number): boolean;
+  /** `GameManager.CONFIG.hasOption`: whether the game option (`Data.OPT_*`) is on. */
+  hasOption(oid: string): boolean;
   getUniqId(): number;
   addToList(type: number, e: BaseEntity): void;
   removeFromList(type: number, e: BaseEntity): void;
