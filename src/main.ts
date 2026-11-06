@@ -1,5 +1,6 @@
 import { Application } from 'pixi.js';
 import { AudioEngine } from './engine/Audio';
+import { loadGameFonts } from './engine/Fonts';
 import { InputController, type ControlAction } from './engine/Input';
 import { SwfLibrary } from './engine/swf/SwfLibrary';
 import { GameDataStore } from './game/Data';
@@ -100,6 +101,7 @@ async function main(): Promise<void> {
   const [dataStore, lib] = await Promise.all([
     GameDataStore.load(baseUrl, pickLang(GameSession.savedLang(), navigator.languages ?? [])),
     SwfLibrary.load(baseUrl),
+    loadGameFonts(baseUrl),
   ]);
 
   // 3. Initialize Audio & Input engines

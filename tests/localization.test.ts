@@ -8,7 +8,7 @@ import type { SwfLibraryData } from '../src/engine/swf/types';
 import { Data } from '../src/game/Data';
 import { createHeadlessSession, runReplay } from './helpers/headless';
 import { pickLang } from '../src/ui/Language';
-import { headerFile } from '../src/ui/Shell';
+import { SHELL_TEXT_KEYS, TITLE_FILE } from '../src/ui/Shell';
 
 const PUBLIC = join(__dirname, '../public');
 const lib = JSON.parse(readFileSync(join(PUBLIC, 'gfx/library.json'), 'utf-8')) as SwfLibraryData;
@@ -108,9 +108,15 @@ describe('localization (3.4)', () => {
     expect(pickLang(undefined, ['de', 'it'])).toBe('en');
   });
 
-  it("has each language's logo banner", () => {
-    for (const l of ['fr', 'en', 'es'] as const) {
-      expect(() => readFileSync(join(PUBLIC, 'site', headerFile(l)))).not.toThrow();
+  it('has the title logo and every menu text in each language', () => {
+    expect(() => readFileSync(join(PUBLIC, TITLE_FILE))).not.toThrow();
+    const fr = [...SHELL_TEXT_KEYS.fr].sort();
+    for (const l of ['en', 'es'] as const) expect([...SHELL_TEXT_KEYS[l]].sort()).toEqual(fr);
+  });
+
+  it('has the game fonts extracted from the SWF', () => {
+    for (const f of ['franklin-gothic-heavy.otf', 'satans.otf', 'impact.otf']) {
+      expect(readFileSync(join(PUBLIC, 'fonts', f)).length).toBeGreaterThan(10000);
     }
   });
 });

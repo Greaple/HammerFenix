@@ -1,25 +1,36 @@
 /**
  * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d): the mode menu, the
  * results page after a game, the quests and the fridge. They are drawn inside the game frame
- * with the game's own graphics: a level background (`hammer_bg`), the parchment and keys of the
- * pause screen (`hammer_interf_instructions`), the item clips, and the site's logo banner, mode
- * icons and tab icons (`public/site/`, copied by `tools/build-site.ts`). Texts use the game's
- * fonts and colors.
+ * with the game's own graphics: the village scene (`menu`, vector), the game's title logo
+ * (`assets-src/original/images/mainTitle.png`, the only raster), item clips as icons, the
+ * pause screen's space key, and the game's fonts (Satans titles, Franklin Gothic Heavy labels,
+ * extracted from `_gfx.swf` by `tools/build-fonts.ts`). Panels are drawn as vectors in the
+ * parchment and wood colors, so they stay sharp at any size (UI batch U.2).
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
- * the quest and fridge pages show the profile (3.2b) as the site's pages did: quests done and
- * in progress with their items, and the items found with their count. The selected mode's
- * options are checkboxes under its text, the locked ones greyed, as the site's `.mopt` box
- * and `.lidis` rule drew them (3.3).
+ * the quest and fridge pages show the profile (3.2b): quests done, in progress and still to
+ * discover, and the item collection with its "found N times" rule. The selected mode's options
+ * are checkboxes under its text, the locked ones with the quest that unlocks them (3.3).
  */
-import { Container, Graphics, Rectangle, Sprite, Text, TextStyle, Texture } from 'pixi.js';
+import {
+  BlurFilter,
+  ColorMatrixFilter,
+  Container,
+  type FederatedWheelEvent,
+  Graphics,
+  Rectangle,
+  Sprite,
+  Text,
+  TextStyle,
+  Texture,
+} from 'pixi.js';
 import type { InputController } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
 import type { GameResult } from '../game/Loader';
 import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
-import { LANGS, type Lang } from './Language';
+import type { Lang } from './Language';
 
 /** The game's lang texts the screens reuse. */
 export interface ShellTexts {
@@ -35,41 +46,41 @@ export interface ShellTexts {
   getQuestDesc(id: number): string;
 }
 
-/**
- * The site's logo banner in language `l`: "Les Cavernes de Hammerfest" on hammerfest.fr, "The
- * Caverns of Hammerfest" on hfest.net, "Las Cavernas de Hammerfest" on hammerfest.es.
- */
-export function headerFile(l: Lang): string {
-  return `img/design/headers/${l}/header.jpg`;
-}
+/** The game's title logo (420 x 180, transparent), the one image not in the SWFs. */
+export const TITLE_FILE = 'images/mainTitle.png';
+
 type Screen = 'menu' | 'result' | 'quests' | 'fridge';
 
+/** An item clip used as an icon: special items below 1000, score items from 1000. */
+type Icon = { item: number } | { clip: string };
+
 interface ModeEntry {
-  /** The site's menu icon (`menu/<icon>.gif`) and `$mode`. */
-  icon: string;
+  /** The site's `$mode`. */
   mode: string;
+  icon: Icon;
   /** Ported in the game; the others are listed but cannot start. */
   enabled: boolean;
 }
 
 /** The modes a new player has: Adventure and the free Learning mode (site guide, section 3). */
 const MODES: ModeEntry[] = [
-  { icon: 'iadv', mode: 'solo', enabled: true },
-  { icon: 'itutorial', mode: 'tutorial', enabled: false },
+  { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
+  // Item 107, "Livre des étoiles"
+  { mode: 'tutorial', icon: { item: 107 }, enabled: false },
 ];
 
 interface TabEntry {
   screen: 'quests' | 'fridge';
-  icon: string;
+  icon: Icon;
 }
 
-/** The site's tabs under the mode menu: its "Quêtes" and "Réfrigérateur" icons. */
+/** The quest and fridge pages: item 20 (a treasure chest) and item 1018 (strawberry ice). */
 const TABS: TabEntry[] = [
-  { screen: 'quests', icon: 'icon_quests' },
-  { screen: 'fridge', icon: 'icon_inventory' },
+  { screen: 'quests', icon: { item: 20 } },
+  { screen: 'fridge', icon: { item: 1018 } },
 ];
 
-/** What the menu's arrows move through: the modes, each with its unlocked options, the tabs. */
+/** What the menu's arrows move through: the modes, each with its options, the tabs. */
 type MenuEntry =
   | { kind: 'mode'; mode: ModeEntry }
   | { kind: 'option'; mode: ModeEntry; oid: string }
@@ -77,10 +88,10 @@ type MenuEntry =
 
 /**
  * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
- * (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), "N objets sur 353" and
- * "Aucune ! Il va falloir jouer plus !" the public profile's, the option names those of the
- * quests that unlock them (`xml/lang`, quests 62 to 74; "Tornado" is the port's own, as only
- * the French text names it); the others are the port's own.
+ * (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), the fridge rule its section 4,
+ * the quest rule its section 6, the option names those of the quests that unlock them
+ * (`xml/lang`, quests 62 to 74; "Tornado" is the port's own, as only the French text names it);
+ * the others are the port's own.
  */
 const TEXT: Record<Lang, Record<string, string>> = {
   fr: {
@@ -99,18 +110,36 @@ const TEXT: Record<Lang, Record<string, string>> = {
     none: 'Aucun objet trouvé',
     quests: 'Quêtes',
     fridge: 'Réfrigérateur',
-    questsDesc: '{0} quêtes terminées sur {1}, {2} en cours.',
-    fridgeDesc: '{0} objets sur {1}',
-    noQuest: 'Aucune ! Il va falloir jouer plus !',
-    done: 'terminée',
+    done: 'Terminée',
+    progress: 'En cours',
+    todo: 'À découvrir',
+    questRule:
+      'Une quête demande une série d’objets. Ils s’additionnent d’une partie d’Aventure à l’autre ; la quête est validée à la fin de la partie où vous les avez tous.',
+    noQuest:
+      'Aucune quête commencée. Ramassez des objets en mode Aventure : chacun peut lancer une quête !',
+    moreQuests: '{0} quêtes à découvrir : trouvez un de leurs objets pour les commencer.',
+    needed: 'Objets à réunir',
+    reward: 'Récompense',
+    rewardHidden:
+      'Révélée à la fin de la partie où vous aurez réuni tous ces objets. Ils s’additionnent d’une partie d’Aventure à l’autre.',
     questDone: 'Quête terminée : {0}',
-    moreQuests: 'et {0} autres quêtes terminées',
+    moreDone: 'et {0} autres quêtes terminées',
     newFridge: '{0} nouveaux objets dans le réfrigérateur',
     newFridge1: 'Un nouvel objet dans le réfrigérateur',
+    fridgeCount: '{0} objets sur {1}',
+    fridgeRule:
+      'Un objet entre au réfrigérateur quand vous l’avez trouvé assez de fois en Aventure : 10 fois pour la plupart.',
     unknown: 'Objet inconnu',
-    found: 'Trouvé {0} fois',
+    inFridge: 'Au réfrigérateur, trouvé {0} fois',
+    partial: 'Trouvé {0} fois sur {1} : encore {2} pour le réfrigérateur',
+    never: 'Pas encore trouvé',
     back: 'Retour',
+    continue: 'Continuer',
     options: 'Options',
+    lockedBy: 'Se débloque avec la quête « {0} »',
+    optionOn: 'Active pour vos prochaines parties',
+    optionOff: 'Cochez-la pour l’activer',
+    alwaysOn: 'Toujours active une fois débloquée',
     mirror: 'Miroir',
     nightmare: 'Cauchemar',
     ninja: 'Ninjutsu',
@@ -132,18 +161,36 @@ const TEXT: Record<Lang, Record<string, string>> = {
     none: 'No item found',
     quests: 'Quests',
     fridge: 'Fridge',
-    questsDesc: '{0} quests done out of {1}, {2} in progress.',
-    fridgeDesc: '{0} items out of {1}',
-    noQuest: 'None! You will have to play more!',
-    done: 'done',
+    done: 'Done',
+    progress: 'In progress',
+    todo: 'To discover',
+    questRule:
+      'A quest asks for a series of items. They add up from one Adventure game to the next; the quest is done at the end of the game where you have them all.',
+    noQuest:
+      'No quest started yet. Pick up items in Adventure mode: any of them can start a quest!',
+    moreQuests: '{0} quests to discover: find one of their items to start them.',
+    needed: 'Items needed',
+    reward: 'Reward',
+    rewardHidden:
+      'Revealed at the end of the game where you have all these items. They add up from one Adventure game to the next.',
     questDone: 'Quest done: {0}',
-    moreQuests: 'and {0} more quests done',
+    moreDone: 'and {0} more quests done',
     newFridge: '{0} new items in the fridge',
     newFridge1: 'One new item in the fridge',
+    fridgeCount: '{0} items out of {1}',
+    fridgeRule:
+      'An item goes into the fridge once you have found it enough times in Adventure: 10 times for most of them.',
     unknown: 'Unknown item',
-    found: 'Found {0} times',
+    inFridge: 'In the fridge, found {0} times',
+    partial: 'Found {0} times out of {1}: {2} more for the fridge',
+    never: 'Not found yet',
     back: 'Back',
+    continue: 'Continue',
     options: 'Options',
+    lockedBy: 'Unlocked by the quest “{0}”',
+    optionOn: 'On for your next games',
+    optionOff: 'Tick it to turn it on',
+    alwaysOn: 'Always on once unlocked',
     mirror: 'Mirror',
     nightmare: 'Nightmare',
     ninja: 'Ninjutsu',
@@ -166,18 +213,36 @@ const TEXT: Record<Lang, Record<string, string>> = {
     none: 'Ningún objeto',
     quests: 'Exploraciones',
     fridge: 'Frigorífico',
-    questsDesc: '{0} exploraciones terminadas de {1}, {2} en curso.',
-    fridgeDesc: '{0} objetos de {1}',
-    noQuest: '¡Ninguna! ¡Tendrás que jugar más!',
-    done: 'terminada',
+    done: 'Terminada',
+    progress: 'En curso',
+    todo: 'Por descubrir',
+    questRule:
+      'Una exploración pide una serie de objetos. Se suman de una partida de Aventura a otra; la exploración se valida al final de la partida en la que los tienes todos.',
+    noQuest:
+      'Ninguna exploración empezada. Recoge objetos en modo Aventura: ¡cualquiera puede empezar una!',
+    moreQuests: '{0} exploraciones por descubrir: encuentra uno de sus objetos para empezarlas.',
+    needed: 'Objetos necesarios',
+    reward: 'Recompensa',
+    rewardHidden:
+      'Se revela al final de la partida en la que reúnas todos estos objetos. Se suman de una partida de Aventura a otra.',
     questDone: 'Exploración terminada: {0}',
-    moreQuests: 'y {0} exploraciones más',
+    moreDone: 'y {0} exploraciones más',
     newFridge: '{0} objetos nuevos en el frigorífico',
     newFridge1: 'Un objeto nuevo en el frigorífico',
+    fridgeCount: '{0} objetos de {1}',
+    fridgeRule:
+      'Un objeto entra en el frigorífico cuando lo has encontrado bastantes veces en Aventura: 10 veces para la mayoría.',
     unknown: 'Objeto desconocido',
-    found: 'Encontrado {0} veces',
+    inFridge: 'En el frigorífico, encontrado {0} veces',
+    partial: 'Encontrado {0} veces de {1}: faltan {2} para el frigorífico',
+    never: 'Aún no encontrado',
     back: 'Volver',
+    continue: 'Continuar',
     options: 'Opciones',
+    lockedBy: 'Se desbloquea con la exploración «{0}»',
+    optionOn: 'Activa para tus próximas partidas',
+    optionOff: 'Márcala para activarla',
+    alwaysOn: 'Siempre activa una vez desbloqueada',
     mirror: 'Espejo',
     nightmare: 'Pesadilla',
     ninja: 'Ninjutsu',
@@ -186,31 +251,43 @@ const TEXT: Record<Lang, Record<string, string>> = {
   },
 };
 
-const W = 420;
-const H = 520;
-/** The parchment bitmap of `hammer_interf_instructions` (300 x 250 px, in shape 376). */
-const PARCHMENT_BITMAP = 22;
-/** The wide key of the same clip (the space bar). */
-const KEY_ID = 389;
-/** `hammer_bg` frame behind the screens: the stone wall of the first caverns. */
-const BG_FRAME = 3;
-/** The site's color of a completed quest (`.statusCompleted`). */
-const GREEN = '#51cc15';
-
-/** Colors and fonts of `hammer_interf_instructions` (`title`, `move`, `tip`, `click`). */
-const STYLE = {
-  title: { font: 'Satans', size: 24, color: 'rgb(95,69,44)' },
-  label: { font: 'Franklin Gothic Heavy', size: 18, color: 'rgb(230,197,146)' },
-  tip: { font: 'Verdana', size: 10, color: 'rgb(230,190,134)' },
-  click: { font: 'Franklin Gothic Heavy', size: 13, color: 'rgb(208,174,113)' },
-  sector: { font: 'Franklin Gothic Heavy', size: 15, color: 'rgb(255,255,255)' },
-  key: { font: 'Franklin Gothic Heavy', size: 14, color: 'rgb(102,102,102)' },
+/** Every text key, for the test that each language has them all. */
+export const SHELL_TEXT_KEYS: Record<Lang, string[]> = {
+  fr: Object.keys(TEXT.fr),
+  en: Object.keys(TEXT.en),
+  es: Object.keys(TEXT.es),
 };
 
-type TextKind = keyof typeof STYLE;
+const W = 420;
+const H = 520;
+/** The wide key of `hammer_interf_instructions` (the space bar). */
+const KEY_ID = 389;
+
+/** Parchment and wood, as the page's help dialog (`src/style.css`). */
+const C = {
+  parchment: 0xf3e2bd,
+  parchmentDark: 0xe6cf9f,
+  wood: 0x5f452c,
+  woodDark: 0x3f2c1b,
+  ink: '#4a3520',
+  inkSoft: '#7a5f44',
+  gold: '#fff3c4',
+  done: '#3f8f1a',
+  progress: '#b8730f',
+  todo: '#9a8670',
+};
+
+/** Fonts of the game (`hammer_interf_instructions`: Satans titles, Franklin Gothic labels). */
+const FONT = {
+  title: 'Satans, "Franklin Gothic Heavy", "Arial Black", sans-serif',
+  label: '"Franklin Gothic Heavy", "Arial Black", Impact, sans-serif',
+  body: 'Verdana, Geneva, "DejaVu Sans", sans-serif',
+};
+
+type TextKind = keyof typeof FONT;
 
 /** Quest rows shown at once. */
-const QUEST_ROWS = 8;
+const QUEST_ROWS = 7;
 /** Fridge grid. */
 const FRIDGE_COLS = 10;
 const FRIDGE_ROWS = 6;
@@ -223,7 +300,8 @@ export class Shell {
   private readonly input: InputController;
   private readonly texts: ShellTexts;
   private readonly profile: Profile;
-  private readonly images = new Map<string, Texture>();
+  private title: Texture | null = null;
+  private readonly grey = new ColorMatrixFilter();
   private screen: Screen | null = null;
   private result: GameResult | null = null;
   private record: GameRecord | null = null;
@@ -241,26 +319,23 @@ export class Shell {
     this.input = input;
     this.texts = texts;
     this.profile = profile;
+    this.grey.desaturate();
     this.root.visible = false;
     this.root.eventMode = 'static';
+    this.root.hitArea = new Rectangle(0, 0, W, H);
+    this.root.on('wheel', (e: FederatedWheelEvent) => this.onWheel(e.deltaY));
   }
 
-  /** Loads the site images the screens use. */
+  /** Loads the title logo. */
   async load(baseUrl: string): Promise<void> {
-    const files = [
-      ...LANGS.map(headerFile),
-      'img/items/small/a.gif',
-      ...MODES.map((m) => `img/design/menu/${m.icon}.gif`),
-      ...TABS.flatMap((t) => [`img/design/${t.icon}.png`, `img/design/${t.icon}_on.png`]),
-    ];
-    await Promise.all(
-      files.map(async (f) => {
-        const img = new Image();
-        img.src = `${baseUrl}site/${f}`;
-        await img.decode();
-        this.images.set(f, Texture.from(img));
-      }),
-    );
+    try {
+      const img = new Image();
+      img.src = `${baseUrl}${TITLE_FILE}`;
+      await img.decode();
+      this.title = Texture.from(img);
+    } catch {
+      // no logo: the screens show the game's name in text
+    }
   }
 
   get visible(): boolean {
@@ -357,17 +432,34 @@ export class Shell {
     }
   }
 
+  private onWheel(dy: number): void {
+    if (dy === 0) return;
+    const d = Math.sign(dy);
+    if (this.screen === 'quests') this.selectQuest(this.questSel + d);
+    else if (this.screen === 'fridge') {
+      const page = Math.floor(this.fridgeSel / FRIDGE_PAGE) + d;
+      if (page >= 0 && page * FRIDGE_PAGE < this.profile.quests.itemIds.length) {
+        this.selectItem(page * FRIDGE_PAGE);
+      }
+    }
+  }
+
+  /** The modes, the options of each enabled mode (locked ones too, for their hint), the tabs. */
   private menuEntries(): MenuEntry[] {
     const out: MenuEntry[] = [];
     for (const mode of MODES) {
       out.push({ kind: 'mode', mode });
       if (!mode.enabled) continue;
-      for (const oid of MODE_OPTIONS[mode.mode] ?? []) {
-        if (this.profile.hasOption(oid)) out.push({ kind: 'option', mode, oid });
-      }
+      for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
     }
     for (const tab of TABS) out.push({ kind: 'tab', tab });
     return out;
+  }
+
+  /** The mode's options on the menu; the Tornade boost, which applies to every game, last. */
+  private modeOptions(mode: ModeEntry): string[] {
+    const list = MODE_OPTIONS[mode.mode];
+    return list ? [...list, Data.OPT_BOOST] : [];
   }
 
   private select(i: number): void {
@@ -384,6 +476,7 @@ export class Shell {
       if (e.tab.screen === 'quests') this.showQuests();
       else this.showFridge();
     } else if (e.kind === 'option') {
+      if (e.oid === Data.OPT_BOOST) return; // no box to untick (quest 62)
       this.profile.toggleOption(e.oid);
       this.render();
     } else if (e.mode.enabled) {
@@ -391,10 +484,19 @@ export class Shell {
     }
   }
 
-  /** Selects menu entry `i`, or confirms it when it is already selected (a click). */
+  /**
+   * A click on menu entry `i`: tabs open and options tick at once; a mode is selected, and
+   * started when it already was.
+   */
   private clickEntry(i: number): void {
-    if (this.selected === i) this.confirm();
-    else this.select(i);
+    const e = this.menuEntries()[i];
+    if (e.kind === 'mode' && this.selected !== i) {
+      this.select(i);
+      return;
+    }
+    this.selected = i;
+    this.confirm();
+    if (this.screen === 'menu') this.render();
   }
 
   private selectQuest(i: number): void {
@@ -430,42 +532,52 @@ export class Shell {
     this.clear();
     this.root.visible = true;
     this.root.parent?.addChild(this.root); // above the Loader's clip
-    this.drawBackground();
+    this.drawBackground(this.screen === 'quests' || this.screen === 'fridge');
     if (this.screen === 'menu') this.drawMenu();
     else if (this.screen === 'quests') this.drawQuests();
     else if (this.screen === 'fridge') this.drawFridge();
     else if (this.result) this.drawResult(this.result);
   }
 
-  private drawBackground(): void {
-    const bg = this.lib.attach('hammer_bg');
-    bg.gotoAndStop(String(BG_FRAME));
-    // Levels show it at 400 x 500 under the interface; the screens fill the whole frame
+  // ------------------------------------------------------------ drawing kit
+
+  /** The village of the first level (`menu`, vector), dimmed under the full-page panels. */
+  private drawBackground(dim: boolean): void {
+    const bg = this.lib.attach('menu');
     const b = bg.getLocalBounds();
-    bg.scale.set(W / b.width, H / b.height);
-    bg.position.set(-b.x * bg.scale.x, -b.y * bg.scale.y);
+    const s = Math.max(W / b.width, H / b.height);
+    bg.scale.set(s);
+    bg.position.set((W - b.width * s) / 2 - b.x * s, (H - b.height * s) / 2 - b.y * s);
     this.root.addChild(bg);
-    // The banner: the site's logo with Tuberculoz, without its purple bar (from row 180)
-    const tex = this.images.get(headerFile(this.lang));
-    if (tex) {
-      const banner = new Sprite(
-        new Texture({ source: tex.source, frame: new Rectangle(0, 0, 762, 180) }),
-      );
-      banner.scale.set(W / 762);
-      banner.y = 4;
-      this.root.addChild(banner);
-    }
+    if (dim)
+      this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.35 }));
   }
 
-  /** The parchment of the pause screen, scaled to `w` x `h` and centered on (`x`, `y`). */
-  private parchment(x: number, y: number, w: number, h: number): void {
-    const tex = this.lib.bitmapTexture(PARCHMENT_BITMAP);
-    if (!tex) return;
-    const p = new Sprite(tex);
-    p.anchor.set(0.5);
-    p.scale.set(w / tex.width, h / tex.height);
-    p.position.set(x, y);
-    this.root.addChild(p);
+  /** The game's title logo, `w` px wide, its top at `y`. */
+  private drawTitle(y: number, w: number): void {
+    if (!this.title) {
+      this.text('Hammerfest', 'title', W / 2, y + 20, { size: 34, color: C.gold, shadow: true });
+      return;
+    }
+    const s = new Sprite(this.title);
+    s.scale.set(w / this.title.width);
+    s.anchor.set(0.5, 0);
+    s.position.set(W / 2, y);
+    // A soft shade, so the thin "Les Cavernes de" reads over the village
+    const shade = new Graphics()
+      .ellipse(W / 2, y + s.height * 0.52, w * 0.5, s.height * 0.36)
+      .fill({ color: 0x0b1530, alpha: 0.45 });
+    shade.filters = [new BlurFilter({ strength: 18, quality: 3 })];
+    this.root.addChild(shade, s);
+  }
+
+  /** A parchment panel in a wood frame. */
+  private panel(x: number, y: number, w: number, h: number): void {
+    const g = new Graphics();
+    g.roundRect(x + 2, y + 5, w, h, 14).fill({ color: 0x0b1530, alpha: 0.35 });
+    g.roundRect(x, y, w, h, 14).fill(C.parchment).stroke({ color: C.wood, width: 3 });
+    g.roundRect(x + 5, y + 5, w - 10, h - 10, 10).stroke({ color: C.wood, width: 1, alpha: 0.25 });
+    this.root.addChild(g);
   }
 
   private text(
@@ -478,25 +590,27 @@ export class Shell {
       align?: 'left' | 'center' | 'right';
       size?: number;
       color?: string;
+      shadow?: boolean;
+      italic?: boolean;
       parent?: Container;
     } = {},
   ): Text {
-    const st = STYLE[kind];
     const align = opts.align ?? 'center';
+    const size = opts.size ?? (kind === 'title' ? 24 : kind === 'label' ? 15 : 11);
     const t = new Text({
       text: s,
       style: new TextStyle({
-        fontFamily: `${st.font}, "Arial Black", Impact, system-ui, sans-serif`,
-        fontSize: opts.size ?? st.size,
-        fontWeight: kind === 'tip' ? 'normal' : 'bold',
-        fill: opts.color ?? st.color,
+        fontFamily: FONT[kind],
+        fontSize: size,
+        fontStyle: opts.italic ? 'italic' : 'normal',
+        fill: opts.color ?? C.ink,
         align,
+        lineHeight: kind === 'body' ? Math.round(size * 1.35) : undefined,
         wordWrap: opts.width !== undefined,
         wordWrapWidth: opts.width ?? 0,
-        dropShadow:
-          kind === 'title' || kind === 'key'
-            ? undefined
-            : { color: '#000000', alpha: 0.65, blur: 1, distance: 1 },
+        dropShadow: opts.shadow
+          ? { color: '#0b1530', alpha: 0.8, blur: 2, distance: 1.5, angle: Math.PI / 2 }
+          : undefined,
       }),
     });
     t.anchor.set(align === 'center' ? 0.5 : align === 'right' ? 1 : 0, 0);
@@ -505,63 +619,115 @@ export class Shell {
     return t;
   }
 
-  /** A clickable area holding its children. */
-  private button(action: () => void): Container {
+  /**
+   * A clickable area (`x`, `y`, `w`, `h`) holding its children: wood when selected, a light
+   * wash under the pointer.
+   */
+  private button(
+    rect: [number, number, number, number],
+    action: () => void,
+    selected = false,
+    radius = 8,
+  ): Container {
+    const [x, y, w, h] = rect;
     const c = new Container();
     c.eventMode = 'static';
     c.cursor = 'pointer';
+    c.hitArea = new Rectangle(x, y, w, h);
+    const bg = new Graphics().roundRect(x, y, w, h, radius);
+    if (selected) bg.fill({ color: C.wood, alpha: 0.92 });
+    else bg.fill({ color: C.wood, alpha: 0.12 });
+    bg.alpha = selected ? 1 : 0;
+    c.addChild(bg);
+    if (!selected) {
+      c.on('pointerover', () => (bg.alpha = 1));
+      c.on('pointerout', () => (bg.alpha = 0));
+    }
     c.on('pointertap', action);
     this.root.addChild(c);
     return c;
   }
 
   /** The space bar key of the pause screen, with `label` beside it; clicking runs `action`. */
-  private keyButton(label: string, y: number, action: () => void, size?: number): void {
+  private keyButton(label: string, y: number, action: () => void): void {
     const key = this.lib.instantiateCharacter(KEY_ID);
-    const group = this.button(action);
+    const group = new Container();
+    group.eventMode = 'static';
+    group.cursor = 'pointer';
+    group.on('pointertap', action);
     if (key) group.addChild(key);
-    const keyText = this.text(this.texts.getStatic(10) || 'SPACE', 'key', 0, 0, { parent: group });
+    const keyText = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
+      size: 14,
+      color: 'rgb(102,102,102)',
+      parent: group,
+    });
     const b = group.getLocalBounds();
     keyText.position.set(b.x + b.width / 2, b.y + (b.height - keyText.height) / 2 - 1);
-    const lbl = this.text(label, 'label', 0, 0, { align: 'left', size, parent: group });
+    const lbl = this.text(label, 'label', 0, 0, {
+      align: 'left',
+      size: 19,
+      color: '#ffffff',
+      shadow: true,
+      parent: group,
+    });
     lbl.position.set(b.x + b.width + 12, b.y + (b.height - lbl.height) / 2);
     const gb = group.getLocalBounds();
+    group.hitArea = new Rectangle(gb.x - 6, gb.y - 6, gb.width + 12, gb.height + 12);
     group.position.set(W / 2 - gb.x - gb.width / 2, y - gb.y);
+    this.root.addChild(group);
   }
 
-  /** The item's clip as it looks in the game, fitted in a `size` px cell centered on (x, y). */
-  private itemIcon(id: number, x: number, y: number, size: number, parent?: Container): void {
-    const mc = this.lib.attach(id >= 1000 ? 'hammer_item_score' : 'hammer_item_special');
-    mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
+  /** An item or other clip fitted in a `size` px cell centered on (x, y). */
+  private icon(icon: Icon, x: number, y: number, size: number, parent?: Container): Container {
+    let mc;
+    if ('item' in icon) {
+      const id = icon.item;
+      mc = this.lib.attach(id >= 1000 ? 'hammer_item_score' : 'hammer_item_special');
+      mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
+    } else {
+      mc = this.lib.attach(icon.clip);
+      mc.gotoAndStop('1');
+    }
     const b = mc.getLocalBounds();
-    const fit = Math.min(1, size / Math.max(b.width, b.height, 1));
+    const fit = Math.min(1.6, size / Math.max(b.width, b.height, 1));
     mc.scale.set(fit);
     mc.position.set(x - (b.x + b.width / 2) * fit, y - (b.y + b.height / 2) * fit);
     (parent ?? this.root).addChild(mc);
+    return mc;
   }
 
-  /** The site's icon of an item not in the fridge yet (`img/items/small/a.gif`). */
-  private unknownIcon(x: number, y: number, size: number, parent?: Container): void {
-    const tex = this.images.get('img/items/small/a.gif');
-    if (!tex) return;
-    const s = new Sprite(tex);
-    s.anchor.set(0.5);
-    s.scale.set(size / tex.width);
-    s.position.set(x, y);
-    (parent ?? this.root).addChild(s);
+  /** Item `id` as a dark silhouette: one not found yet. */
+  private silhouette(id: number, x: number, y: number, size: number, parent?: Container): void {
+    const mc = this.icon({ item: id }, x, y, size, parent);
+    mc.tint = 0x3f2c1b;
+    mc.alpha = 0.2;
   }
 
-  private highlight(
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    on: boolean | number,
-    parent?: Container,
-  ) {
-    const alpha = on === true ? 0.55 : on === false ? 0 : on;
-    const g = new Graphics().roundRect(x, y, w, h, 6).fill({ color: 0x5f452c, alpha });
-    (parent ?? this.root).addChild(g);
+  /** Item `id` greyed out: found, but not enough times for the fridge. */
+  private greyed(id: number, x: number, y: number, size: number, parent?: Container): void {
+    const mc = this.icon({ item: id }, x, y, size, parent);
+    mc.filters = [this.grey];
+    mc.alpha = 0.75;
+  }
+
+  /** A progress bar, `f` from 0 to 1. */
+  private bar(x: number, y: number, w: number, h: number, f: number, color: string): void {
+    const g = new Graphics()
+      .roundRect(x, y, w, h, h / 2)
+      .fill({ color: C.wood, alpha: 0.18 })
+      .roundRect(x, y, Math.max(h, w * Math.min(1, f)), h, h / 2)
+      .fill(f > 0 ? color : 'rgba(0,0,0,0)');
+    this.root.addChild(g);
+  }
+
+  /** A small closed padlock, its top left at (x, y). */
+  private padlock(x: number, y: number, parent: Container, color: string): void {
+    const g = new Graphics()
+      .roundRect(x + 1.5, y, 6, 7, 3)
+      .stroke({ color, width: 1.4 })
+      .roundRect(x, y + 4, 9, 7, 1.5)
+      .fill(color);
+    parent.addChild(g);
   }
 
   // ------------------------------------------------------------------ menu
@@ -570,126 +736,155 @@ export class Shell {
     const t = this.t;
     const entries = this.menuEntries();
     const cur = entries[this.selected];
-    this.parchment(W / 2, 300, 380, 296);
-    this.text(t.modes, 'title', W / 2, 172);
+    this.drawTitle(4, 300);
+    const top = 132;
+    this.panel(26, top, 368, 334);
+    this.text(t.modes, 'title', W / 2, top + 10, { color: '#5f452c' });
 
     MODES.forEach((m, i) => {
-      const y = 212 + i * 36;
+      const y = top + 46 + i * 38;
       const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
       const sel = n === this.selected;
-      // An option of the mode is selected: the mode stays lit, less
-      const lit = sel ? true : cur.kind === 'option' && cur.mode === m ? 0.3 : false;
-      const row = this.button(() => this.clickEntry(n));
-      this.highlight(70, y - 4, 280, 31, lit, row);
-      const icon = this.images.get(`img/design/menu/${m.icon}.gif`);
-      if (icon) {
-        const s = new Sprite(icon);
-        s.position.set(82, y);
-        s.alpha = m.enabled ? 1 : 0.5;
-        row.addChild(s);
-      }
-      const name = m.enabled ? t[m.mode] : `${t[m.mode]} (${t.soon})`;
-      this.text(name, 'label', 116, y, {
+      const row = this.button([42, y, 336, 34], () => this.clickEntry(n), sel);
+      const ic = this.icon(m.icon, 66, y + 17, 26, row);
+      if (!m.enabled) ic.alpha = 0.45;
+      this.text(t[m.mode], 'label', 90, y + 7, {
         align: 'left',
-        color: m.enabled ? (sel ? '#ffffff' : STYLE.label.color) : 'rgb(170,140,100)',
+        size: 18,
+        color: sel ? C.gold : m.enabled ? C.ink : C.todo,
         parent: row,
       });
+      if (!m.enabled) {
+        this.text(t.soon, 'label', 364, y + 10, {
+          align: 'right',
+          size: 12,
+          color: sel ? C.gold : C.todo,
+          parent: row,
+        });
+      }
     });
 
     const mode = cur.kind === 'tab' ? null : cur.mode;
-    const desc = cur.kind === 'tab' ? this.tabSummary(cur.tab.screen) : t[cur.mode.mode + 'Desc'];
-    this.text(desc, 'tip', W / 2, 284, { width: 300, size: 11 });
-    if (mode) this.drawOptions(mode, entries);
+    const shown = mode ?? MODES[0];
+    this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 128, { width: 320, color: C.inkSoft });
+    if (shown.enabled) this.drawOptions(shown, entries, top + 166);
 
-    if (cur.kind === 'tab') this.keyButton(t[cur.tab.screen], 458, () => this.confirm());
-    else if (cur.mode.enabled) {
-      this.keyButton(t.start, 458, () => this.onStart?.(cur.mode.mode));
-    }
-
-    // The site's tabs, its quest and fridge icons
+    // The quest and fridge pages
+    const counts = this.counts();
     TABS.forEach((tb, i) => {
       const n = entries.findIndex((e) => e.kind === 'tab' && e.tab === tb);
       const sel = n === this.selected;
-      const x = W / 2 + (i === 0 ? -62 : 62);
-      const btn = this.button(() => this.clickEntry(n));
-      const tex = this.images.get(`img/design/${tb.icon}${sel ? '_on' : ''}.png`);
-      if (tex) {
-        const s = new Sprite(tex);
-        s.anchor.set(0.5, 0);
-        s.scale.set(0.6);
-        s.position.set(x, 384);
-        btn.addChild(s);
+      const x = i === 0 ? 42 : 214;
+      const y = top + 270;
+      const btn = this.button([x, y, 164, 50], () => this.clickEntry(n), sel, 10);
+      if (!sel) {
+        btn.addChildAt(
+          new Graphics()
+            .roundRect(x, y, 164, 50, 10)
+            .stroke({ color: C.wood, width: 1, alpha: 0.35 }),
+          1,
+        );
       }
-      this.text(t[tb.screen], 'click', x, 418, {
-        size: 12,
-        color: sel ? '#ffffff' : STYLE.click.color,
+      this.icon(tb.icon, x + 26, y + 25, 32, btn);
+      this.text(t[tb.screen], 'label', x + 48, y + 8, {
+        align: 'left',
+        size: 15,
+        color: sel ? C.gold : C.ink,
+        parent: btn,
+      });
+      const [have, all] = tb.screen === 'quests' ? counts.quests : counts.fridge;
+      this.text(`${have} / ${all}`, 'body', x + 48, y + 29, {
+        align: 'left',
+        size: 11,
+        color: sel ? C.gold : C.inkSoft,
         parent: btn,
       });
     });
+
+    if (cur.kind === 'tab') this.keyButton(t[cur.tab.screen], 478, () => this.confirm());
+    else if (shown.enabled) this.keyButton(t.start, 478, () => this.onStart?.(shown.mode));
+  }
+
+  /** Quests done and items in the fridge, each out of all. */
+  private counts(): { quests: [number, number]; fridge: [number, number] } {
+    const p = this.profile.data;
+    const q = this.profile.quests;
+    const ids = q.itemIds;
+    return {
+      quests: [p.quests.length, q.quests.length],
+      fridge: [ids.filter((id) => q.inFridge(p, id)).length, ids.length],
+    };
   }
 
   /**
-   * The mode's options (the site's `.mopt` box): a checkbox each, greyed while locked. The
-   * Tornade boost has no box to untick: once unlocked it applies to every game (quest 62).
+   * The mode's options (the site's `.mopt` box): a checkbox each, a padlock while locked. The
+   * selected one says what it does, or which quest unlocks it. The Tornade boost has no box to
+   * untick: once unlocked it applies to every game (quest 62).
    */
-  private drawOptions(mode: ModeEntry, entries: MenuEntry[]): void {
-    const list = MODE_OPTIONS[mode.mode];
-    if (!mode.enabled || !list) return;
+  private drawOptions(mode: ModeEntry, entries: MenuEntry[], y0: number): void {
     const t = this.t;
-    this.text(t.options.toUpperCase(), 'tip', W / 2, 318, { size: 9, color: STYLE.click.color });
-    [...list, Data.OPT_BOOST].forEach((oid, k) => {
-      const x = k < 3 ? 76 : 226;
-      const y = 334 + (k % 3) * 16;
+    this.text(t.options.toUpperCase(), 'label', W / 2, y0, { size: 11, color: C.inkSoft });
+    const list = this.modeOptions(mode);
+    let hint = '';
+    list.forEach((oid, k) => {
+      const x = k < 3 ? 52 : 222;
+      const y = y0 + 18 + (k % 3) * 20;
       const unlocked = this.profile.hasOption(oid);
       const fixed = oid === Data.OPT_BOOST;
       const ticked = fixed ? unlocked : this.profile.isChosen(oid);
       const n = entries.findIndex((e) => e.kind === 'option' && e.oid === oid);
-      const sel = n >= 0 && n === this.selected;
-      const row = n >= 0 ? this.button(() => this.clickEntry(n)) : this.root;
-      this.highlight(x - 6, y - 2, 140, 16, sel, row);
-      const box = new Graphics().rect(x, y + 2, 9, 9).stroke({
-        color: 0xe6c592,
-        width: 1,
-        alpha: unlocked ? 1 : 0.35,
-      });
-      if (ticked) {
-        box
-          .moveTo(x + 1.5, y + 6.5)
-          .lineTo(x + 4, y + 9)
-          .lineTo(x + 8.5, y + 3)
-          .stroke({ color: sel ? 0xffffff : 0xe6c592, width: 2 });
+      const sel = n === this.selected;
+      const row = this.button([x - 8, y - 2, 162, 19], () => this.clickEntry(n), sel, 5);
+      const ink = sel ? C.gold : unlocked ? C.ink : C.todo;
+      if (unlocked) {
+        const box = new Graphics()
+          .roundRect(x, y + 2, 11, 11, 2)
+          .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
+          .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 1.4 });
+        if (ticked) {
+          box
+            .moveTo(x + 2.5, y + 7.5)
+            .lineTo(x + 5, y + 10)
+            .lineTo(x + 9.5, y + 4)
+            .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 2 });
+        }
+        row.addChild(box);
+      } else {
+        this.padlock(x + 1, y + 2, row, sel ? C.gold : C.inkSoft);
       }
-      row.addChild(box);
-      this.text(t[oid], 'click', x + 15, y, {
+      this.text(t[oid], 'label', x + 18, y + 1, {
         align: 'left',
-        size: 11,
-        color: !unlocked ? 'rgb(140,112,80)' : sel ? '#ffffff' : STYLE.click.color,
+        size: 13,
+        color: ink,
         parent: row,
       });
+      if (sel) {
+        if (!unlocked) hint = fmt(t.lockedBy, this.questForOption(oid));
+        else if (fixed) hint = t.alwaysOn;
+        else hint = ticked ? t.optionOn : t.optionOff;
+      }
     });
+    if (hint) this.text(hint, 'body', W / 2, y0 + 82, { size: 10, italic: true, color: C.inkSoft });
   }
 
-  private tabSummary(screen: 'quests' | 'fridge'): string {
-    const p = this.profile.data;
-    const q = this.profile.quests;
-    if (screen === 'quests') {
-      const progress = q.quests.filter((x) => q.status(p, x.id) === 'progress').length;
-      return fmt(this.t.questsDesc, p.quests.length, q.quests.length, progress);
-    }
-    const ids = q.itemIds;
-    return fmt(this.t.fridgeDesc, ids.filter((id) => q.inFridge(p, id)).length, ids.length);
+  /** The name of the quest that gives option `oid` (`give option=` in `quests.xml`). */
+  private questForOption(oid: string): string {
+    const q = this.profile.quests.quests.find((x) =>
+      x.actions.some((a) => a.type === 'give' && a.attrs.option === oid),
+    );
+    return q ? this.texts.getQuestName(q.id) : '?';
   }
 
   // ---------------------------------------------------------------- quests
 
-  /** Quests done, then quests in progress, each in id order, as on the site's profile. */
+  /** Quests in progress, then quests done, each in id order. */
   private questList(): number[] {
     const q = this.profile.quests;
     const p = this.profile.data;
     const ids = q.quests.map((x) => x.id);
     return [
-      ...ids.filter((id) => q.status(p, id) === 'done'),
       ...ids.filter((id) => q.status(p, id) === 'progress'),
+      ...ids.filter((id) => q.status(p, id) === 'done'),
     ];
   }
 
@@ -697,67 +892,149 @@ export class Shell {
     const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
-    this.parchment(W / 2, 318, 404, 392);
-    this.text(t.quests, 'title', W / 2, 130);
-    this.text(this.tabSummary('quests'), 'tip', W / 2, 160, { size: 11 });
+    this.panel(12, 12, 396, 452);
+    this.text(t.quests, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+
+    // The three states, counted
+    const ids = q.quests.map((x) => x.id);
+    const count = (s: string) => ids.filter((id) => q.status(p, id) === s).length;
+    const chips: [string, number, string][] = [
+      [t.progress, count('progress'), C.progress],
+      [t.done, count('done'), C.done],
+      [t.todo, count('none'), C.todo],
+    ];
+    chips.forEach(([label, n, color], i) => {
+      const cx = W / 2 + (i - 1) * 124;
+      this.root.addChild(new Graphics().circle(cx - 46, 66, 4.5).fill(color));
+      const sep = this.lang === 'fr' ? '\u00a0: ' : ': ';
+      this.text(`${label}${sep}${n}`, 'label', cx - 38, 59, {
+        align: 'left',
+        size: 12,
+        color: C.ink,
+      });
+    });
 
     const list = this.questList();
+    const listTop = 84;
     if (list.length === 0) {
-      this.text(t.noQuest, 'click', W / 2, 240, { width: 320 });
+      this.text(t.noQuest, 'body', W / 2, listTop + 30, { width: 320, size: 12 });
     }
     list.slice(this.questTop, this.questTop + QUEST_ROWS).forEach((id, k) => {
       const i = this.questTop + k;
-      const y = 182 + k * 20;
+      const y = listTop + k * 24;
       const sel = i === this.questSel;
-      const row = this.button(() => this.selectQuest(i));
-      this.highlight(36, y - 2, 348, 20, sel, row);
+      const row = this.button([24, y, 372, 22], () => this.selectQuest(i), sel, 6);
       const done = q.status(p, id) === 'done';
-      this.text(this.texts.getQuestName(id), 'click', 46, y, {
+      row.addChild(new Graphics().circle(36, y + 11, 4).fill(done ? C.done : C.progress));
+      this.text(this.texts.getQuestName(id), 'label', 48, y + 3, {
         align: 'left',
         size: 13,
-        color: sel ? '#ffffff' : done ? GREEN : STYLE.click.color,
+        color: sel ? C.gold : C.ink,
         parent: row,
       });
-      const reqs = q.requirements(id);
-      const met = reqs.filter((r) => (p.items[r.item] ?? 0) >= r.qty).length;
-      this.text(done ? t.done : `${met} / ${reqs.length}`, 'tip', 374, y + 2, {
-        align: 'right',
-        color: done ? GREEN : STYLE.tip.color,
-        parent: row,
-      });
+      if (done) {
+        this.text('✓', 'label', 384, y + 2, {
+          align: 'right',
+          size: 14,
+          color: sel ? C.gold : C.done,
+          parent: row,
+        });
+      } else {
+        // Items gathered out of all the quest needs
+        const reqs = q.requirements(id);
+        const need = reqs.reduce((a, r) => a + r.qty, 0);
+        const have = reqs.reduce((a, r) => a + Math.min(p.items[r.item] ?? 0, r.qty), 0);
+        this.text(`${have}/${need}`, 'body', 384, y + 4, {
+          align: 'right',
+          size: 11,
+          color: sel ? C.gold : C.inkSoft,
+          parent: row,
+        });
+        row.addChild(
+          new Graphics()
+            .roundRect(296, y + 9, 50, 4, 2)
+            .fill({ color: sel ? 0xfff3c4 : C.wood, alpha: 0.25 })
+            .roundRect(296, y + 9, Math.max(4, (50 * have) / need), 4, 2)
+            .fill(sel ? C.gold : C.progress),
+        );
+      }
     });
-    if (this.questTop > 0) this.text('▲', 'tip', W / 2, 171, { size: 9 });
-    if (this.questTop + QUEST_ROWS < list.length) {
-      this.text('▼', 'tip', W / 2, 182 + QUEST_ROWS * 20 - 2, { size: 9 });
+    const listBottom = listTop + QUEST_ROWS * 24;
+    // Scroll bar when the list is longer than the rows
+    if (list.length > QUEST_ROWS) {
+      const trackH = QUEST_ROWS * 24 - 2;
+      const thumbH = Math.max(16, (trackH * QUEST_ROWS) / list.length);
+      const thumbY = listTop + ((trackH - thumbH) * this.questTop) / (list.length - QUEST_ROWS);
+      this.root.addChild(
+        new Graphics()
+          .roundRect(400, listTop, 3, trackH, 1.5)
+          .fill({ color: C.wood, alpha: 0.15 })
+          .roundRect(400, thumbY, 3, thumbH, 1.5)
+          .fill({ color: C.wood, alpha: 0.6 }),
+      );
+    }
+    const none = count('none');
+    if (list.length > 0 && none > 0) {
+      this.text(fmt(t.moreQuests, none), 'body', W / 2, listBottom + 6, {
+        width: 360,
+        size: 10,
+        italic: true,
+        color: C.inkSoft,
+      });
     }
 
+    const sepY = listBottom + 36;
+    this.root.addChild(
+      new Graphics()
+        .moveTo(36, sepY)
+        .lineTo(384, sepY)
+        .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
+    );
     const id = list[this.questSel];
-    if (id !== undefined) this.drawQuestDetail(id);
+    if (id !== undefined) this.drawQuestDetail(id, sepY + 8);
+    else
+      this.text(t.questRule, 'body', W / 2, sepY + 20, { width: 340, size: 11, color: C.inkSoft });
 
-    this.keyButton(t.back, 470, () => this.showMenu(), 14);
+    this.keyButton(t.back, 478, () => this.showMenu());
   }
 
-  /** The quest's items with "found / needed" (`.itemQuest`), and its text once done. */
-  private drawQuestDetail(id: number): void {
+  /** The selected quest: its items with "found / needed", and its reward once done. */
+  private drawQuestDetail(id: number, y0: number): void {
+    const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
+    const done = q.status(p, id) === 'done';
+    this.text(this.texts.getQuestName(id), 'label', W / 2, y0, { size: 16 });
+    this.text(t.needed.toUpperCase(), 'label', W / 2, y0 + 22, { size: 10, color: C.inkSoft });
+
     const reqs = q.requirements(id);
-    const cell = Math.min(34, 360 / reqs.length);
+    const cell = Math.min(40, 356 / reqs.length);
     const x0 = W / 2 - (reqs.length * cell) / 2;
-    const y = 362;
+    const y = y0 + 54;
     reqs.forEach((r, i) => {
       const x = x0 + i * cell + cell / 2;
       const have = p.items[r.item] ?? 0;
-      if (have > 0) this.itemIcon(r.item, x, y, cell - 8);
-      else this.unknownIcon(x, y, Math.min(20, cell - 10));
-      this.text(`${Math.min(have, r.qty)}/${r.qty}`, 'tip', x, y + 14, {
+      const size = Math.min(28, cell - 8);
+      if (have >= r.qty) this.icon({ item: r.item }, x, y, size);
+      else if (have > 0) this.greyed(r.item, x, y, size);
+      else this.silhouette(r.item, x, y, size);
+      this.text(`${Math.min(have, r.qty)}/${r.qty}`, 'body', x, y + 17, {
         size: 9,
-        color: have >= r.qty ? GREEN : STYLE.tip.color,
+        color: have >= r.qty ? C.done : C.inkSoft,
       });
     });
-    if (q.status(p, id) === 'done') {
-      this.text(this.texts.getQuestDesc(id), 'tip', W / 2, 394, { width: 350, size: 10 });
-    }
+
+    const ry = y0 + 92;
+    this.text(t.reward.toUpperCase(), 'label', W / 2, ry, { size: 10, color: C.inkSoft });
+    if (done)
+      this.text(this.texts.getQuestDesc(id), 'body', W / 2, ry + 15, { width: 350, size: 11 });
+    else
+      this.text(t.rewardHidden, 'body', W / 2, ry + 15, {
+        width: 350,
+        size: 11,
+        italic: true,
+        color: C.inkSoft,
+      });
   }
 
   // ---------------------------------------------------------------- fridge
@@ -767,65 +1044,123 @@ export class Shell {
     const q = this.profile.quests;
     const p = this.profile.data;
     const ids = q.itemIds;
-    this.parchment(W / 2, 318, 404, 392);
-    this.text(t.fridge, 'title', W / 2, 130);
-    this.text(this.tabSummary('fridge'), 'tip', W / 2, 160, { size: 11 });
+    this.panel(12, 12, 396, 452);
+    this.text(t.fridge, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+    const [have, all] = this.counts().fridge;
+    this.text(fmt(t.fridgeCount, have, all), 'label', W / 2, 56, { size: 13 });
+    this.bar(110, 75, 200, 6, have / all, C.done);
+    this.text(t.fridgeRule, 'body', W / 2, 88, { width: 360, size: 10, color: C.inkSoft });
 
     const page = Math.floor(this.fridgeSel / FRIDGE_PAGE);
     const pages = Math.ceil(ids.length / FRIDGE_PAGE);
     const x0 = W / 2 - (FRIDGE_COLS * FRIDGE_CELL) / 2;
-    const y0 = 178;
+    const y0 = 122;
     ids.slice(page * FRIDGE_PAGE, (page + 1) * FRIDGE_PAGE).forEach((id, k) => {
       const i = page * FRIDGE_PAGE + k;
       const cx = x0 + (k % FRIDGE_COLS) * FRIDGE_CELL;
       const cy = y0 + Math.floor(k / FRIDGE_COLS) * FRIDGE_CELL;
-      const cellBtn = this.button(() => this.selectItem(i));
-      this.highlight(cx, cy, FRIDGE_CELL - 2, FRIDGE_CELL - 2, i === this.fridgeSel, cellBtn);
-      const mx = cx + FRIDGE_CELL / 2 - 1;
-      const my = cy + FRIDGE_CELL / 2 - 1;
+      const sel = i === this.fridgeSel;
+      const cellBtn = this.button(
+        [cx + 1, cy + 1, FRIDGE_CELL - 2, FRIDGE_CELL - 2],
+        () => this.selectItem(i),
+        sel,
+        6,
+      );
+      const mx = cx + FRIDGE_CELL / 2;
+      const my = cy + FRIDGE_CELL / 2;
+      const n = p.items[id] ?? 0;
       if (q.inFridge(p, id)) {
-        this.itemIcon(id, mx, my, FRIDGE_CELL - 8, cellBtn);
-        const n = p.items[id] ?? 0;
+        this.icon({ item: id }, mx, my, FRIDGE_CELL - 10, cellBtn);
         if (n > 1) {
-          const c = this.text(`${n}`, 'tip', 0, 0, { size: 9, color: '#ffffff', parent: cellBtn });
-          c.anchor.set(1, 1);
-          c.position.set(cx + FRIDGE_CELL - 3, cy + FRIDGE_CELL - 2);
+          const c = this.text(`${n}`, 'body', cx + FRIDGE_CELL - 4, cy + FRIDGE_CELL - 12, {
+            align: 'right',
+            size: 8,
+            color: C.gold,
+            parent: cellBtn,
+          });
+          const pill = new Graphics()
+            .roundRect(c.x - c.width - 3, c.y - 0.5, c.width + 6, 11, 5.5)
+            .fill({ color: C.wood, alpha: 0.85 });
+          cellBtn.addChildAt(pill, cellBtn.getChildIndex(c));
         }
+      } else if (n > 0) {
+        this.greyed(id, mx, my, FRIDGE_CELL - 12, cellBtn);
+        const f = n / q.unlockCount(id);
+        cellBtn.addChild(
+          new Graphics()
+            .roundRect(cx + 6, cy + FRIDGE_CELL - 6, FRIDGE_CELL - 12, 3, 1.5)
+            .fill({ color: C.wood, alpha: 0.2 })
+            .roundRect(cx + 6, cy + FRIDGE_CELL - 6, (FRIDGE_CELL - 12) * f, 3, 1.5)
+            .fill(C.progress),
+        );
       } else {
-        this.unknownIcon(mx, my, 20, cellBtn);
+        this.silhouette(id, mx, my, FRIDGE_CELL - 12, cellBtn);
       }
     });
 
     // Pages
-    const py = y0 + FRIDGE_ROWS * FRIDGE_CELL + 4;
-    this.text(`${page + 1} / ${pages}`, 'tip', W / 2, py, { size: 11 });
+    const py = y0 + FRIDGE_ROWS * FRIDGE_CELL + 6;
+    this.text(`${page + 1} / ${pages}`, 'label', W / 2, py, { size: 13, color: C.inkSoft });
     if (page > 0) {
-      const b = this.button(() => this.selectItem((page - 1) * FRIDGE_PAGE));
-      this.text('◀', 'click', W / 2 - 50, py - 2, { parent: b });
+      const b = this.button([W / 2 - 92, py - 4, 44, 24], () =>
+        this.selectItem((page - 1) * FRIDGE_PAGE),
+      );
+      this.text('◀', 'label', W / 2 - 70, py, { size: 13, parent: b });
     }
     if (page < pages - 1) {
-      const b = this.button(() => this.selectItem((page + 1) * FRIDGE_PAGE));
-      this.text('▶', 'click', W / 2 + 50, py - 2, { parent: b });
+      const b = this.button([W / 2 + 48, py - 4, 44, 24], () =>
+        this.selectItem((page + 1) * FRIDGE_PAGE),
+      );
+      this.text('▶', 'label', W / 2 + 70, py, { size: 13, parent: b });
     }
 
-    // The selected item: name, family and count (the site's `table.fridge` columns)
+    // The selected item: picture, name, family and how far it is from the fridge
+    const sepY = py + 28;
+    this.root.addChild(
+      new Graphics()
+        .moveTo(36, sepY)
+        .lineTo(384, sepY)
+        .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
+    );
     const id = ids[this.fridgeSel];
     const n = p.items[id] ?? 0;
+    const need = q.unlockCount(id);
     const known = q.inFridge(p, id);
-    this.text(known ? this.texts.getItemName(id) : t.unknown, 'label', W / 2, 402, { size: 15 });
+    const dy = sepY + 12;
+    if (known) this.icon({ item: id }, 64, dy + 30, 46);
+    else if (n > 0) this.greyed(id, 64, dy + 30, 46);
+    else this.silhouette(id, 64, dy + 30, 46);
+    this.text(n > 0 ? this.texts.getItemName(id) : t.unknown, 'label', 104, dy, {
+      align: 'left',
+      size: 16,
+      width: 280,
+    });
     const fid = q.familyOf(id);
     if (fid !== undefined) {
       const fam = q.itemsOf(fid);
-      const have = fam.filter((x) => q.inFridge(p, x)).length;
-      const name = this.texts.getFamilyName(fid);
-      this.text(`${name} (${have}/${fam.length})`, 'click', W / 2, 422, { size: 12 });
+      const famHave = fam.filter((x) => q.inFridge(p, x)).length;
+      this.text(
+        `${this.texts.getFamilyName(fid)} (${famHave}/${fam.length})`,
+        'body',
+        104,
+        dy + 24,
+        {
+          align: 'left',
+          size: 11,
+          color: C.inkSoft,
+        },
+      );
     }
-    if (n > 0) {
-      const s = known ? fmt(t.found, n) : `${fmt(t.found, n)} (${n}/${q.unlockCount(id)})`;
-      this.text(s, 'tip', W / 2, 440, { size: 10 });
-    }
+    const status = known ? fmt(t.inFridge, n) : n > 0 ? fmt(t.partial, n, need, need - n) : t.never;
+    this.text(status, 'body', 104, dy + 42, {
+      align: 'left',
+      size: 11,
+      width: 280,
+      color: known ? C.done : n > 0 ? C.progress : C.inkSoft,
+    });
+    if (!known && n > 0) this.bar(104, dy + 60, 160, 5, n / need, C.progress);
 
-    this.keyButton(t.back, 470, () => this.showMenu(), 14);
+    this.keyButton(t.back, 478, () => this.showMenu());
   }
 
   // --------------------------------------------------------------- results
@@ -837,46 +1172,54 @@ export class Shell {
    */
   private drawResult(r: GameResult): void {
     const t = this.t;
-    this.parchment(W / 2, 318, 400, 330);
-    this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, 168);
+    this.drawTitle(4, 250);
+    const top = 112;
+    this.panel(26, top, 368, 354);
+    this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
+      color: '#5f452c',
+    });
 
-    let y = 206;
+    let y = top + 50;
     if (r.kind === 'gameOver') {
       const lvl = r.stats.reachedLevel;
-      this.text(`${this.texts.getStatic(1)} ${lvl}`, 'label', W / 2, y);
+      this.text(`${this.texts.getStatic(1)} ${lvl}`, 'label', W / 2, y, { size: 17 });
       const sector = this.texts.getSectorName(0, lvl);
-      if (sector) this.text(sector, 'click', W / 2, y + 22);
-      this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 42, {
-        size: 22,
-        color: '#ffffff',
+      if (sector) this.text(sector, 'body', W / 2, y + 22, { color: C.inkSoft });
+      this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
+        size: 26,
+        color: '#5f452c',
       });
-      y += 76;
+      y += 82;
     }
 
-    // Quest lines above the key
+    // Quest lines at the bottom of the panel
     const lines: { s: string; color: string }[] = [];
     const done = this.record?.quests ?? [];
     for (const id of done.slice(0, done.length > 3 ? 2 : 3)) {
-      lines.push({ s: fmt(t.questDone, this.texts.getQuestName(id)), color: GREEN });
+      lines.push({ s: fmt(t.questDone, this.texts.getQuestName(id)), color: C.done });
     }
-    if (done.length > 3) lines.push({ s: fmt(t.moreQuests, done.length - 2), color: GREEN });
+    if (done.length > 3) lines.push({ s: fmt(t.moreDone, done.length - 2), color: C.done });
     const fridge = this.record?.fridge.length ?? 0;
     if (fridge > 0) {
       const s = fridge === 1 ? t.newFridge1 : fmt(t.newFridge, fridge);
-      lines.push({ s, color: STYLE.click.color });
+      lines.push({ s, color: C.progress });
     }
-    const linesTop = 446 - lines.length * 17;
+    const panelBottom = top + 354;
+    const linesTop = panelBottom - 16 - lines.length * 18;
     lines.forEach((l, i) => {
-      this.text(l.s, 'click', W / 2, linesTop + i * 17, { size: 12, color: l.color });
+      this.text(l.s, 'label', W / 2, linesTop + i * 18, { size: 13, color: l.color });
     });
 
     const picks = resultPicks(r);
-    this.text(picks.length > 0 ? t.collected : t.none, 'click', W / 2, y);
-    y += 22;
-    const bottom = lines.length > 0 ? linesTop - 4 : r.kind === 'gameOver' ? 425 : 455;
+    this.text((picks.length > 0 ? t.collected : t.none).toUpperCase(), 'label', W / 2, y, {
+      size: 11,
+      color: C.inkSoft,
+    });
+    y += 20;
+    const bottom = lines.length > 0 ? linesTop - 6 : panelBottom - 14;
     this.drawItems(picks, y, bottom);
 
-    this.keyButton(this.texts.getStatic(6) || '...', 458, () => this.showMenu(), 14);
+    this.keyButton(t.continue, 478, () => this.showMenu());
   }
 
   /** The items in rows, as they look in the game, with their count. */
@@ -889,11 +1232,13 @@ export class Shell {
     picks.forEach(([id, n], i) => {
       const x = x0 + (i % cols) * size + size / 2;
       const y = top + Math.floor(i / cols) * size + size / 2;
-      this.itemIcon(id, x, y, size - 8 * (size / cell));
+      this.icon({ item: id }, x, y, size - 8 * (size / cell));
       if (n > 1) {
-        const c = this.text(`x${n}`, 'tip', 0, 0, { size: 10, color: '#ffffff' });
-        c.anchor.set(1, 1);
-        c.position.set(x + size / 2 - 1, y + size / 2);
+        this.text(`x${n}`, 'body', x + size / 2 - 1, y + size / 2 - 12, {
+          align: 'right',
+          size: 9,
+          color: C.ink,
+        });
       }
     });
   }

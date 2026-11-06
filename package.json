@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "assets": "tsx tools/build-data.ts && tsx tools/build-swf.ts && tsx tools/build-site.ts",
+    "assets": "tsx tools/build-data.ts && tsx tools/build-swf.ts && tsx tools/build-fonts.ts && tsx tools/build-site.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "orig": "tsx tools/normalize-original.ts"
@@ -25,7 +25,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/opentype.js": "^1.3.10",
     "fast-xml-parser": "^5.11.2",
+    "opentype.js": "^1.3.4",
     "prettier": "^3.6.0",
     "swf-parser": "^0.14.1",
     "swf-types": "^0.14.0",
