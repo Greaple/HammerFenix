@@ -54,7 +54,8 @@ export interface LoaderHost {
  * `attachLoading` and the fades of `mainGame`. The `loading` clip comes from `_loader.swf`.
  *
  * Also the start of a game once the page has chosen the mode (3.1b): `gameReady` ("click to
- * start", frame 2), `queryStart` (frame 3), `startGame` and the fade-out of frame 6. The SWF and
+ * start", frame 2), `queryStart` (frame 3), `startGame` and the fade-out of frame 6. The menu
+ * skips that step (`startNow`, a port addition): its fade goes straight into the game. The SWF and
  * music downloads before it (frames 1 and 7) are not ported: the port loads its assets before
  * the site page shows.
  *
@@ -149,11 +150,23 @@ export class Loader {
     this.startGame();
   }
 
+  /**
+   * Port addition: starts the game at once, as the menu does. In the original the site page
+   * loaded the game after the mode was chosen, so frame 2 covered that download and waited for
+   * a click; the port has everything loaded before the menu shows, so there is nothing to wait
+   * for. No cover either: the menu fades out over the game itself (`Shell.fadeOut`).
+   */
+  startNow(mode: string): void {
+    this.reset();
+    this.mode = mode;
+    this.startGame(false);
+  }
+
   /** `Loader.startGame`: builds the game, then fades out frame 6 while it runs. */
-  private startGame(): void {
+  private startGame(cover = true): void {
     this.fl_wait = false;
     this.host.startGameInstance();
-    this.attachLoading(6);
+    if (cover) this.attachLoading(6);
   }
 
   private countUniques(a: number[]): number {

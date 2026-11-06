@@ -314,6 +314,9 @@ export class Shell {
   private gameOverArt: Texture | null = null;
   private readonly grey = new ColorMatrixFilter();
   private screen: Screen | null = null;
+  /** When `fadeOut` started (`performance.now()`), while it runs. */
+  private fadeFrom: number | null = null;
+  private fadeMs = 700;
   private result: GameResult | null = null;
   private record: GameRecord | null = null;
   /** Index in `menuEntries()`. */
@@ -388,8 +391,22 @@ export class Shell {
 
   hide(): void {
     this.screen = null;
+    this.fadeFrom = null;
     this.root.visible = false;
+    this.root.alpha = 1;
+    this.root.eventMode = 'static';
     this.clear();
+  }
+
+  /**
+   * Fades the screen out over the game starting under it, then hides it. The menu's village
+   * is the first level's, so it dissolves into the level.
+   */
+  fadeOut(ms = 700): void {
+    this.screen = null;
+    this.root.eventMode = 'none';
+    this.fadeFrom = performance.now();
+    this.fadeMs = ms;
   }
 
   /** Redraws the current screen, e.g. after a language change. */
@@ -399,6 +416,12 @@ export class Shell {
 
   /** Keys, once per frame while a screen shows: arrows choose, space confirms. */
   update(): void {
+    if (this.fadeFrom !== null) {
+      const a = 1 - (performance.now() - this.fadeFrom) / this.fadeMs;
+      if (a <= 0) this.hide();
+      else this.root.alpha = a;
+      return;
+    }
     if (!this.screen) return;
     const inp = this.input;
     inp.poll();
@@ -537,6 +560,9 @@ export class Shell {
 
   private render(): void {
     this.clear();
+    this.fadeFrom = null;
+    this.root.alpha = 1;
+    this.root.eventMode = 'static';
     this.root.visible = true;
     this.root.parent?.addChild(this.root); // above the Loader's clip
     this.drawBackground(this.screen === 'quests' || this.screen === 'fridge');

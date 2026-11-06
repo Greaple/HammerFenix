@@ -2218,6 +2218,18 @@ export class GameSession implements IGameContext {
     this.onStateChange?.({ isOver: false, isPaused: false });
   }
 
+  /**
+   * The menu starts the game at once, without the Loader's "click to start" (port addition,
+   * `Loader.startNow`): the assets are already loaded.
+   */
+  startNow(mode = 'solo'): void {
+    this.stopInputCapture();
+    this.backToMainWorld();
+    this.readyMode = mode;
+    this.loader.startNow(mode);
+    this.onStateChange?.({ isOver: false, isPaused: false });
+  }
+
   /** A click on the game: `loading.onRelease`. */
   clickStart(): void {
     this.loader.onRelease();

@@ -46,6 +46,17 @@ describe('game start from the site (Loader.gameReady / startGame)', () => {
     expect(session.player).not.toBeNull();
   });
 
+  it('the menu starts at once: no "click to start", no cover (port addition)', () => {
+    session.startNow('solo');
+    expect(session.loader.gameRunning).toBe(true);
+    expect(session.loader.waitingStart).toBe(false);
+    expect(session.loader.loading).toBeNull();
+    expect(session.gameRoot.visible).toBe(true);
+    expect(session.siteMode).toBe('solo');
+    step(20);
+    expect(session.player).not.toBeNull();
+  });
+
   it('ignores clicks during a game', () => {
     const seed = session.seed;
     session.clickStart();

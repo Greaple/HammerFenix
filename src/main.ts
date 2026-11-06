@@ -154,10 +154,12 @@ async function main(): Promise<void> {
     session.start();
   };
   shell.onStart = (mode) => {
-    showGame();
+    // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
+    shell.fadeOut();
+    session.start();
     // The site's start query answers with the profile's families; the page sent the options
     session.setParameters(profile.familiesParam, profile.optionsParam(mode));
-    session.gameReady(mode);
+    session.startNow(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
   // The Loader is done (score saved, or the end of the set): the results replace the game
