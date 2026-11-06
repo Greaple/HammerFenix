@@ -75,13 +75,16 @@ export class SwfLibrary {
     this.rasterizer = new ShapeRasterizer(bitmaps, Math.min(3, Math.max(2, Math.ceil(dpr))));
   }
 
-  static async load(
-    baseUrl = './',
-    onProgress?: (loaded: number, total: number) => void,
-  ): Promise<SwfLibrary> {
+  /**
+   * Loads the library and its bitmaps. `onProgress` gets the share done, from 0 to 1: the
+   * download of `library.json` (9 MB) is most of it, then the bitmaps.
+   */
+  static async load(baseUrl = './', onProgress?: (done: number) => void): Promise<SwfLibrary> {
     const res = await fetch(`${baseUrl}gfx/library.json`);
     if (!res.ok) throw new Error(`Failed to load SWF library (${res.status})`);
-    const data = (await res.json()) as SwfLibraryData;
+    const data = JSON.parse(
+      await readText(res, (f) => onProgress?.(f * DOWNLOAD_SHARE)),
+    ) as SwfLibraryData;
 
     const bmpEntries: [number, BitmapDef][] = [];
     for (const [idStr, def] of Object.entries(data.characters)) {
@@ -91,7 +94,9 @@ export class SwfLibrary {
     const bitmaps = new Map<number, HTMLCanvasElement | HTMLImageElement>();
     let done = 0;
     const total = bmpEntries.length;
-    onProgress?.(0, total);
+    const report = () =>
+      onProgress?.(DOWNLOAD_SHARE + (1 - DOWNLOAD_SHARE) * (total > 0 ? done / total : 1));
+    report();
 
     // Load in batches of 32 to avoid saturating connections while staying fast.
     const batchSize = 32;
@@ -102,7 +107,7 @@ export class SwfLibrary {
           const surface = await decodeBitmapAsset(baseUrl, def);
           bitmaps.set(id, surface);
           done++;
-          onProgress?.(done, total);
+          report();
         }),
       );
     }
@@ -327,4 +332,37 @@ export class SwfLibrary {
     for (const t of this.bitmapTextures.values()) t.destroy(true);
     this.bitmapTextures.clear();
   }
+}
+
+/** Share of the loading bar for the download of `library.json`; the bitmaps take the rest. */
+const DOWNLOAD_SHARE = 0.8;
+
+/**
+ * Reads a response as text, reporting how far the download is (0 to 1). With a compressed
+ * response the `Content-Length` counts compressed bytes while the stream gives the
+ * uncompressed ones, so then (or without the header) the share is an estimate that slows
+ * down as it goes.
+ */
+async function readText(res: Response, onProgress: (f: number) => void): Promise<string> {
+  const reader = res.body?.getReader();
+  if (!reader) return res.text();
+  const length = Number(res.headers.get('content-length')) || 0;
+  const encoded = (res.headers.get('content-encoding') ?? 'identity') !== 'identity';
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onProgress(length > 0 && !encoded ? loaded / length : loaded / (loaded + 3_000_000));
+  }
+  onProgress(1);
+  const all = new Uint8Array(loaded);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.length;
+  }
+  return new TextDecoder().decode(all);
 }

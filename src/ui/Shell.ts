@@ -1300,9 +1300,7 @@ function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
-/** A keyboard is likely: not a touch-only device. */
+/** A keyboard is likely: not a touch screen (`html.touch`, set by main.ts). */
 function hasKeyboard(): boolean {
-  return (
-    typeof matchMedia === 'undefined' || !matchMedia('(hover: none) and (pointer: coarse)').matches
-  );
+  return typeof document === 'undefined' || !document.documentElement.classList.contains('touch');
 }

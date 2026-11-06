@@ -433,6 +433,79 @@ body:not(.dev) .dev-only {
     0 6px 14px rgba(10, 30, 70, 0.3);
 }
 
+/* The loading screen over the frame, until the menu shows (main.ts `LoadingScreen`) */
+.game-canvas-container {
+  position: relative;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 0 12%;
+  background:
+    radial-gradient(ellipse at 50% 35%, rgba(255, 255, 255, 0.18), transparent 60%),
+    linear-gradient(180deg, #1d3f7a 0%, var(--sky) 70%, #6fb6ea 100%);
+  transition: opacity 0.5s ease;
+}
+
+.loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-logo {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(10, 30, 70, 0.45));
+}
+
+.loading-text {
+  font-family: 'Franklin Gothic Heavy', var(--font-display);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 3.2cqw, 1.1rem);
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(10, 30, 70, 0.7);
+  text-align: center;
+}
+
+.loading-bar {
+  width: 80%;
+  height: 12px;
+  padding: 2px;
+  background: var(--parchment);
+  border: 2px solid var(--wood);
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5px var(--parchment-edge);
+  overflow: hidden;
+}
+
+.loading-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e9a23b, #f6c75b);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.2s ease-out;
+}
+
+.loading-retry {
+  display: none;
+}
+
+.loading.failed .loading-bar {
+  display: none;
+}
+
+.loading.failed .loading-retry {
+  display: inline-block;
+}
+
 /* Pixi sizes the canvas inline (autoDensity); the frame decides. Its resolution follows the
    frame's size (main.ts), so no pixel scaling is needed. */
 .game-canvas-container canvas {
@@ -455,14 +528,13 @@ body:not(.dev) .dev-only {
   gap: 16px;
 }
 
-@media (hover: none) and (pointer: coarse) {
-  :root {
-    --below-frame: 170px;
-  }
+/* `html.touch` is set by main.ts on touch screens, or once the screen is touched */
+html.touch {
+  --below-frame: 92px;
+}
 
-  .touch-controls {
-    display: flex;
-  }
+html.touch .touch-controls {
+  display: flex;
 }
 
 .touch-btn {
@@ -495,26 +567,21 @@ body:not(.dev) .dev-only {
 
 .touch-dpad {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-}
-
-.dpad-middle {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.dpad-center {
-  width: 48px;
-  height: 48px;
+  gap: 6px;
 }
 
 .dpad-btn {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
   font-size: 1.1rem;
+}
+
+/* Down only kicks a bomb upward (a quest power): smaller */
+.dpad-down {
+  width: 44px;
+  height: 44px;
+  align-self: flex-end;
 }
 
 .touch-actions {
@@ -543,59 +610,61 @@ body:not(.dev) .dev-only {
 }
 
 /* Phone held sideways: the controls go on each side of the frame */
-@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
-  :root {
-    --topbar-h: 0px;
+@media (orientation: landscape) and (max-height: 520px) {
+  html.touch {
     --below-frame: 0px;
   }
 
-  .topbar {
+  html.touch .topbar {
     position: absolute;
     inset: 0 0 auto 0;
     z-index: 2;
     pointer-events: none;
   }
 
-  .topbar > * {
+  html.touch .topbar > * {
     pointer-events: auto;
   }
 
-  .credit {
+  html.touch .credit {
     display: none;
   }
 
-  .logo {
+  html.touch .logo {
     font-size: 1.05rem;
   }
 
-  .app-main {
+  html.touch .app-main {
     padding-top: 8px;
     padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
 
-  .game-canvas-container {
-    --frame-h: 100cqh;
+  /* Controls at the screen's edges, where the thumbs rest; the frame stays centered */
+  html.touch .game-wrapper {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: end;
+    gap: 12px;
+    height: 100%;
   }
 
-  .game-wrapper {
-    flex-direction: row;
-    justify-content: center;
-    gap: 16px;
-  }
-
-  .touch-controls {
+  html.touch .touch-controls {
     display: contents;
   }
 
-  .touch-dpad {
+  html.touch .game-canvas-container {
+    align-self: center;
+  }
+
+  html.touch .touch-dpad {
     order: -1;
-    align-self: flex-end;
+    justify-self: start;
     margin-bottom: 12px;
   }
 
-  .touch-actions {
+  html.touch .touch-actions {
     flex-direction: column-reverse;
-    align-self: flex-end;
+    justify-self: end;
     margin-bottom: 12px;
   }
 }

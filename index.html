@@ -90,40 +90,42 @@
         <div id="game-wrapper" class="game-wrapper">
           <div id="game-canvas-container" class="game-canvas-container" role="application">
             <!-- PixiJS canvas injected dynamically -->
+            <div id="loading" class="loading" role="status">
+              <img class="loading-logo" src="/images/mainTitle.webp" alt="" />
+              <p class="loading-text" data-i18n="loading">Travelling to Hammerfest…</p>
+              <div class="loading-bar"><div id="loading-fill" class="loading-fill"></div></div>
+              <button type="button" class="parchment-btn loading-retry" onclick="location.reload()">
+                <span data-i18n="retry">Try again</span>
+              </button>
+            </div>
           </div>
 
           <!-- On-screen touch controls for phones and tablets -->
           <div id="touch-controls" class="touch-controls">
             <div class="touch-dpad">
-              <button type="button" id="touch-up" class="touch-btn dpad-btn" data-i18n-label="jump">
-                ▲
+              <button
+                type="button"
+                id="touch-left"
+                class="touch-btn dpad-btn"
+                data-i18n-label="left"
+              >
+                ◀
               </button>
-              <div class="dpad-middle">
-                <button
-                  type="button"
-                  id="touch-left"
-                  class="touch-btn dpad-btn"
-                  data-i18n-label="left"
-                >
-                  ◀
-                </button>
-                <div class="dpad-center"></div>
-                <button
-                  type="button"
-                  id="touch-right"
-                  class="touch-btn dpad-btn"
-                  data-i18n-label="right"
-                >
-                  ▶
-                </button>
-              </div>
               <button
                 type="button"
                 id="touch-down"
-                class="touch-btn dpad-btn"
+                class="touch-btn dpad-btn dpad-down"
                 data-i18n-label="down"
               >
                 ▼
+              </button>
+              <button
+                type="button"
+                id="touch-right"
+                class="touch-btn dpad-btn"
+                data-i18n-label="right"
+              >
+                ▶
               </button>
             </div>
 

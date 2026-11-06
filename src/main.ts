@@ -66,8 +66,13 @@ function initDialogFallbacks(): void {
 
 async function main(): Promise<void> {
   initDialogFallbacks();
+  initTouch();
 
   const baseUrl = import.meta.env.BASE_URL || './';
+  // The page's texts at once, in the language the game will start in
+  const startLang = pickLang(GameSession.savedLang(), navigator.languages ?? []);
+  applyPageText(startLang);
+  const loading = new LoadingScreen();
 
   // 1. Create PixiJS application (420 x 520 virtual resolution)
   const app = new Application();
@@ -99,8 +104,8 @@ async function main(): Promise<void> {
 
   // 2. Load game data and assets in parallel
   const [dataStore, lib] = await Promise.all([
-    GameDataStore.load(baseUrl, pickLang(GameSession.savedLang(), navigator.languages ?? [])),
-    SwfLibrary.load(baseUrl),
+    GameDataStore.load(baseUrl, startLang),
+    SwfLibrary.load(baseUrl, (f) => loading.progress(f)),
     loadGameFonts(baseUrl),
   ]);
 
@@ -136,6 +141,11 @@ async function main(): Promise<void> {
   app.stage.addChild(shell.root);
   session.gameRoot.visible = false;
   shell.showMenu();
+  loading.done();
+  // Touch found after the menu showed: redraw it without its keyboard hints
+  new MutationObserver(() => shell.refresh()).observe(document.documentElement, {
+    attributeFilter: ['class'],
+  });
   app.ticker.add(() => shell.update());
   /** Leaves the menu for the game (the debug toolbar plays without the menu). */
   const showGame = () => {
@@ -162,6 +172,17 @@ async function main(): Promise<void> {
   (window as any).gameSession = session;
   (window as any).pixiApp = app;
   (window as any).gameLib = lib;
+
+  // A hidden tab pauses the game (the pause screen of P) and silences the sound. Port
+  // addition: the Flash game kept running behind other tabs.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (session.loader.gameRunning && !session.fl_pause) session.onPause();
+      audio.setSuspended(true);
+    } else {
+      audio.setSuspended(false);
+    }
+  });
 
   // Initialize Debug Toolkit
   const debugToolkit = new DebugToolkit(session, document.body);
@@ -336,14 +357,55 @@ async function main(): Promise<void> {
 
   bindTouch('touch-left', 'left');
   bindTouch('touch-right', 'right');
-  bindTouch('touch-up', 'jump');
   bindTouch('touch-down', 'down');
   bindTouch('touch-jump', 'jump');
   bindTouch('touch-bomb', 'attack');
 }
 
+/**
+ * Marks the page as a touch screen (`html.touch`): the touch controls show and the screens
+ * drop their keyboard hints. On from the start on phones and tablets, and on a computer once
+ * its screen is touched.
+ */
+function initTouch(): void {
+  const root = document.documentElement;
+  const coarse = window.matchMedia?.('(hover: none) and (pointer: coarse)');
+  root.classList.toggle('touch', coarse?.matches ?? false);
+  window.addEventListener(
+    'touchstart',
+    () => {
+      if (!root.classList.contains('touch')) root.classList.add('touch');
+    },
+    { passive: true },
+  );
+}
+
+/** The loading screen over the game frame, until the menu shows (`#loading`). */
+class LoadingScreen {
+  private readonly el = document.getElementById('loading');
+  private readonly fill = document.getElementById('loading-fill');
+
+  progress(f: number): void {
+    if (this.fill) this.fill.style.transform = `scaleX(${Math.max(0, Math.min(1, f))})`;
+  }
+
+  done(): void {
+    this.progress(1);
+    this.el?.classList.add('done');
+    window.setTimeout(() => this.el?.remove(), 600);
+  }
+
+  failed(): void {
+    this.el?.classList.add('failed');
+    const lang = pickLang(GameSession.savedLang(), navigator.languages ?? []);
+    const text = this.el?.querySelector('.loading-text');
+    if (text) text.textContent = pageText(lang, 'loadError');
+  }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   main().catch((err) => {
     console.error('Fatal initialization error:', err);
+    new LoadingScreen().failed();
   });
 });

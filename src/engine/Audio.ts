@@ -61,6 +61,13 @@ export class AudioEngine {
     }
   }
 
+  /** Stops all sound while the page is hidden, and starts it again (`false`). */
+  setSuspended(on: boolean): void {
+    if (!this.ctx) return;
+    if (on && this.ctx.state === 'running') void this.ctx.suspend();
+    else if (!on && this.ctx.state === 'suspended') void this.ctx.resume();
+  }
+
   /** Unlocks the Web Audio context after a user gesture. */
   unlock(): void {
     const ctx = this.ensureContext();

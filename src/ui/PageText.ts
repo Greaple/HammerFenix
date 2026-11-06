@@ -5,7 +5,8 @@
  * screen's (`Lang` statics 7 to 10) where it has them. The rest is the port's own.
  *
  * Elements opt in with attributes: `data-i18n` (text), `data-i18n-html` (trusted markup from
- * this file) and `data-i18n-label` (`aria-label` and `title`).
+ * this file) and `data-i18n-label` (`aria-label` and `title`). The loading texts are the
+ * original loader's (`Lang` static 50), shown before the lang files load.
  */
 import type { Lang } from './Language';
 
@@ -14,6 +15,9 @@ type PageTexts = Record<string, string>;
 const TEXT: Record<Lang, PageTexts> = {
   fr: {
     pageTitle: 'HammerFenix — Les Cavernes de Hammerfest',
+    loading: 'Voyage vers Hammerfest…',
+    loadError: 'Le voyage a échoué : le jeu n’a pas pu se charger.',
+    retry: 'Réessayer',
     credit: 'Hammerfest © Motion Twin',
     soundOn: 'Couper le son',
     soundOff: 'Remettre le son',
@@ -49,6 +53,9 @@ const TEXT: Record<Lang, PageTexts> = {
   },
   en: {
     pageTitle: 'HammerFenix — The Caverns of Hammerfest',
+    loading: 'Travelling to Hammerfest…',
+    loadError: 'The journey failed: the game could not load.',
+    retry: 'Try again',
     credit: 'Hammerfest © Motion Twin',
     soundOn: 'Mute sound',
     soundOff: 'Turn sound on',
@@ -84,6 +91,9 @@ const TEXT: Record<Lang, PageTexts> = {
   },
   es: {
     pageTitle: 'HammerFenix — Las Cavernas de Hammerfest',
+    loading: 'Viajando a Hammerfest…',
+    loadError: 'El viaje ha fallado: el juego no se ha podido cargar.',
+    retry: 'Reintentar',
     credit: 'Hammerfest © Motion Twin',
     soundOn: 'Silenciar',
     soundOff: 'Activar el sonido',
