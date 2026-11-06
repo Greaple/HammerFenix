@@ -270,6 +270,8 @@ export const SHELL_TEXT_KEYS: Record<Lang, string[]> = {
 
 const W = 420;
 const H = 520;
+/** Blur of the village behind the screens, in frame pixels. */
+const BG_BLUR = 5;
 /** Center of the screens' main button, at the bottom of their panel. */
 const BUTTON_Y = 478;
 
@@ -594,10 +596,19 @@ export class Shell {
   private drawBackground(dim: boolean): void {
     const bg = this.lib.attach('menu');
     const b = bg.getLocalBounds();
-    const s = Math.max(W / b.width, H / b.height);
+    // Blurred, so the menu reads as a backdrop and its fade into the first level does not show
+    // that the two villages are not drawn at the same place. A little larger than the frame,
+    // so the blur does not darken its edges.
+    const m = BG_BLUR * 3;
+    const s = Math.max((W + 2 * m) / b.width, (H + 2 * m) / b.height);
     bg.scale.set(s);
     bg.position.set((W - b.width * s) / 2 - b.x * s, (H - b.height * s) / 2 - b.y * s);
-    this.root.addChild(bg);
+    bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4 })];
+    // Drawn once into a texture: a blurred picture needs no more than the frame's resolution
+    const layer = new Container();
+    layer.addChild(bg);
+    layer.cacheAsTexture({ resolution: 1.5 });
+    this.root.addChild(layer);
     if (dim)
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.35 }));
   }
