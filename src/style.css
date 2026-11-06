@@ -106,7 +106,7 @@ body::before {
 .app-container {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
 }
 
 /* Floating header: the name on the left, round buttons on the right, no bar behind them */
@@ -399,6 +399,9 @@ body:not(.dev) .dev-only {
 
 .app-main {
   flex: 1;
+  min-height: 0;
+  /* The frame sizes itself from the room left under the header, whatever its height */
+  container-type: size;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -416,8 +419,8 @@ body:not(.dev) .dev-only {
 
 /* As large as the window allows, keeping the game's 420 x 520 shape, framed in wood */
 .game-canvas-container {
-  --frame-h: calc(100dvh - var(--topbar-h) - 48px - var(--below-frame));
-  width: min(100%, 760px, max(240px, var(--frame-h) * 420 / 520));
+  --frame-h: calc(100cqh - var(--below-frame));
+  width: min(100cqw, 760px, max(240px, var(--frame-h) * 420 / 520));
   aspect-ratio: 420 / 520;
   background-color: #000;
   border: 6px solid var(--wood);
@@ -571,7 +574,7 @@ body:not(.dev) .dev-only {
   }
 
   .game-canvas-container {
-    --frame-h: calc(100dvh - 16px);
+    --frame-h: 100cqh;
   }
 
   .game-wrapper {
@@ -1242,5 +1245,19 @@ dialog.parchment-dialog::backdrop {
 
   .lang-pill .icon {
     display: none;
+  }
+
+  /* The dev toolbar takes its own line under the name and buttons */
+  body.dev .topbar {
+    flex-wrap: wrap;
+  }
+
+  body.dev .dev-toolbar {
+    order: 3;
+    width: 100%;
+  }
+
+  body.dev .brand {
+    flex: 1 1 0;
   }
 }

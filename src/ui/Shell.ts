@@ -260,8 +260,8 @@ export const SHELL_TEXT_KEYS: Record<Lang, string[]> = {
 
 const W = 420;
 const H = 520;
-/** The wide key of `hammer_interf_instructions` (the space bar). */
-const KEY_ID = 389;
+/** Center of the screens' main button, at the bottom of their panel. */
+const BUTTON_Y = 478;
 
 /** Parchment and wood, as the page's help dialog (`src/style.css`). */
 const C = {
@@ -648,33 +648,70 @@ export class Shell {
     return c;
   }
 
-  /** The space bar key of the pause screen, with `label` beside it; clicking runs `action`. */
-  private keyButton(label: string, y: number, action: () => void): void {
-    const key = this.lib.instantiateCharacter(KEY_ID);
-    const group = new Container();
-    group.eventMode = 'static';
-    group.cursor = 'pointer';
-    group.on('pointertap', action);
-    if (key) group.addChild(key);
-    const keyText = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
-      size: 14,
-      color: 'rgb(102,102,102)',
-      parent: group,
-    });
-    const b = group.getLocalBounds();
-    keyText.position.set(b.x + b.width / 2, b.y + (b.height - keyText.height) / 2 - 1);
+  /**
+   * The screen's main action: a wood button at the bottom of the panel, centered on `cy`, as
+   * the help dialog's (`.parchment-btn`). With a keyboard, a keycap says the space bar does it
+   * too. `action` null draws it disabled.
+   */
+  private actionButton(label: string, cy: number, action: (() => void) | null, w = 220): void {
+    const h = 36;
+    const x = W / 2 - w / 2;
+    const y = cy - h / 2;
+    const c = new Container();
+    const face = new Container();
+    const on = action !== null;
+    c.addChild(new Graphics().roundRect(x, y + 3, w, h, h / 2).fill(on ? C.woodDark : 0xc9b48c));
+    face.addChild(new Graphics().roundRect(x, y, w, h, h / 2).fill(on ? C.wood : 0xd8c59c));
+    const glow = new Graphics().roundRect(x, y, w, h, h / 2).fill({ color: 0xffffff, alpha: 0.12 });
+    glow.visible = false;
+    face.addChild(glow);
     const lbl = this.text(label, 'label', 0, 0, {
       align: 'left',
-      size: 19,
-      color: '#ffffff',
-      shadow: true,
-      parent: group,
+      size: 17,
+      color: on ? C.gold : C.todo,
+      parent: face,
     });
-    lbl.position.set(b.x + b.width + 12, b.y + (b.height - lbl.height) / 2);
-    const gb = group.getLocalBounds();
-    group.hitArea = new Rectangle(gb.x - 6, gb.y - 6, gb.width + 12, gb.height + 12);
-    group.position.set(W / 2 - gb.x - gb.width / 2, y - gb.y);
-    this.root.addChild(group);
+    // The keycap, sized to its text
+    let capW = 0;
+    const cap = new Container();
+    if (on && hasKeyboard()) {
+      const k = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
+        align: 'left',
+        size: 9,
+        color: '#5f452c',
+        parent: cap,
+      });
+      capW = k.width + 12;
+      cap.addChildAt(
+        new Graphics()
+          .roundRect(0, 1.5, capW, 17, 4)
+          .fill(0xc8a878)
+          .roundRect(0, 0, capW, 17, 4)
+          .fill(0xfffaf0),
+        0,
+      );
+      k.position.set(6, (17 - k.height) / 2);
+      face.addChild(cap);
+    }
+    const gap = capW > 0 ? 10 : 0;
+    const left = W / 2 - (lbl.width + gap + capW) / 2;
+    lbl.position.set(left, cy - lbl.height / 2);
+    cap.position.set(left + lbl.width + gap, cy - 9);
+    c.addChild(face);
+    if (on) {
+      c.eventMode = 'static';
+      c.cursor = 'pointer';
+      c.hitArea = new Rectangle(x, y, w, h + 3);
+      c.on('pointerover', () => (glow.visible = true));
+      c.on('pointerout', () => {
+        glow.visible = false;
+        face.y = 0;
+      });
+      c.on('pointerdown', () => (face.y = 2));
+      c.on('pointerup', () => (face.y = 0));
+      c.on('pointertap', action);
+    }
+    this.root.addChild(c);
   }
 
   /** An item or other clip fitted in a `size` px cell centered on (x, y). */
@@ -736,9 +773,9 @@ export class Shell {
     const t = this.t;
     const entries = this.menuEntries();
     const cur = entries[this.selected];
-    this.drawTitle(4, 300);
-    const top = 132;
-    this.panel(26, top, 368, 334);
+    this.drawTitle(2, 290);
+    const top = 124;
+    this.panel(26, top, 368, H - 8 - top);
     this.text(t.modes, 'title', W / 2, top + 10, { color: '#5f452c' });
 
     MODES.forEach((m, i) => {
@@ -801,8 +838,9 @@ export class Shell {
       });
     });
 
-    if (cur.kind === 'tab') this.keyButton(t[cur.tab.screen], 478, () => this.confirm());
-    else if (shown.enabled) this.keyButton(t.start, 478, () => this.onStart?.(shown.mode));
+    if (cur.kind === 'tab') this.actionButton(t[cur.tab.screen], BUTTON_Y, () => this.confirm());
+    else if (shown.enabled) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
+    else this.actionButton(t.start, BUTTON_Y, null);
   }
 
   /** Quests done and items in the fridge, each out of all. */
@@ -892,7 +930,7 @@ export class Shell {
     const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
-    this.panel(12, 12, 396, 452);
+    this.panel(12, 12, 396, H - 20);
     this.text(t.quests, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
 
     // The three states, counted
@@ -975,7 +1013,8 @@ export class Shell {
     }
     const none = count('none');
     if (list.length > 0 && none > 0) {
-      this.text(fmt(t.moreQuests, none), 'body', W / 2, listBottom + 6, {
+      const shownRows = Math.min(list.length, QUEST_ROWS);
+      this.text(fmt(t.moreQuests, none), 'body', W / 2, listTop + shownRows * 24 + 6, {
         width: 360,
         size: 10,
         italic: true,
@@ -995,7 +1034,7 @@ export class Shell {
     else
       this.text(t.questRule, 'body', W / 2, sepY + 20, { width: 340, size: 11, color: C.inkSoft });
 
-    this.keyButton(t.back, 478, () => this.showMenu());
+    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170);
   }
 
   /** The selected quest: its items with "found / needed", and its reward once done. */
@@ -1044,7 +1083,7 @@ export class Shell {
     const q = this.profile.quests;
     const p = this.profile.data;
     const ids = q.itemIds;
-    this.panel(12, 12, 396, 452);
+    this.panel(12, 12, 396, H - 20);
     this.text(t.fridge, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
     const [have, all] = this.counts().fridge;
     this.text(fmt(t.fridgeCount, have, all), 'label', W / 2, 56, { size: 13 });
@@ -1160,7 +1199,7 @@ export class Shell {
     });
     if (!known && n > 0) this.bar(104, dy + 60, 160, 5, n / need, C.progress);
 
-    this.keyButton(t.back, 478, () => this.showMenu());
+    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170);
   }
 
   // --------------------------------------------------------------- results
@@ -1174,7 +1213,7 @@ export class Shell {
     const t = this.t;
     this.drawTitle(4, 250);
     const top = 112;
-    this.panel(26, top, 368, 354);
+    this.panel(26, top, 368, H - 8 - top);
     this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
       color: '#5f452c',
     });
@@ -1204,7 +1243,7 @@ export class Shell {
       const s = fridge === 1 ? t.newFridge1 : fmt(t.newFridge, fridge);
       lines.push({ s, color: C.progress });
     }
-    const panelBottom = top + 354;
+    const panelBottom = BUTTON_Y - 24;
     const linesTop = panelBottom - 16 - lines.length * 18;
     lines.forEach((l, i) => {
       this.text(l.s, 'label', W / 2, linesTop + i * 18, { size: 13, color: l.color });
@@ -1219,7 +1258,7 @@ export class Shell {
     const bottom = lines.length > 0 ? linesTop - 6 : panelBottom - 14;
     this.drawItems(picks, y, bottom);
 
-    this.keyButton(t.continue, 478, () => this.showMenu());
+    this.actionButton(t.continue, BUTTON_Y, () => this.showMenu());
   }
 
   /** The items in rows, as they look in the game, with their count. */
@@ -1252,4 +1291,11 @@ function fmt(s: string, ...args: (string | number)[]): string {
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */
 function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/** A keyboard is likely: not a touch-only device. */
+function hasKeyboard(): boolean {
+  return (
+    typeof matchMedia === 'undefined' || !matchMedia('(hover: none) and (pointer: coarse)').matches
+  );
 }
