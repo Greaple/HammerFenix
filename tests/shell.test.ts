@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PersistCodec } from '../src/engine/codec/PersistCodec';
-import { resultPicks } from '../src/ui/Shell';
+import { resultPicks } from '../src/game/Profile';
 
-describe('results page items (Shell resultPicks)', () => {
+describe('results page items (resultPicks)', () => {
   it('reads $item2 of a game over, score items from 1000', () => {
     const item2: number[] = [];
     item2[13] = 1;

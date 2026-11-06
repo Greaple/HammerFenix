@@ -383,6 +383,32 @@ export const Data = {
 
   RARITY: [0, 2000, 1000, 300, 100, 10, 1, 60] as readonly number[],
 
+  // Mode options
+  OPT_MIRROR: 'mirror',
+  OPT_MIRROR_MULTI: 'mirrormulti',
+  OPT_NIGHTMARE_MULTI: 'nightmaremulti',
+  OPT_NIGHTMARE: 'nightmare',
+  OPT_LIFE_SHARING: 'lifesharing',
+  OPT_SOCCER_BOMBS: 'soccerbomb',
+  OPT_KICK_CONTROL: 'kickcontrol',
+  OPT_BOMB_CONTROL: 'bombcontrol',
+  OPT_NINJA: 'ninja',
+  OPT_BOMB_EXPERT: 'bombexpert',
+  OPT_BOOST: 'boost',
+
+  OPT_SET_TA_0: 'set_ta_0',
+  OPT_SET_TA_1: 'set_ta_1',
+  OPT_SET_TA_2: 'set_ta_2',
+
+  OPT_SET_MTA_0: 'set_mta_0',
+  OPT_SET_MTA_1: 'set_mta_1',
+  OPT_SET_MTA_2: 'set_mta_2',
+
+  OPT_SET_SOC_0: 'set_soc_0',
+  OPT_SET_SOC_1: 'set_soc_1',
+  OPT_SET_SOC_2: 'set_soc_2',
+  OPT_SET_SOC_3: 'set_soc_3',
+
   // Player heads (frames of the head clip)
   HEAD_NORMAL: 1,
   HEAD_AFRO: 2,
@@ -533,6 +559,21 @@ export class GameDataStore {
 
   getItemName(id: number): string {
     return this.lang.items[id] ?? '';
+  }
+
+  /** `Lang.getFamilyName` */
+  getFamilyName(id: number): string {
+    return this.lang.families[id] ?? '';
+  }
+
+  /** `Lang.getQuestName` */
+  getQuestName(id: number): string {
+    return this.lang.quests[id]?.title ?? '';
+  }
+
+  /** `Lang.getQuestDesc` */
+  getQuestDesc(id: number): string {
+    return this.lang.quests[id]?.desc ?? '';
   }
 
   getSectorName(did: number, lid: number): string {

@@ -7,6 +7,8 @@ import { GameSession } from './game/GameSession';
 import { SymbolBrowser } from './ui/SymbolBrowser';
 import { DebugToolkit } from './ui/DebugToolkit';
 import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
+import { Profile } from './game/Profile';
+import { QuestEngine } from './game/Quests';
 import { Shell } from './ui/Shell';
 
 const SOUNDS: Record<string, string> = {
@@ -111,7 +113,9 @@ async function main(): Promise<void> {
   // 5. Create GameSession. The mode menu shows first, in the game frame (it replaces the
   // hammerfest.fr pages, roadmap 3.1).
   const session = await GameSession.create(app, lib, dataStore, audio, input, 'adventure');
-  const shell = new Shell(lib, input, dataStore);
+  // The player's profile: what the hammerfest.fr server kept (roadmap 3.2)
+  const profile = new Profile(new QuestEngine(dataStore.quests, dataStore.items));
+  const shell = new Shell(lib, input, dataStore, profile);
   await shell.load(baseUrl);
   app.stage.addChild(shell.root);
   session.gameRoot.visible = false;
@@ -125,14 +129,19 @@ async function main(): Promise<void> {
   };
   shell.onStart = (mode) => {
     showGame();
+    // The site's start query answers with the profile's families
+    session.setParameters(profile.familiesParam);
     session.gameReady(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
   // The Loader is done (score saved, or the end of the set): the results replace the game
   session.onGameResult = (result) => {
     session.stop();
-    shell.showResult(result);
+    // Only Adventure games started from the menu count for the profile (site guide, section 4)
+    const record = session.siteMode === 'solo' ? profile.recordGame(result) : null;
+    shell.showResult(result, record);
   };
+  (window as any).profile = profile;
   (window as any).shell = shell;
   (window as any).gameSession = session;
   (window as any).pixiApp = app;

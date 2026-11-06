@@ -1,18 +1,21 @@
 /**
- * The screens that replace the hammerfest.fr site (roadmap 3.1): the mode menu and the results
- * page after a game. They are drawn inside the game frame with the game's own graphics: a level
- * background (`hammer_bg`), the parchment and keys of the pause screen
- * (`hammer_interf_instructions`), the item clips, and the site's logo banner and mode icons
- * (`public/site/`, copied by `tools/build-site.ts`). Texts use the game's fonts and colors.
+ * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d): the mode menu, the
+ * results page after a game, the quests and the fridge. They are drawn inside the game frame
+ * with the game's own graphics: a level background (`hammer_bg`), the parchment and keys of the
+ * pause screen (`hammer_interf_instructions`), the item clips, and the site's logo banner, mode
+ * icons and tab icons (`public/site/`, copied by `tools/build-site.ts`). Texts use the game's
+ * fonts and colors.
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
- * mode list and texts follow the site guide; the results show what the game sends the site.
+ * mode list and texts follow the site guide; the results show what the game sends the site;
+ * the quest and fridge pages show the profile (3.2b) as the site's pages did: quests done and
+ * in progress with their items, and the items found with their count.
  */
-import { Container, Graphics, Sprite, Text, TextStyle, Texture, Rectangle } from 'pixi.js';
-import { PersistCodec } from '../engine/codec/PersistCodec';
+import { Container, Graphics, Rectangle, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import type { InputController } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import type { GameResult } from '../game/Loader';
+import { type GameRecord, type Profile, resultPicks } from '../game/Profile';
 
 /** The game's lang texts the screens reuse. */
 export interface ShellTexts {
@@ -23,9 +26,13 @@ export interface ShellTexts {
   getItemName(id: number): string;
   /** `Lang.getSectorName`: the name of the area of level `lid` in dimension `did`. */
   getSectorName(did: number, lid: number): string;
+  getFamilyName(id: number): string;
+  getQuestName(id: number): string;
+  getQuestDesc(id: number): string;
 }
 
 type Lang = 'fr' | 'en' | 'es';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge';
 
 interface ModeEntry {
   /** The site's menu icon (`menu/<icon>.gif`) and `$mode`. */
@@ -41,9 +48,16 @@ const MODES: ModeEntry[] = [
   { icon: 'itutorial', mode: 'tutorial', enabled: false },
 ];
 
+/** The site's tabs under the mode menu: its "Quêtes" and "Réfrigérateur" icons. */
+const TABS: { screen: 'quests' | 'fridge'; icon: string }[] = [
+  { screen: 'quests', icon: 'icon_quests' },
+  { screen: 'fridge', icon: 'icon_inventory' },
+];
+
 /**
- * Texts. Mode names and descriptions are the site guide's (`guide.html` of hammerfest.fr,
- * hfest.net and hammerfest.es); the others are the port's own.
+ * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
+ * (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), "N objets sur 353" and
+ * "Aucune ! Il va falloir jouer plus !" the public profile's; the others are the port's own.
  */
 const TEXT: Record<Lang, Record<string, string>> = {
   fr: {
@@ -60,6 +74,19 @@ const TEXT: Record<Lang, Record<string, string>> = {
     endGame: 'Fin de l’aventure !',
     collected: 'Objets trouvés',
     none: 'Aucun objet trouvé',
+    quests: 'Quêtes',
+    fridge: 'Réfrigérateur',
+    questsDesc: '{0} quêtes terminées sur {1}, {2} en cours.',
+    fridgeDesc: '{0} objets sur {1}',
+    noQuest: 'Aucune ! Il va falloir jouer plus !',
+    done: 'terminée',
+    questDone: 'Quête terminée : {0}',
+    moreQuests: 'et {0} autres quêtes terminées',
+    newFridge: '{0} nouveaux objets dans le réfrigérateur',
+    newFridge1: 'Un nouvel objet dans le réfrigérateur',
+    unknown: 'Objet inconnu',
+    found: 'Trouvé {0} fois',
+    back: 'Retour',
   },
   en: {
     modes: 'Game modes',
@@ -74,6 +101,19 @@ const TEXT: Record<Lang, Record<string, string>> = {
     endGame: 'End of the adventure!',
     collected: 'Items found',
     none: 'No item found',
+    quests: 'Quests',
+    fridge: 'Fridge',
+    questsDesc: '{0} quests done out of {1}, {2} in progress.',
+    fridgeDesc: '{0} items out of {1}',
+    noQuest: 'None! You will have to play more!',
+    done: 'done',
+    questDone: 'Quest done: {0}',
+    moreQuests: 'and {0} more quests done',
+    newFridge: '{0} new items in the fridge',
+    newFridge1: 'One new item in the fridge',
+    unknown: 'Unknown item',
+    found: 'Found {0} times',
+    back: 'Back',
   },
   es: {
     modes: 'Modos de juego',
@@ -89,6 +129,19 @@ const TEXT: Record<Lang, Record<string, string>> = {
     endGame: '¡Fin de la aventura!',
     collected: 'Objetos encontrados',
     none: 'Ningún objeto',
+    quests: 'Exploraciones',
+    fridge: 'Frigorífico',
+    questsDesc: '{0} exploraciones terminadas de {1}, {2} en curso.',
+    fridgeDesc: '{0} objetos de {1}',
+    noQuest: '¡Ninguna! ¡Tendrás que jugar más!',
+    done: 'terminada',
+    questDone: 'Exploración terminada: {0}',
+    moreQuests: 'y {0} exploraciones más',
+    newFridge: '{0} objetos nuevos en el frigorífico',
+    newFridge1: 'Un objeto nuevo en el frigorífico',
+    unknown: 'Objeto desconocido',
+    found: 'Encontrado {0} veces',
+    back: 'Volver',
   },
 };
 
@@ -100,6 +153,8 @@ const PARCHMENT_BITMAP = 22;
 const KEY_ID = 389;
 /** `hammer_bg` frame behind the screens: the stone wall of the first caverns. */
 const BG_FRAME = 3;
+/** The site's color of a completed quest (`.statusCompleted`). */
+const GREEN = '#51cc15';
 
 /** Colors and fonts of `hammer_interf_instructions` (`title`, `move`, `tip`, `click`). */
 const STYLE = {
@@ -113,23 +168,38 @@ const STYLE = {
 
 type TextKind = keyof typeof STYLE;
 
+/** Quest rows shown at once. */
+const QUEST_ROWS = 8;
+/** Fridge grid. */
+const FRIDGE_COLS = 10;
+const FRIDGE_ROWS = 6;
+const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
+const FRIDGE_CELL = 34;
+
 export class Shell {
   readonly root = new Container();
   private readonly lib: SwfLibrary;
   private readonly input: InputController;
   private readonly texts: ShellTexts;
+  private readonly profile: Profile;
   private readonly images = new Map<string, Texture>();
-  private screen: 'menu' | 'result' | null = null;
+  private screen: Screen | null = null;
   private result: GameResult | null = null;
+  private record: GameRecord | null = null;
+  /** Menu entry: the modes, then the tabs. */
   private selected = 0;
+  private questSel = 0;
+  private questTop = 0;
+  private fridgeSel = 0;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
 
-  constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts) {
+  constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts, profile: Profile) {
     this.lib = lib;
     this.input = input;
     this.texts = texts;
+    this.profile = profile;
     this.root.visible = false;
     this.root.eventMode = 'static';
   }
@@ -138,7 +208,9 @@ export class Shell {
   async load(baseUrl: string): Promise<void> {
     const files = [
       'img/design/headers/fr/header.jpg',
+      'img/items/small/a.gif',
       ...MODES.map((m) => `img/design/menu/${m.icon}.gif`),
+      ...TABS.flatMap((t) => [`img/design/${t.icon}.png`, `img/design/${t.icon}_on.png`]),
     ];
     await Promise.all(
       files.map(async (f) => {
@@ -154,16 +226,39 @@ export class Shell {
     return this.root.visible;
   }
 
+  /** The screen showing, if any. */
+  get current(): Screen | null {
+    return this.screen;
+  }
+
   showMenu(): void {
     this.screen = 'menu';
     this.result = null;
+    this.record = null;
     this.render();
   }
 
-  /** The page the site loaded once the game was saved: the results of `result`. */
-  showResult(result: GameResult): void {
+  /**
+   * The page the site loaded once the game was saved: the results of `result`, and what it
+   * added to the profile (`record`, for an Adventure game).
+   */
+  showResult(result: GameResult, record: GameRecord | null = null): void {
     this.screen = 'result';
     this.result = result;
+    this.record = record;
+    this.render();
+  }
+
+  showQuests(): void {
+    this.screen = 'quests';
+    this.questSel = 0;
+    this.questTop = 0;
+    this.render();
+  }
+
+  showFridge(): void {
+    this.screen = 'fridge';
+    this.fridgeSel = 0;
     this.render();
   }
 
@@ -178,29 +273,78 @@ export class Shell {
     if (this.screen) this.render();
   }
 
-  /** Keys, once per frame while a screen shows: up/down choose, space confirms. */
+  /** Keys, once per frame while a screen shows: arrows choose, space confirms. */
   update(): void {
     if (!this.screen) return;
-    this.input.poll();
-    if (this.screen === 'menu') {
-      if (this.input.consumePress('jump')) this.select(this.selected - 1);
-      if (this.input.consumePress('down')) this.select(this.selected + 1);
-      if (this.input.consumePress('attack')) this.confirm();
-    } else if (this.input.consumePress('attack') || this.input.consumePress('jump')) {
-      this.showMenu();
+    const inp = this.input;
+    inp.poll();
+    const up = inp.consumePress('jump');
+    const down = inp.consumePress('down');
+    const left = inp.consumePress('left');
+    const right = inp.consumePress('right');
+    const ok = inp.consumePress('attack');
+    const esc = inp.consumePress('pause');
+    switch (this.screen) {
+      case 'menu': {
+        const tab = this.selected >= MODES.length;
+        if (up) this.select(this.selected - 1);
+        if (down) this.select(this.selected + 1);
+        if (tab && (left || right)) {
+          this.select(this.selected === MODES.length ? MODES.length + 1 : MODES.length);
+        }
+        if (ok) this.confirm();
+        break;
+      }
+      case 'result':
+        if (ok || up) this.showMenu();
+        break;
+      case 'quests':
+        if (up) this.selectQuest(this.questSel - 1);
+        if (down) this.selectQuest(this.questSel + 1);
+        if (ok || esc) this.showMenu();
+        break;
+      case 'fridge':
+        if (left) this.selectItem(this.fridgeSel - 1);
+        if (right) this.selectItem(this.fridgeSel + 1);
+        if (up) this.selectItem(this.fridgeSel - FRIDGE_COLS);
+        if (down) this.selectItem(this.fridgeSel + FRIDGE_COLS);
+        if (ok || esc) this.showMenu();
+        break;
     }
   }
 
   private select(i: number): void {
-    const n = (i + MODES.length) % MODES.length;
+    const count = MODES.length + TABS.length;
+    const n = (i + count) % count;
     if (n === this.selected) return;
     this.selected = n;
     this.render();
   }
 
   private confirm(): void {
+    if (this.selected >= MODES.length) {
+      if (TABS[this.selected - MODES.length].screen === 'quests') this.showQuests();
+      else this.showFridge();
+      return;
+    }
     const m = MODES[this.selected];
     if (m.enabled) this.onStart?.(m.mode);
+  }
+
+  private selectQuest(i: number): void {
+    const n = Math.max(0, Math.min(this.questList().length - 1, i));
+    if (n === this.questSel) return;
+    this.questSel = n;
+    if (n < this.questTop) this.questTop = n;
+    if (n >= this.questTop + QUEST_ROWS) this.questTop = n - QUEST_ROWS + 1;
+    this.render();
+  }
+
+  private selectItem(i: number): void {
+    const n = Math.max(0, Math.min(this.profile.quests.itemIds.length - 1, i));
+    if (n === this.fridgeSel) return;
+    this.fridgeSel = n;
+    this.render();
   }
 
   private get t(): Record<string, string> {
@@ -218,6 +362,8 @@ export class Shell {
     this.root.parent?.addChild(this.root); // above the Loader's clip
     this.drawBackground();
     if (this.screen === 'menu') this.drawMenu();
+    else if (this.screen === 'quests') this.drawQuests();
+    else if (this.screen === 'fridge') this.drawFridge();
     else if (this.result) this.drawResult(this.result);
   }
 
@@ -262,6 +408,7 @@ export class Shell {
       align?: 'left' | 'center' | 'right';
       size?: number;
       color?: string;
+      parent?: Container;
     } = {},
   ): Text {
     const st = STYLE[kind];
@@ -284,50 +431,78 @@ export class Shell {
     });
     t.anchor.set(align === 'center' ? 0.5 : align === 'right' ? 1 : 0, 0);
     t.position.set(x, y);
-    this.root.addChild(t);
+    (opts.parent ?? this.root).addChild(t);
     return t;
+  }
+
+  /** A clickable area holding its children. */
+  private button(action: () => void): Container {
+    const c = new Container();
+    c.eventMode = 'static';
+    c.cursor = 'pointer';
+    c.on('pointertap', action);
+    this.root.addChild(c);
+    return c;
   }
 
   /** The space bar key of the pause screen, with `label` beside it; clicking runs `action`. */
   private keyButton(label: string, y: number, action: () => void, size?: number): void {
     const key = this.lib.instantiateCharacter(KEY_ID);
-    const group = new Container();
+    const group = this.button(action);
     if (key) group.addChild(key);
-    this.root.addChild(group);
-    const keyText = this.text(this.texts.getStatic(10) || 'SPACE', 'key', 0, 0);
-    group.addChild(keyText);
+    const keyText = this.text(this.texts.getStatic(10) || 'SPACE', 'key', 0, 0, { parent: group });
     const b = group.getLocalBounds();
     keyText.position.set(b.x + b.width / 2, b.y + (b.height - keyText.height) / 2 - 1);
-    const lbl = this.text(label, 'label', 0, 0, { align: 'left', size });
-    group.addChild(lbl);
+    const lbl = this.text(label, 'label', 0, 0, { align: 'left', size, parent: group });
     lbl.position.set(b.x + b.width + 12, b.y + (b.height - lbl.height) / 2);
     const gb = group.getLocalBounds();
     group.position.set(W / 2 - gb.x - gb.width / 2, y - gb.y);
-    group.eventMode = 'static';
-    group.cursor = 'pointer';
-    group.on('pointertap', action);
   }
+
+  /** The item's clip as it looks in the game, fitted in a `size` px cell centered on (x, y). */
+  private itemIcon(id: number, x: number, y: number, size: number, parent?: Container): void {
+    const mc = this.lib.attach(id >= 1000 ? 'hammer_item_score' : 'hammer_item_special');
+    mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
+    const b = mc.getLocalBounds();
+    const fit = Math.min(1, size / Math.max(b.width, b.height, 1));
+    mc.scale.set(fit);
+    mc.position.set(x - (b.x + b.width / 2) * fit, y - (b.y + b.height / 2) * fit);
+    (parent ?? this.root).addChild(mc);
+  }
+
+  /** The site's icon of an item not in the fridge yet (`img/items/small/a.gif`). */
+  private unknownIcon(x: number, y: number, size: number, parent?: Container): void {
+    const tex = this.images.get('img/items/small/a.gif');
+    if (!tex) return;
+    const s = new Sprite(tex);
+    s.anchor.set(0.5);
+    s.scale.set(size / tex.width);
+    s.position.set(x, y);
+    (parent ?? this.root).addChild(s);
+  }
+
+  private highlight(x: number, y: number, w: number, h: number, on: boolean, parent?: Container) {
+    const g = new Graphics()
+      .roundRect(x, y, w, h, 6)
+      .fill({ color: 0x5f452c, alpha: on ? 0.55 : 0 });
+    (parent ?? this.root).addChild(g);
+  }
+
+  // ------------------------------------------------------------------ menu
 
   private drawMenu(): void {
     const t = this.t;
-    this.parchment(W / 2, 288, 380, 230);
-    this.text(t.modes, 'title', W / 2, 190);
+    this.parchment(W / 2, 296, 380, 280);
+    this.text(t.modes, 'title', W / 2, 172);
 
     MODES.forEach((m, i) => {
-      const y = 232 + i * 36;
+      const y = 212 + i * 36;
       const sel = i === this.selected;
-      const row = new Container();
-      row.eventMode = 'static';
-      row.cursor = 'pointer';
-      row.on('pointertap', () => {
+      const row = this.button(() => {
         if (this.selected === i) this.confirm();
         else this.select(i);
       });
-      this.root.addChild(row);
-      const hl = new Graphics()
-        .roundRect(70, y - 4, 280, 31, 6)
-        .fill({ color: 0x5f452c, alpha: sel ? 0.55 : 0 });
-      row.addChild(hl);
+      this.highlight(70, y - 4, 280, 31, sel, row);
       const icon = this.images.get(`img/design/menu/${m.icon}.gif`);
       if (icon) {
         const s = new Sprite(icon);
@@ -336,22 +511,211 @@ export class Shell {
         row.addChild(s);
       }
       const name = m.enabled ? t[m.mode] : `${t[m.mode]} (${t.soon})`;
-      const lbl = this.text(name, 'label', 116, y, {
+      this.text(name, 'label', 116, y, {
         align: 'left',
         color: m.enabled ? (sel ? '#ffffff' : STYLE.label.color) : 'rgb(170,140,100)',
+        parent: row,
       });
-      row.addChild(lbl);
     });
 
+    const tab = this.selected >= MODES.length ? TABS[this.selected - MODES.length] : null;
     const m = MODES[this.selected];
-    this.text(t[m.mode + 'Desc'], 'tip', W / 2, 312, { width: 300, size: 11 });
+    const desc = tab ? this.tabSummary(tab.screen) : t[m.mode + 'Desc'];
+    this.text(desc, 'tip', W / 2, 288, { width: 300, size: 11 });
 
-    if (m.enabled) this.keyButton(t.start, 420, () => this.confirm());
+    if (tab) this.keyButton(t[tab.screen], 458, () => this.confirm());
+    else if (m.enabled) this.keyButton(t.start, 458, () => this.confirm());
+
+    // The site's tabs, its quest and fridge icons
+    TABS.forEach((tb, i) => {
+      const n = MODES.length + i;
+      const sel = n === this.selected;
+      const x = W / 2 + (i === 0 ? -62 : 62);
+      const btn = this.button(() => {
+        if (this.selected === n) this.confirm();
+        else this.select(n);
+      });
+      const tex = this.images.get(`img/design/${tb.icon}${sel ? '_on' : ''}.png`);
+      if (tex) {
+        const s = new Sprite(tex);
+        s.anchor.set(0.5, 0);
+        s.scale.set(0.8);
+        s.position.set(x, 330);
+        btn.addChild(s);
+      }
+      this.text(t[tb.screen], 'click', x, 376, {
+        size: 12,
+        color: sel ? '#ffffff' : STYLE.click.color,
+        parent: btn,
+      });
+    });
   }
+
+  private tabSummary(screen: 'quests' | 'fridge'): string {
+    const p = this.profile.data;
+    const q = this.profile.quests;
+    if (screen === 'quests') {
+      const progress = q.quests.filter((x) => q.status(p, x.id) === 'progress').length;
+      return fmt(this.t.questsDesc, p.quests.length, q.quests.length, progress);
+    }
+    const ids = q.itemIds;
+    return fmt(this.t.fridgeDesc, ids.filter((id) => q.inFridge(p, id)).length, ids.length);
+  }
+
+  // ---------------------------------------------------------------- quests
+
+  /** Quests done, then quests in progress, each in id order, as on the site's profile. */
+  private questList(): number[] {
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const ids = q.quests.map((x) => x.id);
+    return [
+      ...ids.filter((id) => q.status(p, id) === 'done'),
+      ...ids.filter((id) => q.status(p, id) === 'progress'),
+    ];
+  }
+
+  private drawQuests(): void {
+    const t = this.t;
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    this.parchment(W / 2, 318, 404, 392);
+    this.text(t.quests, 'title', W / 2, 130);
+    this.text(this.tabSummary('quests'), 'tip', W / 2, 160, { size: 11 });
+
+    const list = this.questList();
+    if (list.length === 0) {
+      this.text(t.noQuest, 'click', W / 2, 240, { width: 320 });
+    }
+    list.slice(this.questTop, this.questTop + QUEST_ROWS).forEach((id, k) => {
+      const i = this.questTop + k;
+      const y = 182 + k * 20;
+      const sel = i === this.questSel;
+      const row = this.button(() => this.selectQuest(i));
+      this.highlight(36, y - 2, 348, 20, sel, row);
+      const done = q.status(p, id) === 'done';
+      this.text(this.texts.getQuestName(id), 'click', 46, y, {
+        align: 'left',
+        size: 13,
+        color: sel ? '#ffffff' : done ? GREEN : STYLE.click.color,
+        parent: row,
+      });
+      const reqs = q.requirements(id);
+      const met = reqs.filter((r) => (p.items[r.item] ?? 0) >= r.qty).length;
+      this.text(done ? t.done : `${met} / ${reqs.length}`, 'tip', 374, y + 2, {
+        align: 'right',
+        color: done ? GREEN : STYLE.tip.color,
+        parent: row,
+      });
+    });
+    if (this.questTop > 0) this.text('▲', 'tip', W / 2, 171, { size: 9 });
+    if (this.questTop + QUEST_ROWS < list.length) {
+      this.text('▼', 'tip', W / 2, 182 + QUEST_ROWS * 20 - 2, { size: 9 });
+    }
+
+    const id = list[this.questSel];
+    if (id !== undefined) this.drawQuestDetail(id);
+
+    this.keyButton(t.back, 470, () => this.showMenu(), 14);
+  }
+
+  /** The quest's items with "found / needed" (`.itemQuest`), and its text once done. */
+  private drawQuestDetail(id: number): void {
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const reqs = q.requirements(id);
+    const cell = Math.min(34, 360 / reqs.length);
+    const x0 = W / 2 - (reqs.length * cell) / 2;
+    const y = 362;
+    reqs.forEach((r, i) => {
+      const x = x0 + i * cell + cell / 2;
+      const have = p.items[r.item] ?? 0;
+      if (have > 0) this.itemIcon(r.item, x, y, cell - 8);
+      else this.unknownIcon(x, y, Math.min(20, cell - 10));
+      this.text(`${Math.min(have, r.qty)}/${r.qty}`, 'tip', x, y + 14, {
+        size: 9,
+        color: have >= r.qty ? GREEN : STYLE.tip.color,
+      });
+    });
+    if (q.status(p, id) === 'done') {
+      this.text(this.texts.getQuestDesc(id), 'tip', W / 2, 394, { width: 350, size: 10 });
+    }
+  }
+
+  // ---------------------------------------------------------------- fridge
+
+  private drawFridge(): void {
+    const t = this.t;
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const ids = q.itemIds;
+    this.parchment(W / 2, 318, 404, 392);
+    this.text(t.fridge, 'title', W / 2, 130);
+    this.text(this.tabSummary('fridge'), 'tip', W / 2, 160, { size: 11 });
+
+    const page = Math.floor(this.fridgeSel / FRIDGE_PAGE);
+    const pages = Math.ceil(ids.length / FRIDGE_PAGE);
+    const x0 = W / 2 - (FRIDGE_COLS * FRIDGE_CELL) / 2;
+    const y0 = 178;
+    ids.slice(page * FRIDGE_PAGE, (page + 1) * FRIDGE_PAGE).forEach((id, k) => {
+      const i = page * FRIDGE_PAGE + k;
+      const cx = x0 + (k % FRIDGE_COLS) * FRIDGE_CELL;
+      const cy = y0 + Math.floor(k / FRIDGE_COLS) * FRIDGE_CELL;
+      const cellBtn = this.button(() => this.selectItem(i));
+      this.highlight(cx, cy, FRIDGE_CELL - 2, FRIDGE_CELL - 2, i === this.fridgeSel, cellBtn);
+      const mx = cx + FRIDGE_CELL / 2 - 1;
+      const my = cy + FRIDGE_CELL / 2 - 1;
+      if (q.inFridge(p, id)) {
+        this.itemIcon(id, mx, my, FRIDGE_CELL - 8, cellBtn);
+        const n = p.items[id] ?? 0;
+        if (n > 1) {
+          const c = this.text(`${n}`, 'tip', 0, 0, { size: 9, color: '#ffffff', parent: cellBtn });
+          c.anchor.set(1, 1);
+          c.position.set(cx + FRIDGE_CELL - 3, cy + FRIDGE_CELL - 2);
+        }
+      } else {
+        this.unknownIcon(mx, my, 20, cellBtn);
+      }
+    });
+
+    // Pages
+    const py = y0 + FRIDGE_ROWS * FRIDGE_CELL + 4;
+    this.text(`${page + 1} / ${pages}`, 'tip', W / 2, py, { size: 11 });
+    if (page > 0) {
+      const b = this.button(() => this.selectItem((page - 1) * FRIDGE_PAGE));
+      this.text('◀', 'click', W / 2 - 50, py - 2, { parent: b });
+    }
+    if (page < pages - 1) {
+      const b = this.button(() => this.selectItem((page + 1) * FRIDGE_PAGE));
+      this.text('▶', 'click', W / 2 + 50, py - 2, { parent: b });
+    }
+
+    // The selected item: name, family and count (the site's `table.fridge` columns)
+    const id = ids[this.fridgeSel];
+    const n = p.items[id] ?? 0;
+    const known = q.inFridge(p, id);
+    this.text(known ? this.texts.getItemName(id) : t.unknown, 'label', W / 2, 402, { size: 15 });
+    const fid = q.familyOf(id);
+    if (fid !== undefined) {
+      const fam = q.itemsOf(fid);
+      const have = fam.filter((x) => q.inFridge(p, x)).length;
+      const name = this.texts.getFamilyName(fid);
+      this.text(`${name} (${have}/${fam.length})`, 'click', W / 2, 422, { size: 12 });
+    }
+    if (n > 0) {
+      const s = known ? fmt(t.found, n) : `${fmt(t.found, n)} (${n}/${q.unlockCount(id)})`;
+      this.text(s, 'tip', W / 2, 440, { size: 10 });
+    }
+
+    this.keyButton(t.back, 470, () => this.showMenu(), 14);
+  }
+
+  // --------------------------------------------------------------- results
 
   /**
    * What the game sent the site: the reached level and score for a game over, and the items
-   * found. The end of the set sends no score (`GameMode.exitGame`).
+   * found. The end of the set sends no score (`GameMode.exitGame`). Then what the game added
+   * to the profile: the quests it completed and the new fridge items.
    */
   private drawResult(r: GameResult): void {
     const t = this.t;
@@ -371,10 +735,28 @@ export class Shell {
       y += 76;
     }
 
+    // Quest lines above the key
+    const lines: { s: string; color: string }[] = [];
+    const done = this.record?.quests ?? [];
+    for (const id of done.slice(0, done.length > 3 ? 2 : 3)) {
+      lines.push({ s: fmt(t.questDone, this.texts.getQuestName(id)), color: GREEN });
+    }
+    if (done.length > 3) lines.push({ s: fmt(t.moreQuests, done.length - 2), color: GREEN });
+    const fridge = this.record?.fridge.length ?? 0;
+    if (fridge > 0) {
+      const s = fridge === 1 ? t.newFridge1 : fmt(t.newFridge, fridge);
+      lines.push({ s, color: STYLE.click.color });
+    }
+    const linesTop = 446 - lines.length * 17;
+    lines.forEach((l, i) => {
+      this.text(l.s, 'click', W / 2, linesTop + i * 17, { size: 12, color: l.color });
+    });
+
     const picks = resultPicks(r);
     this.text(picks.length > 0 ? t.collected : t.none, 'click', W / 2, y);
     y += 22;
-    this.drawItems(picks, y, r.kind === 'gameOver' ? 425 : 455);
+    const bottom = lines.length > 0 ? linesTop - 4 : r.kind === 'gameOver' ? 425 : 455;
+    this.drawItems(picks, y, bottom);
 
     this.keyButton(this.texts.getStatic(6) || '...', 458, () => this.showMenu(), 14);
   }
@@ -385,52 +767,23 @@ export class Shell {
     const cell = 40;
     const rows = Math.max(1, Math.ceil(picks.length / cols));
     const size = Math.min(cell, (bottom - top) / rows);
-    const scale = size / cell;
     const x0 = W / 2 - (Math.min(cols, picks.length) * size) / 2;
     picks.forEach(([id, n], i) => {
-      const mc = this.lib.attach(id >= 1000 ? 'hammer_item_score' : 'hammer_item_special');
-      mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
-      const holder = new Container();
-      holder.addChild(mc);
-      const b = mc.getLocalBounds();
-      const fit = Math.min(1, (cell - 8) / Math.max(b.width, b.height, 1));
-      mc.scale.set(fit);
-      mc.position.set(-(b.x + b.width / 2) * fit, -(b.y + b.height / 2) * fit);
-      holder.scale.set(scale);
-      holder.position.set(
-        x0 + (i % cols) * size + size / 2,
-        top + Math.floor(i / cols) * size + size / 2,
-      );
-      this.root.addChild(holder);
+      const x = x0 + (i % cols) * size + size / 2;
+      const y = top + Math.floor(i / cols) * size + size / 2;
+      this.itemIcon(id, x, y, size - 8 * (size / cell));
       if (n > 1) {
         const c = this.text(`x${n}`, 'tip', 0, 0, { size: 10, color: '#ffffff' });
         c.anchor.set(1, 1);
-        c.position.set(holder.x + size / 2 - 1, holder.y + size / 2);
+        c.position.set(x + size / 2 - 1, y + size / 2);
       }
     });
   }
 }
 
-/**
- * The items found in the game, as `[item id, count]` in id order. A game over sends `$item2`
- * (count per id, score items at id + 1000); the end of the set sends the special and score
- * pick arrays, `PersistCodec` encoded (`GameMode.exitGame`).
- */
-export function resultPicks(r: GameResult): [number, number][] {
-  let counts: number[] = [];
-  if (r.kind === 'gameOver') {
-    counts = r.stats.item2;
-  } else if (r.params) {
-    const codec = new PersistCodec();
-    const [special, score] = (codec.decode<string>(r.params) ?? '').split(':');
-    (codec.decode<number[]>(special ?? '') ?? []).forEach((n, id) => (counts[id] = n));
-    (codec.decode<number[]>(score ?? '') ?? []).forEach((n, id) => (counts[id + 1000] = n));
-  }
-  const out: [number, number][] = [];
-  counts.forEach((n, id) => {
-    if (n > 0) out.push([id, n]);
-  });
-  return out;
+/** Replaces `{0}`, `{1}`... with the arguments. */
+function fmt(s: string, ...args: (string | number)[]): string {
+  return s.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)]));
 }
 
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */

@@ -19,6 +19,13 @@ export interface Replay {
   set: string;
   level: number;
   seed: number;
+  /**
+   * `$families` and `$options` of the game (`GameParameters`). Absent in the first replays,
+   * which were recorded with families 0, 1, 2, 1000, 1001, 1002; a replay without them plays
+   * with the system families.
+   */
+  families?: string;
+  options?: string;
   input: [number, number][];
 }
 
@@ -36,8 +43,16 @@ export class InputRecorder {
     return this.runs.reduce((n, [, count]) => n + count, 0);
   }
 
-  toReplay(set: string, level: number, seed: number): Replay {
-    return { version: 1, set, level, seed, input: this.runs.map(([m, n]) => [m, n]) };
+  toReplay(set: string, level: number, seed: number, families?: string, options?: string): Replay {
+    return {
+      version: 1,
+      set,
+      level,
+      seed,
+      families,
+      options,
+      input: this.runs.map(([m, n]) => [m, n]),
+    };
   }
 }
 

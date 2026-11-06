@@ -19,6 +19,7 @@ import { FxManager } from './FxManager';
 import { Random } from './Random';
 import { PersistCodec } from '../engine/codec/PersistCodec';
 import packageJson from '../../package.json';
+import { GameParameters, SYSTEM_FAMILIES } from './GameParameters';
 import { type GameResult, Loader } from './Loader';
 import { RandomManager } from './RandomManager';
 import { StatsManager } from './StatsManager';
@@ -30,14 +31,6 @@ import { LevelWorld } from './levels/LevelWorld';
 import { ScriptRunner } from './levels/ScriptRunner';
 
 const SAVE_KEY = 'hammerfenix_save_v1';
-
-/**
- * Item families the player has unlocked. The original reads them from the player profile
- * (`GameParameters.specialItemFamilies` / `scoreItemFamilies`). Until profiles exist (roadmap 3.2),
- * use the base families.
- */
-const SPECIAL_ITEM_FAMILIES: readonly number[] = [0, 1, 2];
-const SCORE_ITEM_FAMILIES: readonly number[] = [1000, 1001, 1002];
 
 export interface GameSaveData {
   highScore: number;
@@ -95,8 +88,20 @@ export class GameSession implements IGameContext {
   duration = 0;
   /** `GameMode.savedScores`: each player's final score, by pid. */
   savedScores: number[] = [];
+  /**
+   * `GameManager.CONFIG`: the families and options of the next game. The site sets them from
+   * the player's profile (`setParameters`); with no site the original uses the system families.
+   */
+  config = new GameParameters(SYSTEM_FAMILIES, '');
   /** The page around the game: the fades at the end of a game and the hand-off to the site. */
   readonly loader: Loader;
+  /**
+   * The `$mode` of the current game when the site (the menu) started it, null for a game started
+   * otherwise (debug toolbar, replays). Only the site's games count for the profile.
+   */
+  siteMode: string | null = null;
+  /** The `$mode` of the game the Loader is waiting to start. */
+  private readyMode: string | null = null;
   /** The last game's result, once the Loader is done with it. */
   lastResult: GameResult | null = null;
   onGameResult?: (result: GameResult) => void;
@@ -104,7 +109,13 @@ export class GameSession implements IGameContext {
   private readonly animRand = new Random();
 
   private recorder: InputRecorder | null = null;
-  private recordStart: { set: string; level: number; seed: number } | null = null;
+  private recordStart: {
+    set: string;
+    level: number;
+    seed: number;
+    families: string;
+    options: string;
+  } | null = null;
   /** The last recording, kept after it stops (also when a debug restart ends it). */
   lastRecording: Replay | null = null;
 
@@ -261,7 +272,10 @@ export class GameSession implements IGameContext {
       stage: app.stage,
       gameRoot: this.gameRoot,
       getLangStr: (id) => this.dataStore.getStatic(id),
-      startGameInstance: () => this.initGame(0),
+      startGameInstance: () => {
+        this.initGame(0);
+        this.siteMode = this.readyMode;
+      },
     });
     this.loader.onResult = (r) => this.onGameEnd(r);
 
@@ -366,6 +380,7 @@ export class GameSession implements IGameContext {
     // A new GameManager and Loader: the original loads a new page for each game
     this.loader.reset();
     this.lastResult = null;
+    this.siteMode = null;
     this.history = [];
     const keyRand = new Random();
     keyRand.reseed(seed ^ 0x4b4559);
@@ -439,7 +454,12 @@ export class GameSession implements IGameContext {
   }
 
   hasFamily(id: number): boolean {
-    return SPECIAL_ITEM_FAMILIES.includes(id) || SCORE_ITEM_FAMILIES.includes(id);
+    return this.config.hasFamily(id);
+  }
+
+  /** The `$families` and `$options` of the next games, as the site sent them. */
+  setParameters(families: string, options = ''): void {
+    this.config = new GameParameters(families, options);
   }
 
   /** From `GameMode.init`: register the extend letters and the unlocked item families. */
@@ -448,11 +468,14 @@ export class GameSession implements IGameContext {
     this.randMan.register(Data.RAND_EXTENDS_ID, [...Data.RAND_EXTENDS]);
     this.randMan.register(
       Data.RAND_ITEMS_ID,
-      this.dataStore.getRandFromFamilies(this.dataStore.items.special, SPECIAL_ITEM_FAMILIES),
+      this.dataStore.getRandFromFamilies(
+        this.dataStore.items.special,
+        this.config.specialItemFamilies,
+      ),
     );
     this.randMan.register(
       Data.RAND_SCORES_ID,
-      this.dataStore.getRandFromFamilies(this.dataStore.items.score, SCORE_ITEM_FAMILIES),
+      this.dataStore.getRandFromFamilies(this.dataStore.items.score, this.config.scoreItemFamilies),
     );
   }
 
@@ -2055,6 +2078,7 @@ export class GameSession implements IGameContext {
   gameReady(mode = 'solo'): void {
     this.stopInputCapture();
     this.backToMainWorld();
+    this.readyMode = mode;
     this.loader.gameReady(mode);
     this.gameRoot.visible = false; // `game` holds no GameManager yet
     this.onStateChange?.({ isOver: false, isPaused: false });
@@ -2089,7 +2113,13 @@ export class GameSession implements IGameContext {
     this.initGame(levelId);
     this.input.resetState();
     this.recorder = new InputRecorder();
-    this.recordStart = { set: this.currentSetName, level: levelId, seed: this.seed };
+    this.recordStart = {
+      set: this.currentSetName,
+      level: levelId,
+      seed: this.seed,
+      families: this.config.families.join(','),
+      options: this.config.optionList.join(','),
+    };
     this.input.startRecording(this.recorder);
   }
 
@@ -2101,8 +2131,8 @@ export class GameSession implements IGameContext {
   stopRecording(): Replay | null {
     if (!this.recorder || !this.recordStart) return null;
     this.input.stopRecording();
-    const { set, level, seed } = this.recordStart;
-    this.lastRecording = this.recorder.toReplay(set, level, seed);
+    const { set, level, seed, families, options } = this.recordStart;
+    this.lastRecording = this.recorder.toReplay(set, level, seed, families, options);
     this.recorder = null;
     this.recordStart = null;
     return this.lastRecording;
@@ -2115,6 +2145,7 @@ export class GameSession implements IGameContext {
       await this.changeSet(replay.set, replay.level);
     }
     this.backToMainWorld();
+    this.setParameters(replay.families ?? SYSTEM_FAMILIES, replay.options ?? '');
     this.initGame(replay.level, replay.seed);
     const player = new InputPlayer(replay.input);
     this.input.startReplay(player);

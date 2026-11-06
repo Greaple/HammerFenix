@@ -18,6 +18,12 @@ const FILES = [
   ...['iadv', 'itutorial', 'itatt', 'imulticoop', 'imultitime', 'isoccer', 'ibossrush'].map(
     (n) => `hammerfest.fr/img/design/menu/${n}.gif`,
   ),
+  // Tabs of the quest and fridge screens, and the fridge's unknown item
+  ...['icon_quests', 'icon_inventory'].flatMap((n) => [
+    `hammerfest.fr/img/design/${n}.png`,
+    `hammerfest.fr/img/design/${n}_on.png`,
+  ]),
+  'hammerfest.fr/img/items/small/a.gif',
 ];
 
 for (const f of FILES) {

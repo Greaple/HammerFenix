@@ -3,6 +3,7 @@
   "set": "adventure",
   "level": 12,
   "seed": 1004,
+  "families": "0,1,2,1000,1001,1002",
   "input": [
     [1, 11],
     [0, 2],
