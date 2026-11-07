@@ -1,24 +1,41 @@
 /**
- * Web Audio multi-channel sound manager matching `mtypes/lib/SoundManager.mt`
- * and Hammerfest's `Data.CHAN_*` channels (`CHAN_MUSIC = 0`, `CHAN_BOMB = 1`, etc.).
+ * Web Audio port of `SoundManager` (`mtypes/lib/SoundManager.mt`, github.com/motion-twin/mtypes)
+ * and of the music `Sound` objects that `Loader.mt` hands to `GameManager` (`musics`).
+ *
+ * As in Flash, a channel (`Data.CHAN_*`) only groups sounds under one volume: `playSound`
+ * starts a new instance each time and never cuts the ones already playing (Flash `Sound.start`).
+ * Flash Player plays at most 32 sounds at once and drops new ones past that (Ruffle's
+ * `AudioManager.MAX_SOUNDS`). Volumes are Flash's, 0 to 100 (100 = full).
+ *
+ * Port additions: the page's sound switch (`setMuted`) and the pause of a hidden tab
+ * (`setSuspended`). Files are fetched by `preload` (Flash had them in the SWF, and the Loader
+ * downloaded the musics before the game) and decoded once a user gesture unlocks the audio.
  */
 export class AudioEngine {
+  /** Ruffle's `AudioManager.MAX_SOUNDS`. */
+  static readonly MAX_SOUNDS = 32;
+
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
-  private sfxGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  /** One gain per channel: the channel clip's `vol_ctrl` sound. */
+  private readonly channelGains = new Map<number, GainNode>();
 
   private readonly urls = new Map<string, string>();
+  private readonly files = new Map<string, Promise<ArrayBuffer | null>>();
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly loading = new Map<string, Promise<AudioBuffer | null>>();
-  private readonly channelSources = new Map<number, AudioBufferSourceNode>();
+
+  /** Every sound playing, with its channel (-1 for the music). */
+  private readonly playing = new Map<AudioBufferSourceNode, number>();
+  private musicSource: AudioBufferSourceNode | null = null;
   private currentMusicName: string | null = null;
 
   private muted = false;
-  private sfxVol = 0.7;
-  private musicVol = 0.45;
-  /** `Mode.setMusicVolume`: the game's own music level (0 muted by M, 0.5 paused, 1). */
-  private musicLevel = 1;
+  /** `SoundManagerChannel.vol`: 100 until `setVolume`. */
+  private readonly channelVolumes = new Map<number, number>();
+  /** The music `Sound`'s volume (`Sound.setVolume`). */
+  private musicVolume = 100;
 
   constructor(sounds: Record<string, string>, baseUrl = './') {
     for (const [name, rel] of Object.entries(sounds)) {
@@ -30,6 +47,7 @@ export class AudioEngine {
     return this.muted;
   }
 
+  /** The page's sound switch (port addition): silences everything. */
   setMuted(m: boolean): void {
     this.muted = m;
     if (this.masterGain && this.ctx) {
@@ -42,22 +60,18 @@ export class AudioEngine {
     return this.muted;
   }
 
-  setVolumes(sfx: number, music: number): void {
-    this.sfxVol = Math.max(0, Math.min(1, sfx));
-    this.musicVol = Math.max(0, Math.min(1, music));
-    this.applyVolumes();
+  /** `SoundManager.setVolume`: the volume (0 to 100) of every sound of a channel. */
+  setVolume(chan: number, volume: number): void {
+    this.channelVolumes.set(chan, volume);
+    const g = this.channelGains.get(chan);
+    if (g && this.ctx) g.gain.setValueAtTime(volume / 100, this.ctx.currentTime);
   }
 
-  /** The music's level from the game (`Mode.setMusicVolume`), times the music volume. */
-  setMusicLevel(n: number): void {
-    this.musicLevel = Math.max(0, Math.min(1, n));
-    this.applyVolumes();
-  }
-
-  private applyVolumes(): void {
-    if (this.ctx && this.sfxGain && this.musicGain) {
-      this.sfxGain.gain.setValueAtTime(this.sfxVol, this.ctx.currentTime);
-      this.musicGain.gain.setValueAtTime(this.musicVol * this.musicLevel, this.ctx.currentTime);
+  /** `musics[i].setVolume`: the music's volume (0 to 100). */
+  setMusicVolume(volume: number): void {
+    this.musicVolume = volume;
+    if (this.musicGain && this.ctx) {
+      this.musicGain.gain.setValueAtTime(volume / 100, this.ctx.currentTime);
     }
   }
 
@@ -68,19 +82,27 @@ export class AudioEngine {
     else if (!on && this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
-  /** Unlocks the Web Audio context after a user gesture. */
+  /** Fetches every sound file, so they play on time once decoded. */
+  preload(): void {
+    for (const name of this.urls.keys()) void this.fetchFile(name);
+  }
+
+  /** Unlocks the Web Audio context after a user gesture, and decodes the sounds. */
   unlock(): void {
     const ctx = this.ensureContext();
-    if (ctx && ctx.state === 'suspended') {
+    if (!ctx) return;
+    for (const name of this.urls.keys()) void this.loadBuffer(name);
+    if (ctx.state === 'suspended') {
       void ctx.resume().then(() => {
-        if (this.currentMusicName && !this.channelSources.has(0)) {
+        if (this.currentMusicName && !this.musicSource) {
           this.playMusic(this.currentMusicName);
         }
       });
     }
   }
 
-  playSound(name: string, channel = 1): void {
+  /** `SoundManager.playSound`: `start(0, 1)`, over the sounds already playing. */
+  playSound(name: string, chan = 1): void {
     const ctx = this.ensureContext();
     if (!ctx || ctx.state !== 'running') {
       void this.loadBuffer(name);
@@ -89,47 +111,47 @@ export class AudioEngine {
 
     const buf = this.buffers.get(name);
     if (buf) {
-      this.startSource(buf, channel, false);
+      this.startSource(buf, chan, false);
     } else {
       void this.loadBuffer(name).then((loaded) => {
         if (loaded && this.ctx?.state === 'running') {
-          this.startSource(loaded, channel, false);
+          this.startSource(loaded, chan, false);
         }
       });
     }
   }
 
+  /** `SoundManager.stop`: stops every sound of a channel. */
+  stop(chan: number): void {
+    for (const [src, c] of this.playing) {
+      if (c === chan) this.stopSource(src);
+    }
+  }
+
+  /**
+   * `musics[id].start(0, 99999)`, as `Mode.playMusicAt` calls it: the track starts from the
+   * beginning, even when it is already playing.
+   */
   playMusic(name: string): void {
-    if (this.currentMusicName === name && this.channelSources.has(0)) return;
+    this.stopMusic();
     this.currentMusicName = name;
-    this.stopChannel(0);
 
     const ctx = this.ensureContext();
     if (!ctx) return;
 
     void this.loadBuffer(name).then((buf) => {
-      if (!buf || this.currentMusicName !== name) return;
+      if (!buf || this.currentMusicName !== name || this.musicSource) return;
       if (this.ctx?.state === 'running') {
-        this.startSource(buf, 0, true);
+        this.musicSource = this.startSource(buf, -1, true);
       }
     });
   }
 
+  /** `musics[id].stop()` */
   stopMusic(): void {
     this.currentMusicName = null;
-    this.stopChannel(0);
-  }
-
-  stopChannel(channel: number): void {
-    const prev = this.channelSources.get(channel);
-    if (prev) {
-      try {
-        prev.stop();
-      } catch {
-        // Already stopped
-      }
-      this.channelSources.delete(channel);
-    }
+    if (this.musicSource) this.stopSource(this.musicSource);
+    this.musicSource = null;
   }
 
   private ensureContext(): AudioContext | null {
@@ -141,49 +163,86 @@ export class AudioEngine {
     this.masterGain.gain.value = this.muted ? 0 : 1;
     this.masterGain.connect(this.ctx.destination);
 
-    this.sfxGain = this.ctx.createGain();
-    this.sfxGain.gain.value = this.sfxVol;
-    this.sfxGain.connect(this.masterGain);
-
     this.musicGain = this.ctx.createGain();
-    this.musicGain.gain.value = this.musicVol * this.musicLevel;
+    this.musicGain.gain.value = this.musicVolume / 100;
     this.musicGain.connect(this.masterGain);
     return this.ctx;
   }
 
-  private startSource(buffer: AudioBuffer, channel: number, loop: boolean): void {
-    if (!this.ctx || !this.sfxGain || !this.musicGain) return;
-    // Monophonic per channel (matches Flash SoundManagerChannel behavior).
-    this.stopChannel(channel);
+  /** `SoundManager.getChannel`: the channel's gain, made on first use at volume 100. */
+  private getChannel(chan: number): GainNode | null {
+    if (!this.ctx || !this.masterGain) return null;
+    let g = this.channelGains.get(chan);
+    if (!g) {
+      g = this.ctx.createGain();
+      g.gain.value = (this.channelVolumes.get(chan) ?? 100) / 100;
+      g.connect(this.masterGain);
+      this.channelGains.set(chan, g);
+    }
+    return g;
+  }
+
+  private startSource(
+    buffer: AudioBuffer,
+    chan: number,
+    loop: boolean,
+  ): AudioBufferSourceNode | null {
+    if (!this.ctx) return null;
+    if (this.playing.size >= AudioEngine.MAX_SOUNDS) return null;
+    const out = chan < 0 ? this.musicGain : this.getChannel(chan);
+    if (!out) return null;
 
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
     src.loop = loop;
-    src.connect(channel === 0 ? this.musicGain : this.sfxGain);
+    src.connect(out);
     src.onended = () => {
-      if (this.channelSources.get(channel) === src) {
-        this.channelSources.delete(channel);
-      }
+      this.playing.delete(src);
+      if (this.musicSource === src) this.musicSource = null;
     };
-    this.channelSources.set(channel, src);
+    this.playing.set(src, chan);
     src.start(0);
+    return src;
+  }
+
+  private stopSource(src: AudioBufferSourceNode): void {
+    this.playing.delete(src);
+    try {
+      src.stop();
+    } catch {
+      // Already stopped
+    }
+  }
+
+  private fetchFile(name: string): Promise<ArrayBuffer | null> {
+    let file = this.files.get(name);
+    if (!file) {
+      const url = this.urls.get(name);
+      file = url
+        ? fetch(url)
+            .then((res) => (res.ok ? res.arrayBuffer() : null))
+            .catch(() => null)
+        : Promise.resolve(null);
+      this.files.set(name, file);
+    }
+    return file;
   }
 
   private async loadBuffer(name: string): Promise<AudioBuffer | null> {
     if (this.buffers.has(name)) return this.buffers.get(name)!;
     if (this.loading.has(name)) return this.loading.get(name)!;
 
-    const url = this.urls.get(name);
     const ctx = this.ensureContext();
-    if (!url || !ctx) return null;
+    if (!this.urls.has(name) || !ctx) return null;
 
     const promise = (async () => {
       try {
-        const res = await fetch(url);
-        if (!res.ok) return null;
-        const arr = await res.arrayBuffer();
-        const decoded = await ctx.decodeAudioData(arr);
+        const file = await this.fetchFile(name);
+        if (!file) return null;
+        // decodeAudioData detaches its input: decode a copy, the file stays cached
+        const decoded = await ctx.decodeAudioData(file.slice(0));
         this.buffers.set(name, decoded);
+        this.files.delete(name);
         return decoded;
       } catch {
         return null;

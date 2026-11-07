@@ -419,6 +419,7 @@ export class GameSession implements IGameContext {
     this.tipId = 0;
     this.cycle = 0;
     // A new GameManager and Loader: the original loads a new page for each game
+    this.initSoundChannels();
     this.loader.reset();
     this.lastResult = null;
     this.siteMode = null;
@@ -1879,9 +1880,29 @@ export class GameSession implements IGameContext {
     return this.fl_mirror ? Data.LEVEL_WIDTH - cx - 1 : cx;
   }
 
-  /** `Mode.playMusic`: tracks are `[music, boss, hurryUp]`. */
+  /**
+   * `GameManager` constructor, "Sounds channels": each channel's volume from the player's
+   * settings, the enemies' and the interface's 10 lower. The no-music `sound_kick` loop at volume
+   * 0 that follows is not ported (it plays nothing).
+   */
+  private initSoundChannels(): void {
+    const volume = this.config.soundVolume * 100;
+    const audio = this.audio;
+    audio.setVolume(Data.CHAN_MUSIC, this.config.musicVolume * 100);
+    audio.setVolume(Data.CHAN_PLAYER, volume);
+    audio.setVolume(Data.CHAN_BOMB, volume);
+    audio.setVolume(Data.CHAN_ITEM, volume);
+    audio.setVolume(Data.CHAN_FIELD, volume);
+    audio.setVolume(Data.CHAN_BAD, Math.max(0, volume - 10));
+    audio.setVolume(Data.CHAN_INTERF, Math.max(0, volume - 10));
+    audio.setMusicVolume(this.config.musicVolume * 100);
+  }
+
+  /** `Mode.playMusic` / `playMusicAt(id, 0)`: tracks are `[music, boss, hurryUp]`. */
   playMusicTrack(trackId: number): void {
+    if (!this.config.hasMusic()) return;
     if (MUSIC_TRACKS[trackId] === undefined) return;
+    if (this.fl_music) this.stopMusic();
     this.currentTrack = trackId;
     this.audio.playMusic(MUSIC_TRACKS[trackId]);
     this.fl_music = true;
@@ -1890,14 +1911,16 @@ export class GameSession implements IGameContext {
 
   /** `Mode.stopMusic` */
   stopMusic(): void {
+    if (!this.config.hasMusic()) return;
     this.audio.stopMusic();
     this.fl_music = false;
   }
 
   /** `Mode.setMusicVolume`: `n` times the player's music volume. */
   setMusicVolume(n: number): void {
-    if (!this.fl_music) return;
-    this.audio.setMusicLevel(n);
+    if (!this.fl_music || !this.config.hasMusic()) return;
+    n *= this.config.musicVolume * 100;
+    this.audio.setMusicVolume(Math.round(n));
   }
 
   setWarpStart(): void {

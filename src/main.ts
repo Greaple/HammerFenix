@@ -111,6 +111,7 @@ async function main(): Promise<void> {
 
   // 3. Initialize Audio & Input engines
   const audio = new AudioEngine(SOUNDS, baseUrl);
+  audio.preload();
   const input = new InputController();
   input.attach();
 
