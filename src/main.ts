@@ -1,4 +1,4 @@
-import { Application } from 'pixi.js';
+import { Application, UPDATE_PRIORITY } from 'pixi.js';
 import { AudioEngine } from './engine/Audio';
 import { loadGameFonts } from './engine/Fonts';
 import { InputController, type ControlAction } from './engine/Input';
@@ -85,6 +85,8 @@ async function main(): Promise<void> {
     autoDensity: true,
   });
 
+  /** Set when the canvas must be drawn again although the game did not step (a resize). */
+  let forceRender = true;
   const canvasContainer = document.getElementById('game-canvas-container');
   if (canvasContainer) {
     canvasContainer.appendChild(app.canvas);
@@ -99,6 +101,7 @@ async function main(): Promise<void> {
       if (Math.abs(res - lastRes) < 0.01) return;
       lastRes = res;
       app.renderer.resize(420, 520, res);
+      forceRender = true;
     }).observe(canvasContainer);
   }
 
@@ -148,6 +151,23 @@ async function main(): Promise<void> {
     attributeFilter: ['class'],
   });
   app.ticker.add(() => shell.update());
+  // Render only when the picture can have changed (port addition, for phones and 120 Hz screens):
+  // the game changes only on its 32 Hz logic ticks. Screens, fades and a stopped loop (debug
+  // stepping) render every frame.
+  let renderedStep = -1;
+  app.ticker.remove(app.render, app);
+  app.ticker.add(
+    () => {
+      const loop = session.gameLoop;
+      if (forceRender || shell.visible || !loop.isRunning || loop.stepCount !== renderedStep) {
+        forceRender = false;
+        renderedStep = loop.stepCount;
+        app.render();
+      }
+    },
+    null,
+    UPDATE_PRIORITY.LOW,
+  );
   /** Leaves the menu for the game (the debug toolbar plays without the menu). */
   const showGame = () => {
     if (!shell.visible) return;
@@ -358,11 +378,67 @@ async function main(): Promise<void> {
     el.addEventListener('contextmenu', (e) => e.preventDefault());
   };
 
-  bindTouch('touch-left', 'left');
-  bindTouch('touch-right', 'right');
-  bindTouch('touch-down', 'down');
+  bindDpad(input, {
+    'touch-left': 'left',
+    'touch-right': 'right',
+    'touch-down': 'down',
+  });
   bindTouch('touch-jump', 'jump');
   bindTouch('touch-bomb', 'attack');
+}
+
+/**
+ * The D-pad follows the finger: sliding from one arrow to another switches the key without
+ * lifting, as on a game pad (a touch otherwise stays on the button it started on). A thumb that
+ * drifts off the arrows (or over a gap) keeps its key until it lifts or reaches another arrow.
+ */
+function bindDpad(input: InputController, buttons: Record<string, ControlAction>): void {
+  const els = new Map<HTMLElement, ControlAction>();
+  for (const [id, action] of Object.entries(buttons)) {
+    const el = document.getElementById(id);
+    if (el) els.set(el, action);
+  }
+  /** The button each finger is on. */
+  const held = new Map<number, HTMLElement | null>();
+  const buttonAt = (x: number, y: number): HTMLElement | null => {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('.dpad-btn') ?? null;
+    return el && els.has(el) ? el : null;
+  };
+  const isHeld = (el: HTMLElement) => [...held.values()].includes(el);
+  const moveTo = (id: number, el: HTMLElement | null) => {
+    const prev = held.get(id) ?? null;
+    if (prev === el) return;
+    held.set(id, el);
+    if (prev && !isHeld(prev)) {
+      prev.classList.remove('active');
+      input.setTouch(els.get(prev)!, false);
+    }
+    if (el) {
+      el.classList.add('active');
+      input.setTouch(els.get(el)!, true);
+    }
+  };
+  const end = (e: PointerEvent) => {
+    if (!held.has(e.pointerId)) return;
+    moveTo(e.pointerId, null);
+    held.delete(e.pointerId);
+  };
+  for (const el of els.keys()) {
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      // Touch pointers are captured by the button they start on: free them to follow the finger
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+      moveTo(e.pointerId, el);
+    });
+    el.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+  window.addEventListener('pointermove', (e) => {
+    if (!held.has(e.pointerId)) return;
+    const el = buttonAt(e.clientX, e.clientY);
+    if (el) moveTo(e.pointerId, el);
+  });
+  window.addEventListener('pointerup', end);
+  window.addEventListener('pointercancel', end);
 }
 
 /**

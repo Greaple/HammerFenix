@@ -16,6 +16,7 @@ export class FixedGameLoop {
   private logicAccum = 0;
   private logicTicks = 0;
   private animTicks = 0;
+  private steps = 0;
   timeScale = 1.0;
   /** Bullet time (`GameMode.bulletTime`): slows the game on top of `timeScale`. */
   bulletScale = 1.0;
@@ -50,9 +51,23 @@ export class FixedGameLoop {
     }
   }
 
+  /** True between `start()` and `stop()`. */
+  get isRunning(): boolean {
+    return this.running;
+  }
+
+  /**
+   * Logic ticks run since the page opened. The game only changes on a tick (animation steps
+   * are tied to them), so the page renders only when this moves.
+   */
+  get stepCount(): number {
+    return this.steps;
+  }
+
   /** Runs one logic tick, plus the animation steps that fall in it. */
   stepSingleFrame(): void {
     this.onLogicStep();
+    this.steps++;
     this.logicTicks++;
     const target = Math.floor((this.logicTicks * FixedGameLoop.ANIM_HZ) / FixedGameLoop.LOGIC_HZ);
     while (this.animTicks < target) {

@@ -69,6 +69,8 @@ body {
   font-size: 14px;
   line-height: 1.4;
   overflow-x: hidden;
+  /* No pull to refresh or rubber band in the middle of a game */
+  overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -553,7 +555,10 @@ html.touch .touch-controls {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: manipulation;
+  /* A thumb that moves while it holds a button must not scroll, zoom or pull to refresh: the
+     browser would cancel the press (pointercancel) and drop the key mid-move */
+  touch-action: none;
+  -webkit-touch-callout: none;
   transition:
     background-color 0.1s ease,
     transform 0.1s ease;

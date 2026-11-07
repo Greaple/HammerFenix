@@ -1372,14 +1372,18 @@ function hasKeyboard(): boolean {
   return typeof document === 'undefined' || !document.documentElement.classList.contains('touch');
 }
 
-/** An image as a mipmapped texture (it shows smaller than its size), or null if it fails. */
+/**
+ * An image as a mipmapped texture (it shows smaller than its size), or null if it fails.
+ * Waits for `load`, not `img.decode()`: in a hidden tab Chrome can fail or never settle a
+ * decode, and the page then stayed on the loading screen.
+ */
 async function loadTexture(url: string): Promise<Texture | null> {
-  try {
-    const img = new Image();
-    img.src = url;
-    await img.decode();
-    return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
-  } catch {
-    return null;
-  }
+  const img = new Image();
+  const loaded = new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+  });
+  img.src = url;
+  if (!(await loaded)) return null;
+  return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
 }
