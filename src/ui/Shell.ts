@@ -680,6 +680,23 @@ export class Shell {
   }
 
   /**
+   * An item count on a wood pill whose bottom right corner is (`right`, `bottom`), so it reads
+   * over any item.
+   */
+  private countBadge(s: string, right: number, bottom: number, parent = this.root): void {
+    const padX = 4;
+    const h = 13;
+    const c = this.text(s, 'label', 0, 0, { align: 'right', size: 10, color: C.gold, parent });
+    const w = c.width + padX * 2;
+    c.position.set(right - padX, bottom - h / 2 - c.height / 2);
+    const pill = new Graphics()
+      .roundRect(right - w, bottom - h, w, h, h / 2)
+      .fill({ color: C.wood, alpha: 0.9 })
+      .stroke({ color: 0x3f2c1b, alpha: 0.5, width: 1 });
+    parent.addChildAt(pill, parent.getChildIndex(c));
+  }
+
+  /**
    * A clickable area (`x`, `y`, `w`, `h`) holding its children: wood when selected, a light
    * wash under the pointer.
    */
@@ -1170,18 +1187,7 @@ export class Shell {
       const n = p.items[id] ?? 0;
       if (q.inFridge(p, id)) {
         this.icon({ item: id }, mx, my, FRIDGE_CELL - 10, cellBtn);
-        if (n > 1) {
-          const c = this.text(`${n}`, 'body', cx + FRIDGE_CELL - 4, cy + FRIDGE_CELL - 12, {
-            align: 'right',
-            size: 8,
-            color: C.gold,
-            parent: cellBtn,
-          });
-          const pill = new Graphics()
-            .roundRect(c.x - c.width - 3, c.y - 0.5, c.width + 6, 11, 5.5)
-            .fill({ color: C.wood, alpha: 0.85 });
-          cellBtn.addChildAt(pill, cellBtn.getChildIndex(c));
-        }
+        if (n > 1) this.countBadge(`${n}`, cx + FRIDGE_CELL - 2, cy + FRIDGE_CELL - 2, cellBtn);
       } else if (n > 0) {
         this.greyed(id, mx, my, FRIDGE_CELL - 12, cellBtn);
         const f = n / q.unlockCount(id);
@@ -1346,18 +1352,7 @@ export class Shell {
       const x = x0 + (i % cols) * size + size / 2;
       const y = top + Math.floor(i / cols) * size + size / 2;
       this.icon({ item: id }, x, y, size - 8 * (size / cell));
-      if (n > 1) {
-        // A pill behind the count keeps it readable over dark items (the fridge's look).
-        const c = this.text(`x${n}`, 'body', x + size / 2 - 3, y + size / 2 - 12, {
-          align: 'right',
-          size: 9,
-          color: C.gold,
-        });
-        const pill = new Graphics()
-          .roundRect(c.x - c.width - 3, c.y - 0.5, c.width + 6, 12, 6)
-          .fill({ color: C.wood, alpha: 0.85 });
-        this.root.addChildAt(pill, this.root.getChildIndex(c));
-      }
+      if (n > 1) this.countBadge(`x${n}`, x + size / 2, y + size / 2 - 1);
     });
   }
 }
