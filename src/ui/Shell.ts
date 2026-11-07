@@ -1347,11 +1347,16 @@ export class Shell {
       const y = top + Math.floor(i / cols) * size + size / 2;
       this.icon({ item: id }, x, y, size - 8 * (size / cell));
       if (n > 1) {
-        this.text(`x${n}`, 'body', x + size / 2 - 1, y + size / 2 - 12, {
+        // A pill behind the count keeps it readable over dark items (the fridge's look).
+        const c = this.text(`x${n}`, 'body', x + size / 2 - 3, y + size / 2 - 12, {
           align: 'right',
           size: 9,
-          color: C.ink,
+          color: C.gold,
         });
+        const pill = new Graphics()
+          .roundRect(c.x - c.width - 3, c.y - 0.5, c.width + 6, 12, 6)
+          .fill({ color: C.wood, alpha: 0.85 });
+        this.root.addChildAt(pill, this.root.getChildIndex(c));
       }
     });
   }
