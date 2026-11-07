@@ -345,6 +345,35 @@ function buildFont(tag: any): opentype.Font {
   });
 }
 
+/**
+ * opentype.js writes the time of the build in the `head` table (`created`, `modified`), so each
+ * build made new files: the offline cache (5.3) then saw a new version at every deploy. Sets both
+ * to 0 and recomputes the table's checksum and the font's `checkSumAdjustment`.
+ */
+function fixTimestamps(font: Buffer): Buffer {
+  const sum = (buf: Buffer, from: number, length: number) => {
+    let s = 0;
+    for (let i = 0; i < length; i += 4) {
+      const word = Buffer.alloc(4);
+      buf.copy(word, 0, from + i, Math.min(from + i + 4, from + length));
+      s = (s + word.readUInt32BE(0)) >>> 0;
+    }
+    return s;
+  };
+  const tables = font.readUInt16BE(4);
+  for (let i = 0; i < tables; i++) {
+    const entry = 12 + i * 16;
+    if (font.toString('ascii', entry, entry + 4) !== 'head') continue;
+    const head = font.readUInt32BE(entry + 8);
+    const length = font.readUInt32BE(entry + 12);
+    font.fill(0, head + 20, head + 36); // created, modified (LONGDATETIME each)
+    font.writeUInt32BE(0, head + 8); // checkSumAdjustment
+    font.writeUInt32BE(sum(font, head, length), entry + 4);
+    font.writeUInt32BE((0xb1b0afba - sum(font, 0, font.length)) >>> 0, head + 8);
+  }
+  return font;
+}
+
 function main(): void {
   const swf = parseSwf(readFileSync(SWF));
   // The fullest font of each family (the SWF has a 95-glyph bold copy of Franklin Gothic)
@@ -357,7 +386,8 @@ function main(): void {
   mkdirSync(OUT, { recursive: true });
   for (const [name, tag] of best) {
     const font = buildFont(tag);
-    writeFileSync(join(OUT, FONT_FILES[name]), Buffer.from(font.toArrayBuffer()));
+    const bytes = fixTimestamps(Buffer.from(font.toArrayBuffer()));
+    writeFileSync(join(OUT, FONT_FILES[name]), bytes);
     console.log(`fonts: ${name}, ${tag.glyphs.length} glyphs -> public/fonts/${FONT_FILES[name]}`);
   }
 }

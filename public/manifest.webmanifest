@@ -1,0 +1,15 @@
+{
+  "name": "HammerFenix — The Caverns of Hammerfest",
+  "short_name": "HammerFenix",
+  "description": "A faithful remake of the Flash platformer The Caverns of Hammerfest (Motion Twin, 2006).",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#3a86d8",
+  "theme_color": "#3a86d8",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

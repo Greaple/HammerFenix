@@ -146,6 +146,10 @@ async function main(): Promise<void> {
   session.gameRoot.visible = false;
   shell.showMenu();
   loading.done();
+  // Offline play (roadmap 5.3): the build's service worker caches the game once it has loaded
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
   // Touch found after the menu showed: redraw it without its keyboard hints
   new MutationObserver(() => shell.refresh()).observe(document.documentElement, {
     attributeFilter: ['class'],
