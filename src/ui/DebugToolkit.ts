@@ -139,9 +139,9 @@ export class DebugToolkit {
         <div class="debug-section">
           <h4>Original Flash Game Comparison</h4>
           <p class="debug-desc">
-            To compare directly with the 2006 Flash original:
-            Open <code>assets-src/original/swf/game.swf</code> in a standalone Flash Player or
-            <a href="https://ruffle.rs/demo/" target="_blank" rel="noopener noreferrer">Ruffle Web Emulator</a>.
+            "⚡ Flash Original" runs the 2006 original in Ruffle (<code>original-swf/loader.swf</code>),
+            in its dev mode: its level field sends the original's own jump keys (Ctrl and three
+            numpad digits), in the current dimension.
           </p>
         </div>
       </div>

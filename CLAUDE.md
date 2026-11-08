@@ -39,7 +39,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 
 - Port faithfully: same names, logic and order as the original. Doc comment each class with its source, e.g. ``Port of `entity.item.SpecialItem` (`class/hammer/entity/item/SpecialItem.mt`)``.
 - No `Math.random` in `src/game`: use `game.rand.random(n)` for `Std.random(n)` and `game.rand.next()` for `Math.random()`, so seeded replays stay deterministic.
-- Never invent behavior. If the original is unclear, check the Ruffle side-by-side ("Flash" button) and note it.
+- Never invent behavior. If the original is unclear, check the Ruffle side-by-side ("Flash" button) and note it. Click it to start; its level field jumps with the original's own dev keys (Ctrl + three numpad digits, current dimension only). It runs in dev mode, with the dev item families.
 - Storage: there is no remote database or server. Anything that must persist (profile, quests, collection, options, scores) goes in the browser's `localStorage`, under a versioned `hammerfenix_*` key (e.g. `hammerfenix_save_v1` in `GameSession.ts`). Wrap every read and write in try/catch and fall back to defaults, as `loadSave()` does.
 - Prettier: single quotes, width 100, trailing commas.
 

@@ -1104,6 +1104,18 @@ kbd {
   color: var(--accent-gold);
 }
 
+.flash-compare-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.flash-compare-tools input {
+  width: 5em;
+}
+
 .ruffle-container {
   width: 100%;
   aspect-ratio: 420 / 520;

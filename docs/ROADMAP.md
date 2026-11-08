@@ -6,7 +6,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-08):
 
-1. 2B.3: the level jump for Ruffle (2B.0 to 2B.2 are done). Hiko can't be reached by portal in the original, so its spot checks need the level jump.
+1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 (the original's dev keys, which make the spot checks faster) and 2C.2 (open audit deviations that change play), so the spot checks compare the final behavior.
 3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md).
 4. The rest of Phase 2C and the solo controller (G.1), in any order.
@@ -14,7 +14,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 
 Working notes:
 
-- Start games for comparisons from the debug toolbar: they use the no-site item families and no options, as the Ruffle side-by-side does.
+- Start games for comparisons from the debug toolbar, with no options. The Ruffle side-by-side runs in the original's dev mode, so it draws items from the dev families (`0,7,1000,1001,1002,1` to `19`), not the no-site ones (`0,7,1000,18`) the toolbar uses: compare item draws only after giving the port the same families.
 - Level changes take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that.
 - After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`.
 - Nothing has been tried on a real phone yet (5.4).
@@ -64,7 +64,7 @@ Without reproducible runs you can't check whether the clone matches the original
 
 Levels are data run by shared code, and Phases 1 and 2 audited that code line by line. So 2B checks all level data automatically and compares only a short list of levels by hand, the ones with something no other level has. (Rewritten on 2026-11-08: it replaced 28 batches of 10 to 20 levels each, which repeated the same checks and asked for play a session can't do in Ruffle.)
 
-Start games for comparisons from the debug toolbar: they use the no-site item families (`0,7,1000,18`, found in 3.2a) and no options, as the Ruffle side-by-side does.
+Start games for comparisons from the debug toolbar: they use the no-site item families (`0,7,1000,18`, found in 3.2a) and no options. The Ruffle side-by-side runs in the original's dev mode and uses the dev families (`0,7,1000,1001,1002,1` to `19`, `GameManager` constructor), so item draws differ unless the port is given those.
 
 - [x] 2B.0 Automated data pass over every set in `xml/levels/`, in `tests/level-data.test.ts`. All 662 levels of the 17 sets decode losslessly (encoding them again gives the original strings), the built JSON matches, every value is in range, the port reads each level as the original does (mirrored too), and every background, tile skin, field and enemy id has its SWF frame or class. No difference found. Also found: the original game loads only 14 sets (`swfmake.xml`); `adventure_english`, `basicAdventure` and `bumdum` are not in it, so LEVELS.md lost its bumdum row.
 - [x] 2B.1 Portal test, in `tests/portals.test.ts`. Every link joins existing levels and starts at a portal. The 95 usable links are taken headless, normal and mirrored (field portals entered, floating portals opened by their own script trigger), and the player arrives in the target level on the case `getPortalEntrance` gives. All pass. Quirks of the original data, kept and pinned by the test: the village's link to hiko comes after its link to deepnight (same portal; `getLink` takes the first), so no portal leads to hiko; `main51 > d_temple` arrives at a portal that is only a floating one there (the player lands at the level start); ayame 28 and 34 open portals with no link. Fixed on the way (from 2C.2): a portal case that matches no portal calls `onPortal(null)`, so the player is refused, as in the original.
@@ -72,7 +72,7 @@ Start games for comparisons from the debug toolbar: they use the no-site item fa
   - the 121 background and tile skin pairs of the 14 sets the game loads (124 counted the 3 it doesn't): all draw with their skins, columns and borders, no missing graphics;
   - Adventure 0 to 99 against the world map thumbnails: backgrounds and tile skins match. The thumbnails were drawn from an older version of the levels: 1, 2, 7, 9 and 33 have other layouts and 54 another skin (its old skin is still in `basicAdventure`), so they are not port bugs. Later thumbnails show the darkness;
   - script decor of the 17 Adventure levels that attach some, against the hamm4all screenshots: it matches (village, dimension doors and locks, hell door, mirror), except two to check in Ruffle (LEVELS.md, 2B.4): no torches at 54 and no door at 102 in the screenshots. Dimension decor is left to the 2B.6 spot checks: hamm4all names dimension levels by their portal route, not by id.
-- [ ] 2B.3 Level jump for the original: find whether the original can start at a given set and level (debug and dev entry points in `GameManager.mt`, `Loader.mt`, `HammerClient.as`) and add it to the Ruffle side-by-side. First check that Ruffle runs in the browser pane; it showed a white screen in the shield bug fix. If it can't run there, the spot checks below are done by the user in a normal browser, with the session preparing the list of what to look for.
+- [x] 2B.3 Level jump for the original. Ruffle 0.7.1 runs the original in the browser pane: the white screen came from loading `game.swf` alone, which only holds classes and data. The side-by-side now starts from `loader.swf` (copied to `public/original-swf/`) with Ruffle's `base` set to that folder, so the loader finds `game.swf` and the musics (`../sfx/`), and flashvars `lang` and `mode=solo`; a click starts the game. `game.swf` embeds `xml_dev`, so the original always runs in dev mode, and its own debug keys give the jump (`Player.getDebugControls`): Ctrl and three numpad digits call `forcedGoto(n)`, N goes to the next level, K gives every key. The dialog has a level field and N and K buttons that send them (Ruffle reads keys on its focused shadow `#container`, numpad digits with `location` 3). Limits: the jump stays in the current dimension (take a portal first, K opens the locked ones) and works only while the player can move. Dev mode also gives the original the dev item families (below). Checked on levels 54, 100 and 101. First result: the original shows the torches at 54 (LEVELS.md).
 - [ ] 2B.4 Spot checks, Adventure: the "Adventure" rows of [LEVELS.md](LEVELS.md) (start, boss warnings, set pieces, bosses Bat and Tuberculoz, the ending). Also the bosses' look left from Phase 2 (Bat glow, exit arrow during the fights).
 - [ ] 2B.5 Spot checks, enemies: the "Enemies" rows of LEVELS.md, each enemy type at its first level.
 - [ ] 2B.6 Spot checks, dimensions: the "Dimensions" rows of LEVELS.md.

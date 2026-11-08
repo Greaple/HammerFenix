@@ -257,9 +257,22 @@
             <p>
               Running the authentic Motion Twin <code>game.swf</code> (2006) via
               <strong>Ruffle WebAssembly</strong>. Use this side-by-side to verify player physics,
-              monster walk speeds, bomb timing, sound effects, and level layouts.
+              monster walk speeds, bomb timing, sound effects, and level layouts. Click the game to
+              start. It runs in the original's dev mode: its level jump uses Ctrl and three numpad
+              digits, in the current dimension, while the player can move.
             </p>
           </div>
+          <form id="flash-goto-form" class="flash-compare-tools">
+            <label for="flash-goto-level">Level</label>
+            <input id="flash-goto-level" type="number" min="0" max="999" value="0" />
+            <button type="submit" class="btn btn-sm btn-secondary">Go</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="flash-next-level">
+              Next level (N)
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" id="flash-all-keys">
+              All keys (K)
+            </button>
+          </form>
           <div id="ruffle-container" class="ruffle-container">
             <!-- Ruffle player injected dynamically on first open -->
           </div>
