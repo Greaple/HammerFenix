@@ -42,6 +42,8 @@ export interface IGameContext {
   readonly diffFactor: number;
   readonly scriptRunner: ScriptRunner | null;
 
+  /** `GameManager.fl_debug`, also standing for `GameManager.isDev()`: the dev keys are on. */
+  readonly fl_debug: boolean;
   fl_lock: boolean;
   fl_clear: boolean;
   fl_gameOver: boolean;

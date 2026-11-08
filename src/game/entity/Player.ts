@@ -24,6 +24,7 @@ import {
   PlayerPearlShoot,
   type ShootEntity,
 } from './Shoot';
+import { Log } from '../Log';
 import { ArrowSupa, BallSupa, BubbleSupa, IceMeteorSupa, SmokeSupa, TonsSupa } from './Supa';
 
 const WEAPON_DURATION = Data.SECOND * 30;
@@ -42,6 +43,10 @@ export class PlayerEntity extends PhysicsEntity {
 
   speedFactor = 1.0;
   fl_lockControls = false;
+  /** The dev keys' state (`getDebugControls`): the last key, the numpad input, the next grid. */
+  dbg_lastKey = 0;
+  debugInput = '';
+  dbg_grid = 0;
   fl_entering = false;
 
   score = 0;
@@ -126,6 +131,132 @@ export class PlayerEntity extends PhysicsEntity {
 
     this.register(Data.PLAYER);
     game.logAction('$P:' + this.lives);
+  }
+
+  /**
+   * `Player.getDebugControls`, the original's dev keys, read for player 1 when its controls are
+   * free. Three numpad digits make a number n: with Ctrl, go to level n; with Alt, a score item
+   * n; else a special item n. N next level, K every key, I a random special item, numpad / the
+   * next hurry up, numpad + and - anger or calm every enemy, numpad * removes them, G shows a
+   * flag of the case grid, W the next weapon.
+   */
+  getDebugControls(): void {
+    const game = this.game;
+    const key = (c: number) => game.input.isKeyDown(c);
+
+    // Last key held
+    if (this.dbg_lastKey > 0 && !key(this.dbg_lastKey)) {
+      this.dbg_lastKey = 0;
+    }
+
+    // A number on the numpad
+    for (let i = 0; i < 10; i++) {
+      if (key(96 + i) && this.dbg_lastKey !== 96 + i) {
+        this.debugInput += String(i);
+        this.dbg_lastKey = 96 + i;
+      }
+    }
+    if (this.debugInput.length >= 3) {
+      const n = parseInt(this.debugInput, 10);
+      if (key(17)) {
+        game.forcedGoto(n);
+      } else if (key(18)) {
+        game.spawnScoreItem(this.x + this.dir * 30, this.y, n, null);
+      } else {
+        game.spawnSpecialItem(this.x + this.dir * 30, this.y, n, null);
+      }
+      this.debugInput = '';
+    }
+    if (key(8)) {
+      this.debugInput = '';
+    }
+
+    if (this.debugInput.length > 0) {
+      let str = this.debugInput;
+      while (str.length < 3) {
+        str += '_';
+      }
+      Log.print(`INPUT: ${str}`);
+      Log.print('(backspace to clear)');
+    }
+
+    // Next level "n"
+    if (key(78) && this.dbg_lastKey !== 78) {
+      game.nextLevel();
+      this.dbg_lastKey = 78;
+    }
+
+    // Every key "k"
+    if (key(75) && this.dbg_lastKey !== 75) {
+      for (let i = 0; i < 50; i++) {
+        game.giveKey(i);
+      }
+      this.dbg_lastKey = 75;
+    }
+
+    // Item spawn "i"
+    if (key(73) && this.dbg_lastKey !== 73) {
+      game.spawnSpecialItem(
+        game.rand.random(200) + 200,
+        20,
+        game.randMan.draw(Data.RAND_ITEMS_ID) ?? 0,
+        0,
+      );
+      this.dbg_lastKey = 73;
+    }
+
+    // Next hurry up "/"
+    if (key(111) && this.dbg_lastKey !== 111) {
+      game.huTimer = 9999999;
+      game.huState++;
+      this.dbg_lastKey = 111;
+    }
+
+    // Anger more "+"
+    if (key(107) && this.dbg_lastKey !== 107) {
+      for (const b of game.getList(Data.BAD) as BadEntity[]) {
+        b.angerMore();
+      }
+      this.dbg_lastKey = 107;
+    }
+
+    // Calm down "-"
+    if (key(109) && this.dbg_lastKey !== 109) {
+      for (const b of game.getList(Data.BAD) as BadEntity[]) {
+        b.calmDown();
+      }
+      this.dbg_lastKey = 109;
+    }
+
+    // Case flag grid "g"
+    if (key(71) && this.dbg_lastKey !== 71) {
+      game.view.detachGrid();
+      game.view.attachGrid(Math.round(Math.pow(2, this.dbg_grid)), true);
+      Log.trace(`* WARNING * grid: ${Data.GRID_NAMES[this.dbg_grid]}`);
+      this.dbg_grid++;
+      if (Data.GRID_NAMES[this.dbg_grid] === undefined) {
+        this.dbg_grid = 0;
+      }
+      this.dbg_lastKey = 71;
+    }
+
+    // Next weapon "w"
+    if (key(87) && this.dbg_lastKey !== 87) {
+      this.currentWeapon++;
+      if (this.currentWeapon > 9) {
+        this.currentWeapon = 1;
+      }
+      this.changeWeapon(this.currentWeapon);
+      this.dbg_lastKey = 87;
+    }
+
+    // Removes every enemy "*"
+    if (key(106) && this.dbg_lastKey !== 106) {
+      for (const b of game.getList(Data.BAD)) {
+        b.destroy();
+      }
+      this.dbg_lastKey = 106;
+    }
   }
 
   static attach(game: IGameContext, x: number, y: number): PlayerEntity {
@@ -2045,6 +2176,9 @@ export class PlayerEntity extends PhysicsEntity {
     if (!this.fl_kill && !this.fl_lockControls) {
       if (!this.fl_entering && this.mc._visible) {
         this.updateControls();
+      }
+      if (this.pid === 0 && this.game.fl_debug) {
+        this.getDebugControls();
       }
     }
     if (this.fl_entering && this.cy >= 0) {

@@ -20,8 +20,15 @@ export class FixedGameLoop {
   private animTicks = 0;
   private steps = 0;
   timeScale = 1.0;
-  /** Bullet time (`GameMode.bulletTime`): slows the game on top of `timeScale`. */
+  /**
+   * This tick's `Timer.tmod` (bullet time, the dev key Shift): slows the game on top of
+   * `timeScale`, since logic always steps by 1.
+   */
   bulletScale = 1.0;
+  /** `Timer.fps()`: logic ticks run per real second, measured over half a second. */
+  fps: number = FixedGameLoop.LOGIC_HZ;
+  private fpsStartMs = 0;
+  private fpsSteps = 0;
 
   private readonly onLogicStep: () => void;
   private readonly onAnimStep: () => void;
@@ -41,6 +48,8 @@ export class FixedGameLoop {
     if (this.running) return;
     this.running = true;
     this.lastTimeMs = performance.now();
+    this.fpsStartMs = this.lastTimeMs;
+    this.fpsSteps = 0;
     this.logicAccum = 0;
     this.rafId = requestAnimationFrame(this.tick);
   }
@@ -102,6 +111,12 @@ export class FixedGameLoop {
       this.stepSingleFrame();
       this.logicAccum -= logicDt;
       steps++;
+    }
+    this.fpsSteps += steps;
+    if (nowMs - this.fpsStartMs >= 500) {
+      this.fps = (this.fpsSteps * 1000) / (nowMs - this.fpsStartMs);
+      this.fpsStartMs = nowMs;
+      this.fpsSteps = 0;
     }
 
     this.onRender?.(this.logicAccum / logicDt);

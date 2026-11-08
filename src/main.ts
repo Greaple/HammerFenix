@@ -219,11 +219,12 @@ async function main(): Promise<void> {
   const debugToolkit = new DebugToolkit(session, document.body);
   (window as any).debugToolkit = debugToolkit;
 
-  // Developer tools (level select, restart, debug, Flash comparison) stay hidden unless
-  // switched on in the help dialog or with `?dev`; the choice is remembered.
+  // Developer tools (level select, restart, debug, Flash comparison, the original's dev keys)
+  // stay hidden unless switched on in the help dialog or with `?dev`; the choice is remembered.
   const devToggle = document.getElementById('dev-toggle') as HTMLInputElement | null;
   const setDev = (on: boolean) => {
     document.body.classList.toggle('dev', on);
+    session.fl_debug = on; // the original's dev keys
     if (devToggle) devToggle.checked = on;
     try {
       localStorage.setItem('hammerfenix.dev', on ? '1' : '0');

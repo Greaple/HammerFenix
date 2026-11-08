@@ -28,6 +28,39 @@ const KEY_MAP: Record<string, ControlAction> = {
   KeyM: 'music',
 };
 
+/** Flash key codes (`Key.*`) of the keys that are not a letter or a digit. */
+const FLASH_KEY_CODES: Record<string, number> = {
+  Backspace: 8,
+  Enter: 13,
+  NumpadEnter: 13,
+  ShiftLeft: 16,
+  ShiftRight: 16,
+  ControlLeft: 17,
+  ControlRight: 17,
+  AltLeft: 18,
+  AltRight: 18,
+  Escape: 27,
+  Space: 32,
+  Home: 36,
+  NumpadMultiply: 106,
+  NumpadAdd: 107,
+  NumpadSubtract: 109,
+  NumpadDivide: 111,
+};
+
+/**
+ * The Flash key code (`Key.isDown`'s argument) of a `KeyboardEvent.code`. Port addition: the
+ * top row digits count as the numpad's (96 to 105), since laptops have no numpad.
+ */
+export function flashKeyCode(code: string): number | undefined {
+  if (/^Key[A-Z]$/.test(code)) return code.charCodeAt(3);
+  if (/^(Numpad|Digit)\d$/.test(code)) return 96 + Number(code.slice(-1));
+  return FLASH_KEY_CODES[code];
+}
+
+/** Keys the browser would act on (Home scrolls, Alt opens the menu) while the dev keys are on. */
+const DEV_PREVENT = new Set([18, 36]);
+
 /** The action of key event `e`: Ctrl+Shift+K gives up the game (`GameMode.main`). */
 function actionOf(e: KeyboardEvent): ControlAction | undefined {
   if (e.code === 'KeyK') return e.ctrlKey && e.shiftKey ? 'suicide' : undefined;
@@ -49,10 +82,19 @@ export class InputController {
   private readonly touchHeld = new Set<ControlAction>();
   private readonly padHeld = new Set<ControlAction>();
   private readonly locked = new Set<ControlAction>();
+  /** Flash key codes held now, and in this tick's sample (for the dev keys). */
+  private readonly codesHeld = new Set<number>();
+  private codesSampled = new Set<number>();
   /** Actions held this tick, as `ACTION_BITS`. */
   private sampled = 0;
   private recorder: InputRecorder | null = null;
   private player: InputPlayer | null = null;
+
+  /**
+   * The original's dev keys (`GameManager.fl_debug`) read every key with `isKeyDown`. Off while
+   * recording or replaying: they are not in the recorded action mask.
+   */
+  devKeys = false;
 
   onAnyGesture?: () => void;
 
@@ -62,6 +104,14 @@ export class InputController {
     if (document.querySelector('dialog[open]')) return;
 
     this.onAnyGesture?.();
+    const kc = flashKeyCode(e.code);
+    if (kc !== undefined) {
+      this.codesHeld.add(kc);
+      // Ctrl and a digit is the dev level jump, not the browser's tab switch
+      if (this.devKeys && (DEV_PREVENT.has(kc) || (e.ctrlKey && kc >= 96 && kc <= 105))) {
+        e.preventDefault();
+      }
+    }
     const act = actionOf(e);
     if (!act) return;
     if (act !== 'pause') e.preventDefault();
@@ -69,6 +119,8 @@ export class InputController {
   };
 
   private readonly handleKeyUp = (e: KeyboardEvent) => {
+    const kc = flashKeyCode(e.code);
+    if (kc !== undefined) this.codesHeld.delete(kc);
     if (e.code === 'KeyK') this.keyHeld.delete('suicide');
     const act = KEY_MAP[e.code];
     if (!act) return;
@@ -76,6 +128,7 @@ export class InputController {
   };
 
   private readonly handleBlur = () => {
+    this.codesHeld.clear();
     this.keyHeld.clear();
     this.touchHeld.clear();
     this.padHeld.clear();
@@ -92,6 +145,12 @@ export class InputController {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
     window.removeEventListener('blur', this.handleBlur);
+  }
+
+  /** Holds or releases a key by its Flash key code, as the keyboard does (for tests). */
+  setKeyCode(code: number, pressed: boolean): void {
+    if (pressed) this.codesHeld.add(code);
+    else this.codesHeld.delete(code);
   }
 
   setTouch(action: ControlAction, pressed: boolean): void {
@@ -132,6 +191,8 @@ export class InputController {
     }
     this.sampled = mask;
     this.recorder?.push(mask);
+    this.codesSampled =
+      this.devKeys && !this.recorder && !this.player ? new Set(this.codesHeld) : new Set();
 
     for (const act of [...this.locked]) {
       if (!this.isDown(act)) {
@@ -142,6 +203,14 @@ export class InputController {
 
   isDown(action: ControlAction): boolean {
     return (this.sampled & ACTION_BITS[action]) !== 0;
+  }
+
+  /**
+   * `Key.isDown(code)` for the dev keys: whether the key with Flash key code `code` was held at
+   * this tick's sample. Always false when `devKeys` is off.
+   */
+  isKeyDown(code: number): boolean {
+    return this.codesSampled.has(code);
   }
 
   /** Records every tick's sample from the next `poll()` on. */

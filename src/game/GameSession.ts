@@ -28,6 +28,7 @@ import { GameHud } from './gui/GameHud';
 import type { IGameContext } from './GameContext';
 import { LevelView } from './levels/LevelView';
 import { LevelWorld } from './levels/LevelWorld';
+import { Log } from './Log';
 import { ScriptRunner } from './levels/ScriptRunner';
 
 const SAVE_KEY = 'hammerfenix_save_v1';
@@ -128,6 +129,20 @@ export class GameSession implements IGameContext {
   sFriction = Data.FRICTION_SLIDE;
   speedFactor = 1.0;
   diffFactor = 1.0;
+
+  /**
+   * `GameManager.fl_debug`, which the original sets in dev mode (`isDev`: the set `xml_dev` is
+   * there). Here it is the page's dev switch, and it only turns on the dev keys: the port loads
+   * no `xml_dev` world. Off for headless replays.
+   */
+  private _fl_debug = false;
+  get fl_debug(): boolean {
+    return this._fl_debug;
+  }
+  set fl_debug(on: boolean) {
+    this._fl_debug = on;
+    this.input.devKeys = on;
+  }
 
   fl_lock = false;
   fl_clear = false;
@@ -2002,10 +2017,68 @@ export class GameSession implements IGameContext {
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: false });
   }
 
+  /**
+   * `Mode.getDebugControls` + `GameMode.getDebugControls`: Backspace clears the log, Shift slows
+   * the game to `tmod` 0.3 and Home puts it back to 1 (Shift held with bullet time does nothing
+   * more). Returns this tick's `tmod`. `Adventure`'s Ctrl+Shift+M (the co-op mode) waits for
+   * Phase 4.
+   */
+  private getDebugControls(tmod: number): number {
+    if (this.input.isKeyDown(8)) {
+      Log.clear();
+    }
+    if (this.input.isKeyDown(16)) {
+      tmod = 0.3;
+    }
+    if (this.input.isKeyDown(36)) {
+      tmod = 1.0;
+    }
+    return tmod;
+  }
+
+  /**
+   * The end of `GameMode.getControls`: F prints the frame rate and B the build time. The
+   * original reads them in every mode, but its log shows only in dev mode, so here they wait for
+   * the dev keys (`isKeyDown` is false without them). The Flash version line is left out.
+   */
+  private getDevControls(): void {
+    if (this.input.isKeyDown(70)) {
+      const fps = this.gameLoop.fps;
+      Log.print(`${Math.round(fps)} FPS`);
+      Log.print(`Performances: ${Math.min(100, Math.round((100 * fps) / 30))}%`);
+    }
+    if (this.input.isKeyDown(66)) {
+      Log.print('Dernière mise à jour:');
+      Log.print(typeof __BUILD_TIME__ === 'undefined' ? '?' : __BUILD_TIME__);
+    }
+  }
+
+  /** `GameMode.printDebugInfos`, on the pause screen in dev mode (what the port has of it). */
+  private printDebugInfos(): void {
+    Log.print(`build:${typeof __BUILD_TIME__ === 'undefined' ? '?' : __BUILD_TIME__}`);
+    Log.print(`lang=${this.dataStore.langId}`);
+    Log.print(`debug=${this.fl_debug}`);
+    Log.print('--- DATA ---');
+    Log.print(`families=${this.config.families.join(',')}`);
+    Log.print(`ent = ${this.countList(Data.ENTITY)}`);
+    Log.print(`bad = ${this.countList(Data.BAD)}`);
+    const k: number[] = [];
+    for (let i = 0; i < this.worldKeys.length; i++) {
+      if (this.worldKeys[i]) k.push(i);
+    }
+    Log.print(`keys= ${k.join(', ')}`);
+  }
+
   // ------------------------------------------------------- Fixed Update Loop
 
-  /** `GameMode.main` */
+  /** One logic tick: `GameMode.main`, then the dev log's lines of the tick. */
   update(): void {
+    this.main();
+    Log.flush();
+  }
+
+  /** `GameMode.main` */
+  private main(): void {
     // `Loader.mainGame` stops calling the game's main at the game over, and for good once the
     // game's clip is removed
     if (!this.loader.gameRunning) {
@@ -2039,11 +2112,23 @@ export class GameSession implements IGameContext {
       }
     }
 
-    // Bullet time: the original counts it in real frames, each moving the game by 0.3
+    // Pause: the dev mode prints its infos
+    if (this.fl_pause && this.fl_debug) {
+      this.printDebugInfos();
+    }
+
+    // Bullet time: the original counts it in real frames, each moving the game by 0.3.
+    // `Timer.update` recomputes `tmod` each frame (`calc_tmod`), so it lasts that frame only.
+    let tmod = 1;
     if (this.fl_bullet && this.bulletTimer > 0) {
       this.bulletTimer -= 1 / BULLET_TMOD;
-      this.gameLoop.bulletScale = this.bulletTimer > 0 ? BULLET_TMOD : 1;
+      if (this.bulletTimer > 0) tmod = BULLET_TMOD;
     }
+    if (this.fl_debug) {
+      tmod = this.getDebugControls(tmod);
+    }
+    this.gameLoop.bulletScale = tmod;
+    this.getDevControls();
 
     if (this.fl_pause) {
       return;
@@ -2097,8 +2182,11 @@ export class GameSession implements IGameContext {
 
     this.fxMan.update();
 
-    // Hurry up
+    // Hurry up (H: 21 times faster in dev mode)
     this.huTimer += 1;
+    if (this.input.isKeyDown(72) && this.fl_debug) {
+      this.huTimer += 20;
+    }
     if (
       this.huState < Data.HU_STEPS.length &&
       this.huTimer >= Data.HU_STEPS[this.huState] / this.diffFactor

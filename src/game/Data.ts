@@ -316,6 +316,22 @@ export const Data = {
 
   // IA grid flags
   MAX_ITERATION: 30,
+  /** The flag names the dev key G shows, by flag bit. */
+  GRID_NAMES: [
+    '$IA_TILE_TOP',
+    '$IA_ALLOW_FALL',
+    '$IA_BORDER',
+    '$IA_SMALLSPOT',
+    '$IA_FALL_SPOT',
+    '$IA_JUMP_UP',
+    '$IA_JUMP_DOWN',
+    '$IA_JUMP_LEFT',
+    '$IA_JUMP_RIGHT',
+    '$IA_TILE',
+    '$IA_CLIMB_LEFT',
+    '$IA_CLIMB_RIGHT',
+    '$FL_TELEPORTER',
+  ] as readonly string[],
   IA_TILE_TOP: 1 << 0,
   IA_ALLOW_FALL: 1 << 1,
   IA_BORDER: 1 << 2,

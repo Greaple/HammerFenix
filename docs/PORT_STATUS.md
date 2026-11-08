@@ -165,6 +165,19 @@ All 118 effects are ported (task 2.3, 2026-11-04), with `interrupt`, `levelConve
 - Original quirks kept: picking any item with id 17 (`CONVERT_DIAMANT`, also the gold mushroom) counts as a pearl, so after a finished conversion it gives the 50000 perfect bonus again; the fish callbacks (77-79) are not cleared on a level change and run at the next level clear; interrupting the shoe (7) resets the speed to 1.0 even in nightmare mode.
 - Fixed in the existing effects while porting: warp umbrellas (11, 12) stop at boss and empty levels and show the alert; 22, 88 and 91 showed the wrong curse icon; 26 and 68 now update the darkness; 94 sets its global flag; 114 is temporary, not permanent; 102 plays script clip 100; random draws of 23, 83, 101 and strikes match the original.
 
+## Dev keys (2C.1)
+
+The original's dev mode keys (`Mode`/`GameMode.getDebugControls`, `Player.getDebugControls`, the bosses', `GameMode.getControls`' F and B, H in `GameMode.main`), listed in the help dialog when the dev switch is on. Tested in `tests/devkeys.test.ts`.
+
+- The page's dev switch (help dialog, or `?dev`) stands for `GameManager.fl_debug` and `isDev()` (`GameSession.fl_debug`). It only turns on the keys: the port loads no `xml_dev` world and keeps its families (the debug toolbar already uses the no-site ones).
+- Keys are read with `InputController.isKeyDown(flashKeyCode)`, sampled per tick like the controls. They are not in the recorded action mask, so they are off while recording or replaying. The letters keep their game use too (W jumps and changes weapon; K gives the keys and kills the Bat, as in the original).
+- Port addition: the top-row digits count as numpad digits (laptops have no numpad). Ctrl and a digit no longer switch browser tabs while the keys are on.
+- `Log` (MotionTypes, not in the source) drew on screen; `src/game/Log.ts` writes to the browser console, each tick's `print` lines only when they change. `GameManager.warning` (the G key's grid name) is a `console.warn`.
+- Shift: `game.swf`'s `Timer` recomputes `tmod` each frame from real time (`calc_tmod`), so Shift slows the game only while held, and Home (`tmod` 1.0) only matters during bullet time, which it cancels. Like bullet time, it slows the loop's clock (`FixedGameLoop.bulletScale`), so movie clips slow down too.
+- B prints the build time (Vite `define`, `__BUILD_TIME__`) without the Flash version line. F prints the logic ticks run per real second (`FixedGameLoop.fps`).
+- The pause screen prints `printDebugInfos` to the console, the parts the port has (no cookie, `fl8` or local flags).
+- Not ported: Escape gives up the game in the original's dev mode (it still pauses here, to keep pausing at hand); `Adventure`'s Ctrl+Shift+M (the co-op mode, Phase 4); the entity mouse handlers (`Entity.release`, `rollOver`: Shift-click traces an entity, Shift-hover lights it up).
+
 ## Bosses (`entity/Boss.ts`)
 
 Ported line by line (tasks 2.8, 2.9, 2026-11-05). Tested in `tests/bosses.test.ts`. Boss music and the ending (code triggers 4 and 5, the elevator of level 103) come from the level scripts and were already ported.
@@ -175,7 +188,7 @@ Ported line by line (tasks 2.8, 2.9, 2026-11-05). Tested in `tests/bosses.test.t
 - Bullet time (`GameMode.bulletTime`, Tuberculoz's death): the original sets `Timer.tmod` to 0.3 for 2 s. Logic here always steps by 1, so the loop's clock slows to 0.3 (`FixedGameLoop.bulletScale`) for about 20 ticks: same moves, but movie clips slow down too (in Flash they kept 40 fps).
 - The exit arrow attached at level start (no enemies in the level data) stays during both fights, as the original's code reads. Not checked in Ruffle.
 - The original's `getOne` draws a random number even on an empty list; the port's does not (older difference). So the boss lookups added to `resetHurry`, `onKillBad` and `onExplode` draw only on boss levels.
-- Dev keys of the original (K kills the Bat, Enter kills Tuberculoz, Shift removes his lives) are not ported.
+- Dev keys of the original: K kills the Bat, Enter kills Tuberculoz, Shift takes one of his lives per frame (2C.1, see "Dev keys").
 
 ## Audit 1.5: Player and enemies
 
@@ -208,7 +221,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 ### Open
 
 - Options for the multiplayer modes (Phase 4): `fl_bombControl` (`WalkingBomb`, `MultiCoop`), life sharing, kick control (`Soccer`).
-- Player: debug keys (`getDebugControls`) are not ported.
 - Key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked).
 - `Jumper.checkClimb` skips a null or zero climb height; the original would jump with a NaN speed.
 - `Spear`: no spawn puff when created after the first second; `Kiwi.clearMines` is never called in the original, not ported.

@@ -393,7 +393,10 @@ export class BatBoss extends MoverEntity implements BossEntity {
       }
     }
 
-    // The original's dev mode kills the Bat with K
+    // Dev mode: K kills the Bat
+    if (this.game.fl_debug && this.game.input.isKeyDown(75) && !this.fl_death) {
+      this.kill();
+    }
 
     // Moving
     if (this.fl_move) {
@@ -1451,7 +1454,14 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
       this.updateDash();
     }
 
-    // The original's dev mode kills him with Enter and removes lives with Shift
+    // Dev mode: Enter kills him, Shift takes a life each frame
+    if (this.game.fl_debug && this.game.input.isKeyDown(13)) {
+      this.die();
+    }
+    if (this.game.fl_debug && this.game.input.isKeyDown(16)) {
+      this.lives -= 1;
+      this.updateBar();
+    }
 
     this.checkHits();
   }

@@ -47,6 +47,8 @@ export class LevelView {
 
   private tileList: SwfMovieClip[] = [];
   private mcList: SwfMovieClip[] = [];
+  /** The `debugGrid` cells of the dev key G. */
+  private gridList: SwfMovieClip[] = [];
   private fieldMap: boolean[][] = [];
 
   constructor(world: LevelWorld, dm: DepthManager) {
@@ -346,6 +348,34 @@ export class LevelView {
     if (id === Data.FIELD_PORTAL) {
       this.world.portalList.push(new PortalData(mc, sx, sy));
     }
+  }
+
+  /**
+   * `View.attachGrid`: a `debugGrid` cell on every case, frame 2 where the case has `flag`
+   * (`flagMap`). `over` puts the cells above the game (the dev key G does).
+   */
+  attachGrid(flag: number, over: boolean): void {
+    if (!this.topDm) return;
+    const depth = over ? Data.DP_INTERF : Data.DP_SPECIAL_BG;
+    for (let cx = 0; cx < Data.LEVEL_WIDTH; cx++) {
+      for (let cy = 0; cy < Data.LEVEL_HEIGHT; cy++) {
+        const mc = this.topDm.attach('debugGrid', depth);
+        mc._x = cx * Data.CASE_WIDTH + this.xOffset;
+        mc._y = cy * Data.CASE_HEIGHT;
+        if (((this.world.flagMap[cx]?.[cy] ?? 0) & flag) === 0) {
+          mc.gotoAndStop('1');
+        } else {
+          mc.gotoAndStop('2');
+        }
+        this.gridList.push(mc);
+      }
+    }
+  }
+
+  /** `View.detachGrid` */
+  detachGrid(): void {
+    for (const mc of this.gridList) mc.removeMovieClip();
+    this.gridList = [];
   }
 
   /** Attaches a static or animated decor sprite (`ScriptEngine` `$e_mc`). */

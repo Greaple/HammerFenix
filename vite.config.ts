@@ -7,6 +7,8 @@ export default defineConfig({
   // Relative base so the build works from any sub-path (e.g. GitHub Pages).
   base: './',
   plugins: [offline(), saveEndpoint()],
+  // The build time, which the dev key B prints (the original's `__TIME__`)
+  define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   resolve: {
     alias: {
       '@engine': fileURLToPath(new URL('./src/engine', import.meta.url)),
