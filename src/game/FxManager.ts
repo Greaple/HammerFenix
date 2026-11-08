@@ -93,7 +93,8 @@ export class FxManager {
   private fl_bg = false;
 
   private lastAlert: SwfMovieClip | null = null;
-  private levelName: SwfMovieClip | null = null;
+  /** The level name banner (`attachLevelPop`), null when none shows. */
+  levelName: SwfMovieClip | null = null;
   private nameTimer = 0;
   private igMsg: SwfMovieClip | null = null;
   private igMsgTimer = 0;
@@ -103,8 +104,9 @@ export class FxManager {
     this.game = game;
   }
 
-  attachLevelPop(name: string, flLabel: boolean): void {
-    if (!name) return;
+  /** `FxManager.attachLevelPop`: only levels with a name of their own show it (2B.4). */
+  attachLevelPop(name: string | null, flLabel: boolean): void {
+    if (name === null) return;
     this.levelName?.removeMovieClip();
     const mc = this.game.depthMan.attach('hammer_interf_zone', Data.DP_INTERF);
     mc._x = -this.game.xOffset;
@@ -193,6 +195,10 @@ export class FxManager {
     return a;
   }
 
+  /**
+   * `FxManager.attachExplosion`: the explosion zone. The original blends it with `OVERLAY`; not
+   * ported (Pixi's overlay drew it shifted and banded), so it shows as a pale disc (2C.6).
+   */
   attachExplosion(x: number, y: number, radius: number): FxAnim | null {
     if (this.game.fl_lock) return null;
     const a = this.attachFx(x, y, 'explodeZone');

@@ -26,11 +26,12 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 ## Engine
 
-- Blend modes: Flash `LAYER` is `SwfMovieClip.setLayerBlend` (an `AlphaFilter` that also carries `_alpha`), `ERASE` is Pixi's `erase`. Only set from code (the darkness); timeline blend modes other than multiply, screen and add still draw as normal.
+- Blend modes: Flash `LAYER` is `SwfMovieClip.setLayerBlend` (an `AlphaFilter` that also carries `_alpha`), `ERASE` is Pixi's `erase`. Only set from code (the darkness); timeline blend modes other than multiply, screen and add still draw as normal. `OVERLAY` (`FxManager.attachExplosion`, every explosion) is not ported: Pixi's advanced overlay drew the level shifted and banded inside the zone, so explosions show as a pale disc where the original tints the level (2B.4).
+- Color transforms: a timeline update with an identity color transform resets the previous one (the end of a fade); the build used to drop it, so fades froze one step short (the darkness veil at 79%, the message panel, the pointer, the lives, 24 clips in all). `tools/build-swf.ts` keeps it on updates, as it does for matrices (2B.4).
 - SWF frame scripts: 86 of 89 run in `src/engine/swf/Avm1.ts`. Not run: 2 particle emitters (`_gfx` #234, `_anims` #150) and a ghost effect (`_anims` #3200), which define functions.
 - Frame scripts of a frame reached by `gotoAndStop`, `nextFrame` or `prevFrame` from game code are queued and run after the logic tick or animation step (`runQueuedFrameActions`), as Flash runs them once the running script ends. This lets FX stepped by `Animation.update` loop from their own label (the shield, `hammer_fx_exit`, `hammer_fx_pointer`) and FX that end in `removeMovieClip` remove themselves. `gotoAndPlay` and AVM1 gotos still run them at once.
 - Backward timeline seeks keep children that stay on the same depth, as Flash does.
-- Text fields bound to a variable (`DefineEditText` `variableName`, e.g. `label`, `_parent.label`) show it: `SwfMovieClip.setVariable` (the original's `mc.label = ...`) updates them, and a field placed later reads it (3.4). HTML fields start with their text, not their markup. HTML text is drawn without its tags (no bold).
+- Text fields bound to a variable (`DefineEditText` `variableName`, e.g. `label`, `_parent.label`) show it: `SwfMovieClip.setVariable` (the original's `mc.label = ...`) updates them, and a field placed later reads it (3.4). HTML fields start with their text, not their markup. HTML text keeps `<b>`, `<font color>` and `<br>` (Pixi tag styles, `parseFlashHtml`); other tags are dropped (2B.4).
 - `_width` / `_height` are the exact vector bounds, hidden children included, as in Flash. Hit boxes no longer include the 1 px rasterization margin.
 - Animation runs at 40 Hz, tied to the 32 Hz logic (5 steps per 4 ticks).
 - Input is sampled once per tick (`InputController.poll`), and can be recorded and replayed (`InputRecording.ts`). `SwfLibrary.headless()` runs the game in Node.
@@ -80,10 +81,12 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 
 ## Interface
 
-| Original                                                                                                       | TypeScript                | Status  | Notes                                                        |
-| -------------------------------------------------------------------------------------------------------------- | ------------------------- | ------- | ------------------------------------------------------------ |
-| `gui/GameInterface.mt`                                                                                         | `src/game/gui/GameHud.ts` | partial | Single player only (no `initMulti`, `initTime`, `lightMode`) |
-| `gui/SoccerInterface.mt`, `ExtendBox.mt`, `Container.mt`, `SimpleButton.mt`, `Field.mt`, `Label.mt`, `Item.mt` |                           | missing |                                                              |
+| Original               | TypeScript                | Status  | Notes                                                        |
+| ---------------------- | ------------------------- | ------- | ------------------------------------------------------------ |
+| `gui/GameInterface.mt` | `src/game/gui/GameHud.ts` | partial | Single player only (no `initMulti`, `initTime`, `lightMode`) |
+
+Spot checks (2B.4): the level name banner shows only on levels with a name of their own (`Lang.getLevelName`, not the area's name), and messages show `*word*` in the lighter color (`GameMode.attachPop`, `Data.replaceTag`); both were plain differences. The rest is in [LEVELS.md](LEVELS.md).
+| `gui/SoccerInterface.mt`, `ExtendBox.mt`, `Container.mt`, `SimpleButton.mt`, `Field.mt`, `Label.mt`, `Item.mt` | | missing | |
 
 ## Site screens (3.1a research)
 

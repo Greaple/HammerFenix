@@ -229,8 +229,11 @@ function compileSprite(tag: any, idOffset: number): SpriteDef {
           const m = convertMatrix(st.matrix, 20);
           if (!isIdentityMatrix(m) || st.isUpdate) place.m = m;
         }
+        // An update with an identity color transform still resets the previous one (a fade
+        // that ends at normal color), so it is kept there, as the matrix is
         const cx = convertCxform(st.colorTransform);
         if (cx) place.cx = cx;
+        else if (st.colorTransform && st.isUpdate) place.cx = [1, 1, 1, 1, 0, 0, 0, 0];
         if (st.name) place.n = st.name;
         if (st.clipDepth !== undefined && st.clipDepth > 0) place.clip = st.clipDepth;
         if (st.blendMode !== undefined && st.blendMode > 1) place.blend = st.blendMode;

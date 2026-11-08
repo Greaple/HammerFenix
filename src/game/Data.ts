@@ -443,6 +443,21 @@ export const Data = {
     return Math.round(Math.min(50000, 500 * Math.round(Math.pow(comboIndex + 1, 2))));
   },
 
+  /**
+   * `Data.replaceTag`: wraps every other piece of `str` split on `char` in `start` and `end`
+   * (`*Sorbex*` to `<font ...>Sorbex</font>`). An odd count of `char` leaves `str` as is (the
+   * original also logs a warning).
+   */
+  replaceTag(str: string, char: string, start: string, end: string): string {
+    const arr = str.split(char);
+    if (arr.length % 2 === 0) return str;
+    let out = '';
+    for (let i = 0; i < arr.length; i++) {
+      out += i % 2 !== 0 ? start + arr[i] + end : arr[i];
+    }
+    return out;
+  },
+
   /** `Data.formatNumber`: groups digits by 3 with dots (negative numbers are left as is). */
   formatNumber(n: number): string {
     let txt = String(n);
@@ -590,6 +605,11 @@ export class GameDataStore {
   /** `Lang.getQuestDesc` */
   getQuestDesc(id: number): string {
     return this.lang.quests[id]?.desc ?? '';
+  }
+
+  /** `Lang.getLevelName`: the name of level `lid` itself, null for most levels. */
+  getLevelName(did: number, lid: number): string | null {
+    return this.lang.levels[did]?.[lid] ?? null;
   }
 
   getSectorName(did: number, lid: number): string {

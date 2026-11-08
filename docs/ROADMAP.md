@@ -8,7 +8,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
-3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md). Next.
+3. 2B.4 is done (Adventure rows of [LEVELS.md](LEVELS.md); its "needs play" rows wait for the user). Next: 2B.5 (enemies) and 2B.6 (dimensions).
 4. The rest of Phase 2C and the solo controller (G.1), in any order.
 5. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
@@ -73,7 +73,7 @@ Start games for comparisons from the debug toolbar: they use the no-site item fa
   - Adventure 0 to 99 against the world map thumbnails: backgrounds and tile skins match. The thumbnails were drawn from an older version of the levels: 1, 2, 7, 9 and 33 have other layouts and 54 another skin (its old skin is still in `basicAdventure`), so they are not port bugs. Later thumbnails show the darkness;
   - script decor of the 17 Adventure levels that attach some, against the hamm4all screenshots: it matches (village, dimension doors and locks, hell door, mirror), except two to check in Ruffle (LEVELS.md, 2B.4): no torches at 54 and no door at 102 in the screenshots. Dimension decor is left to the 2B.6 spot checks: hamm4all names dimension levels by their portal route, not by id.
 - [x] 2B.3 Level jump for the original. Ruffle 0.7.1 runs the original in the browser pane: the white screen came from loading `game.swf` alone, which only holds classes and data. The side-by-side now starts from `loader.swf` (copied to `public/original-swf/`) with Ruffle's `base` set to that folder, so the loader finds `game.swf` and the musics (`../sfx/`), and flashvars `lang` and `mode=solo`; a click starts the game. `game.swf` embeds `xml_dev`, so the original always runs in dev mode, and its own debug keys give the jump (`Player.getDebugControls`): Ctrl and three numpad digits call `forcedGoto(n)`, N goes to the next level, K gives every key. The dialog has a level field and N and K buttons that send them (Ruffle reads keys on its focused shadow `#container`, numpad digits with `location` 3). Limits: the jump stays in the current dimension (take a portal first, K opens the locked ones) and works only while the player can move. Dev mode also gives the original the dev item families (below). Checked on levels 54, 100 and 101. First result: the original shows the torches at 54 (LEVELS.md).
-- [ ] 2B.4 Spot checks, Adventure: the "Adventure" rows of [LEVELS.md](LEVELS.md) (start, boss warnings, set pieces, bosses Bat and Tuberculoz, the ending). Also the bosses' look left from Phase 2 (Bat glow, exit arrow during the fights).
+- [x] 2B.4 Spot checks, Adventure: the "Adventure" rows of [LEVELS.md](LEVELS.md), each level opened in both games with their dev keys and frozen at the same delay. Fixed: dark levels were far too light (the build dropped the identity color transform that ends a fade, 24 clips), the level name banner showed on every new level, and `*word*` in messages was not highlighted (HTML text now has colors and bold, also the pause tip's bold from 2C.6). Open: explosions lack the `OVERLAY` blend (2C.6). Needs play (for the user): the position and key triggers of 2, 47, 75, 78, 82, 84, 86, 87, the two boss fights with the Bat glow and the exit arrow, and the elevator ending. Notes: level 2 was already visited in the original's run (no Cerise there); message line breaks differ because Ruffle replaces the device font Verdana.
 - [ ] 2B.5 Spot checks, enemies: the "Enemies" rows of LEVELS.md, each enemy type at its first level.
 - [ ] 2B.6 Spot checks, dimensions: the "Dimensions" rows of LEVELS.md.
 
@@ -102,7 +102,7 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
 - [ ] 2C.6 Glows and SWF runtime leftovers:
   - `FxManager.addGlow` (the soccer ball's glow, used again in 4.4) and item 86's ghost glow on the player and the enemies, with `SwfMovieClip.setGlow` from 2.8;
   - the 3 frame scripts that define functions (particle emitters `_gfx` #234 and `_anims` #150, ghost effect `_anims` #3200): function definitions in `Avm1.ts`;
-  - bold in HTML text fields;
+  - `OVERLAY` blend for the explosions (`FxManager.attachExplosion`): Pixi's advanced blend mode drew the level shifted and banded inside the zone (back buffer under the page scale); needs another way (a filter reading the level below);
   - timeline blend modes other than multiply, screen and add (list the symbols that use them first);
   - item 84's 4 px box blur (now a gaussian blur).
 - [ ] 2C.7 Timing gaps:

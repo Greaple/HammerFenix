@@ -1,4 +1,4 @@
-import type { BLEND_MODES } from 'pixi.js';
+import type { BLEND_MODES, TextStyleOptions } from 'pixi.js';
 import {
   AlphaFilter,
   BlurFilter,
@@ -39,6 +39,67 @@ const PROTECTED_PROPS = new Set<string>([
   'play',
   'stop',
 ]);
+
+const HTML_ENTITIES: Record<string, string> = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  nbsp: '\u00a0',
+};
+
+/**
+ * Flash HTML text to Pixi tagged text. `plain` is the text alone, `tagged` the text with Pixi
+ * tags (`<b>`, `<c_f7e8d5>`), `tags` their styles. Unknown tags are dropped.
+ */
+export function parseFlashHtml(html: string): {
+  plain: string;
+  tagged: string;
+  tags: Record<string, TextStyleOptions>;
+} {
+  const tags: Record<string, TextStyleOptions> = {};
+  const fontStack: (string | null)[] = [];
+  let plain = '';
+  let tagged = '';
+  const decode = (s: string) =>
+    s.replace(/&(#\d+|\w+);/g, (m, e: string) =>
+      e[0] === '#' ? String.fromCharCode(Number(e.slice(1))) : (HTML_ENTITIES[e] ?? m),
+    );
+  for (const part of html.split(/(<[^>]*>)/)) {
+    if (!part.startsWith('<')) {
+      const t = decode(part);
+      plain += t;
+      tagged += t;
+      continue;
+    }
+    const m = /^<\s*(\/?)\s*(\w+)([^>]*)>$/.exec(part);
+    if (!m) continue;
+    const [, close, rawName, attrs] = m;
+    const name = rawName.toLowerCase();
+    if (name === 'br') {
+      plain += '\n';
+      tagged += '\n';
+    } else if (name === 'b') {
+      tags.b = { fontWeight: 'bold' };
+      tagged += close ? '</b>' : '<b>';
+    } else if (name === 'font') {
+      if (close) {
+        const t = fontStack.pop();
+        if (t) tagged += `</${t}>`;
+      } else {
+        const color = /color\s*=\s*["']?#([0-9a-f]{6})/i.exec(attrs)?.[1]?.toLowerCase();
+        const t = color ? `c_${color}` : null;
+        if (t && color) {
+          tags[t] = { fill: `#${color}` };
+          tagged += `<${t}>`;
+        }
+        fontStack.push(t);
+      }
+    }
+  }
+  return { plain, tagged, tags };
+}
 
 /** Flash-compatible dynamic text field (`DefineDynamicText`). */
 export class SwfTextField extends Container {
@@ -93,6 +154,7 @@ export class SwfTextField extends Container {
 
   set text(v: string) {
     this.rawText = String(v ?? '');
+    this.pixiText.style.tagStyles = undefined;
     this.pixiText.text = this.rawText;
     this.realign();
   }
@@ -101,11 +163,16 @@ export class SwfTextField extends Container {
     return this.rawText;
   }
 
+  /**
+   * The HTML subset the game uses: `<b>`, `<font color>` and `<br>`, drawn with Pixi's tag
+   * styles; other tags (`<p>`, `<font>` without a color) are dropped, as before.
+   */
   set htmlText(v: string) {
-    const stripped = String(v ?? '')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '');
-    this.text = stripped;
+    const { plain, tagged, tags } = parseFlashHtml(String(v ?? ''));
+    this.rawText = plain;
+    this.pixiText.style.tagStyles = Object.keys(tags).length > 0 ? tags : undefined;
+    this.pixiText.text = Object.keys(tags).length > 0 ? tagged : plain;
+    this.realign();
   }
 
   get textColor(): number {

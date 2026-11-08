@@ -813,8 +813,10 @@ export class GameSession implements IGameContext {
       this.fl_warpStart = false;
     }
     if (!this.world.isVisited()) {
-      const zoneName = this.dataStore.getSectorName(this.currentDim, this.world.currentId);
-      this.fxMan.attachLevelPop(zoneName, this.world.currentId > 0);
+      this.fxMan.attachLevelPop(
+        this.dataStore.getLevelName(this.currentDim, this.world.currentId),
+        this.world.currentId > 0,
+      );
     }
     this.onLevelChange?.(this.world.currentId, this.currentSetName);
   }
@@ -1490,7 +1492,9 @@ export class GameSession implements IGameContext {
       }
       const field = sub.getText('field');
       if (field) {
-        field.text = msg.replace(/^\n+/, '').replace(/\*/g, '');
+        // Leading line breaks trimmed; `*word*` shows in a lighter color
+        const text = msg.replace(/^[\n\r]+/, '');
+        field.htmlText = Data.replaceTag(text, '*', '<font color="#f7e8d5">', '</font>');
         field._y = -field.textHeight * 0.5 - 2;
       }
     }
