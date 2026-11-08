@@ -4,7 +4,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 
 **Plan and progress:** [docs/ROADMAP.md](docs/ROADMAP.md). Read its "Next up" section first.
 **What is ported, file by file:** [docs/PORT_STATUS.md](docs/PORT_STATUS.md). Read it only when you need a specific area.
-**Level-by-level checks:** [docs/LEVELS.md](docs/LEVELS.md), one row per level (roadmap Phase 2B).
+**Level spot checks:** [docs/LEVELS.md](docs/LEVELS.md), a short list of levels compared by hand (roadmap Phase 2B).
 
 ## Commands
 
@@ -57,4 +57,4 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 
 ## End of each session
 
-Tick finished tasks in `docs/ROADMAP.md`, update "Next up", fix any line in `docs/PORT_STATUS.md` that changed, and fill the rows of `docs/LEVELS.md` for levels you checked.
+Tick finished tasks in `docs/ROADMAP.md`, update "Next up", fix any line in `docs/PORT_STATUS.md` that changed, and fill the rows of `docs/LEVELS.md` you checked.

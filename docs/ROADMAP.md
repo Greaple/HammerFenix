@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-The UI and UX polish batches U.1 to U.4 are done (section below); left there: English and Spanish title logos, and a check of the phone layouts on a real device. Phases 1, 2 and 3 are done. Phase 3 (the site screens, quests and profile, game options and localization; see PORT_STATUS.md "Site screens", "Quests and profile", "Game options" and "Localization (3.4)") was done before Phase 2B. Next is Phase 2B, starting with the automated data pass and the level jump for Ruffle (2B.0), then the small dimensions (2B.12) and the Adventure batches (2B.1 to 2B.11); the larger dimensions (2B.13 to 2B.28) come with Phase 4 (see "Order" in Phase 2B). For 2B comparisons, start games from the debug toolbar: they use the no-site families and no options, as the Ruffle side-by-side does. The bosses' look in Ruffle (Bat glow, exit arrow during the fights) is left for 2B.11. Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7"). Phase 5 (polish) is done: audio (5.1), performance and mobile (5.2), offline play (5.3); none of it is tried on a real phone yet. A settings page for the site's "Paramètres" (`$volume`, `$sound`, `$music`, `$detail`, `$shake`) is still missing; the volumes in `GameParameters` take it as an argument.
+The UI and UX polish batches U.1 to U.4 are done (section below); left there: English and Spanish title logos, and a check of the phone layouts on a real device. Phases 1, 2 and 3 are done. Phase 3 (the site screens, quests and profile, game options and localization; see PORT_STATUS.md "Site screens", "Quests and profile", "Game options" and "Localization (3.4)") was done before Phase 2B. Next is Phase 2B (rewritten on 2026-11-08: automated checks of every level, then spot checks of a short list in [LEVELS.md](LEVELS.md)), starting with the data pass (2B.0) and the portal test (2B.1); the spot checks need the level jump for Ruffle (2B.3). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7"). Phase 5 (polish) is done: audio (5.1), performance and mobile (5.2), offline play (5.3); none of it is tried on a real phone yet. A settings page for the site's "Paramètres" (`$volume`, `$sound`, `$music`, `$detail`, `$shake`) is still missing; the volumes in `GameParameters` take it as an argument.
 
 ## Bugs (found in play)
 
@@ -45,54 +45,30 @@ Without reproducible runs you can't check whether the clone matches the original
 - [x] 2.9 Boss: Tuberculoz (`entity/boss/Tuberculoz.mt`, level 101) and the ending. Also in `entity/Boss.ts`, with his life bar, bullet time (`GameMode.bulletTime`, approximated by slowing the loop's clock) and the exit to level 102. The ending (elevator on 103, then the game ends) already worked; its game over hand-off is 2.11 and its results screen 3.1c.
 - [x] 2.10 `StatsManager.mt` (extend and perfect rules) and `Chrono.mt`. In `StatsManager.ts` and `Chrono.ts`. The best combo of a level sets how many distinct letters (1 to 7) the next level with special slots drops; the letters are drawn when the level starts. `GameMode.lock/unlock` now stop and start the game chrono (level changes, pause). The perfect extend and perfect bonus were already ported. The other stats (kicks, bombs, jumps...) are counted but unused, as in the original. Tested in `tests/stats.test.ts`.
 - [x] 2.11 Game over and end-of-set hand-off, as the original does it. `Adventure.onGameOver` rebuilds the history (version, game chrono, illegal flag) and `saveScore` hands the score, `reachedLevel` and `getPicks2` to the Loader; `onEndOfSet` calls `exitGame` (picks encoded with `PersistCodec`, sent to `endGame.html`). The Loader's end-of-game part is in `Loader.ts`, with the original `loading` clip (`_loader.swf` is now in the asset build): the save screen fades in over 44 frames and the game is removed. The result is a typed `GameResult` (`GameSession.onGameResult`, `lastResult`) for 3.1c and 3.2b. Also ported: `GameManager.logAction` and its callers, the score checksum (`Player.scoreCS`, which marks the game illegal), `registerScore` and `duration`. The placeholder text now shows after the fade, and a restart is only possible then. Replay snapshots with a game over were re-recorded. Tested in `tests/gameover.test.ts`.
-- [x] 2.12 Simplified enemies: Framboise and Baleine, in `Bad.ts`. Framboise now follows the original: a close player bomb (or a random 0.7% per frame) makes it burst into 6 `FramBall` fragments and hide off screen; the fragments fly to a random platform top at least 8 cases away and it rebuilds there piece by piece (`sub` frames, then `o1` / `o2`). A freeze, knock or kill brings it back at once; its own particles are in. Its white glow is kept but never shows, as in the original (`white = 1` is commented out). Baleine is a plain `Flyer` of its own class. Not compared in Ruffle: Framboise only appears in `deepnight`, reached by portal (2B.0 adds the level jump). Tested in `tests/framboise.test.ts`.
+- [x] 2.12 Simplified enemies: Framboise and Baleine, in `Bad.ts`. Framboise now follows the original: a close player bomb (or a random 0.7% per frame) makes it burst into 6 `FramBall` fragments and hide off screen; the fragments fly to a random platform top at least 8 cases away and it rebuilds there piece by piece (`sub` frames, then `o1` / `o2`). A freeze, knock or kill brings it back at once; its own particles are in. Its white glow is kept but never shows, as in the original (`white = 1` is commented out). Baleine is a plain `Flyer` of its own class. Not compared in Ruffle: Framboise only appears in `deepnight`, reached by portal (spot check in 2B.5, after the level jump from 2B.3). Tested in `tests/framboise.test.ts`.
 
-## Phase 2B: Level-by-level comparison with the original
+## Phase 2B: Comparison with the original
 
-Start once Phase 2 is done; before that, most differences are features already listed there. 2B.0 runs first and checks the data of every level automatically, so the batches only cover what needs eyes. Progress is tracked per level in [LEVELS.md](LEVELS.md).
+Levels are data run by shared code, and Phases 1 and 2 audited that code line by line. So 2B checks all level data automatically and compares only a short list of levels by hand, the ones with something no other level has. (Rewritten on 2026-11-08: it replaced 28 batches of 10 to 20 levels each, which repeated the same checks and asked for play a session can't do in Ruffle.)
 
-Order: 2B.0, then 2B.12 (small dimensions, a short first run of the checklist), then the Adventure (2B.1 to 2B.11), then Phase 3, then the larger dimensions (2B.13 to 2B.28) alongside Phase 4. Reason: the Ruffle side-by-side starts the original without the site (only `lang`), so with the base item families, no options and no profile, which is what the port runs today; Phase 3 changes the item pool and adds options, so the core levels are compared before it. 2B.0 must also find out which item families the original uses without the site, so item drops are compared on the same pool: found in 3.2a, `0,7,1000,18` (`GameManager`, "sysfam"), which the port now uses for games not started from the menu.
+Start games for comparisons from the debug toolbar: they use the no-site item families (`0,7,1000,18`, found in 3.2a) and no options, as the Ruffle side-by-side does.
 
-Checklist for every batch task (2B.1 onward), the same each time:
+- [ ] 2B.0 Automated data pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, backgrounds, player start) and report differences as a test. Level scripts are already checked by `tests/scripts.test.ts` (1.7).
+- [ ] 2B.1 Portal test: every link in `xml/portalLinks.xml` points to a set, level and portal id that exist, and every portal a level script opens (`e_portal`, `e_openPortal`) has a link. Then, headless, enter each linked portal and check the player arrives in the target level at the target portal.
+- [ ] 2B.2 Render every level to an image (a tool, headless or in the browser) and build one contact sheet per set, for:
+  - the 124 background and tile skin pairs, each checked once;
+  - Adventure 0 to 99 against the original's world map thumbnails in `assets-src/original/worldmap/niveauNNN.jpg` (52×66, so layout and background only);
+  - decor placed by scripts (`e_mc`, `attach`) against the player screenshots on [hamm4all.net](https://hamm4all.net/games).
+- [ ] 2B.3 Level jump for the original: find whether the original can start at a given set and level (debug and dev entry points in `GameManager.mt`, `Loader.mt`, `HammerClient.as`) and add it to the Ruffle side-by-side. First check that Ruffle runs in the browser pane; it showed a white screen in the shield bug fix. If it can't run there, the spot checks below are done by the user in a normal browser, with the session preparing the list of what to look for.
+- [ ] 2B.4 Spot checks, Adventure: the "Adventure" rows of [LEVELS.md](LEVELS.md) (start, boss warnings, set pieces, bosses Bat and Tuberculoz, the ending). Also the bosses' look left from Phase 2 (Bat glow, exit arrow during the fights).
+- [ ] 2B.5 Spot checks, enemies: the "Enemies" rows of LEVELS.md, each enemy type at its first level.
+- [ ] 2B.6 Spot checks, dimensions: the "Dimensions" rows of LEVELS.md.
 
-1. Open each level in the port and in the original (Ruffle side-by-side, "Flash" button), using the level jump from 2B.0. Player screenshots and notes for every level are on [hamm4all.net](https://hamm4all.net/games) ("Les Cavernes de Hammerfest"), and its rules pages list the original's known bugs.
-2. Check, and fill the level's row in LEVELS.md: look (tiles, background, decor), enemies (types, spawn points, behavior), items (spawn spots, timing), script events, portals and secret passages, darkness, music, level clear and exit.
-3. Fix each difference in the port, or log it in the Notes column with the roadmap task that owns it.
-4. Record a short replay of the level as a regression fixture in `tests/replays/`.
-5. Tick the batch here when every row of it is filled.
+For each spot check: open the level in the port and the original, look at what its row names, then mark it ok, fixed or open (with the task that owns it). Fights and anything that needs real play are marked "needs play" and go to the user. Record a short replay as a regression fixture in `tests/replays/` when a fix changes behavior.
 
-- [ ] 2B.0 Automated pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, portal links, backgrounds) and report differences as a test. Add a way to open a given level in both the port and Ruffle, if the original allows it (check the debug and dev entry points). Mark the Data column of LEVELS.md. Level scripts are already checked by `tests/scripts.test.ts` (1.7).
-- Adventure (107 levels), 10 per batch:
-  - [ ] 2B.1 Adventure 0-9
-  - [ ] 2B.2 Adventure 10-19
-  - [ ] 2B.3 Adventure 20-29 (boss warning at 30 starts here)
-  - [ ] 2B.4 Adventure 30-39
-  - [ ] 2B.5 Adventure 40-49
-  - [ ] 2B.6 Adventure 50-59
-  - [ ] 2B.7 Adventure 60-69
-  - [ ] 2B.8 Adventure 70-79
-  - [ ] 2B.9 Adventure 80-89
-  - [ ] 2B.10 Adventure 90-99
-  - [ ] 2B.11 Adventure 100-106 (bosses Bat and Tuberculoz, the ending)
-- Dimensions reached by portals (`xml/portalLinks.xml`), about 20 per batch:
-  - [ ] 2B.12 Small dimensions: hiko (18), hof (4), hk (1)
-  - [ ] 2B.13 bumdum 0-19
-  - [ ] 2B.14 bumdum 20-42
-  - [ ] 2B.15 ayame 0-19
-  - [ ] 2B.16 ayame 20-39
-  - [ ] 2B.17 ayame 40-57
-  - [ ] 2B.18 deepnight 0-19
-  - [ ] 2B.19 deepnight 20-39
-  - [ ] 2B.20 deepnight 40-59
-  - [ ] 2B.21 deepnight 60-79
-  - [ ] 2B.22 deepnight 80-99
-  - [ ] 2B.23 deepnight 100-119
-  - [ ] 2B.24 deepnight 120-139
-  - [ ] 2B.25 deepnight 140-159
-  - [ ] 2B.26 deepnight 160-179
-  - [ ] 2B.27 deepnight 180-199
-  - [ ] 2B.28 deepnight 200-226
-- The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer, fjv: 79 levels) are checked with their mode in Phase 4, using the same checklist.
+Bugs found by playing go in "Bugs (found in play)" at the top, not here.
+
+The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer, fjv: 79 levels) get their data from 2B.0 and their spot checks with their mode in Phase 4.
 
 ## Phase 3: Shell and progression
 
