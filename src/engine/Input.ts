@@ -71,8 +71,9 @@ function actionOf(e: KeyboardEvent): ControlAction | undefined {
  * Unified input controller combining Keyboard (QWERTY + AZERTY + Arrows),
  * Gamepad API, and on-screen touch controls.
  *
- * Implements Hammerfest's lockable edge-triggered `consumePress(action)`
- * alongside continuous `isDown(action)` (used for pogo-jumping on `jump`).
+ * Implements Hammerfest's lockable edge-triggered presses (`consumePress` for menus and game
+ * keys, `keyIsDown` for the player's controller) alongside continuous `isDown(action)` (used
+ * for pogo-jumping on `jump`).
  *
  * Input is sampled once per logic tick by `poll()`, so a tick sees one consistent state. That
  * sample can be recorded, or replaced by a replay's.
@@ -82,6 +83,11 @@ export class InputController {
   private readonly touchHeld = new Set<ControlAction>();
   private readonly padHeld = new Set<ControlAction>();
   private readonly locked = new Set<ControlAction>();
+  /**
+   * The player's key locks (`PlayerController.keyLocks`), apart from the menus' and the game's:
+   * released only when the controller runs (`releaseControllerLocks`).
+   */
+  private readonly ctrlLocked = new Set<ControlAction>();
   /** Flash key codes held now, and in this tick's sample (for the dev keys). */
   private readonly codesHeld = new Set<number>();
   private codesSampled = new Set<number>();
@@ -133,6 +139,7 @@ export class InputController {
     this.touchHeld.clear();
     this.padHeld.clear();
     this.locked.clear();
+    this.ctrlLocked.clear();
   };
 
   attach(): void {
@@ -242,9 +249,13 @@ export class InputController {
   resetState(): void {
     this.sampled = 0;
     this.locked.clear();
+    this.ctrlLocked.clear();
   }
 
-  /** Edge-triggered press matching `PlayerController.keyIsDown` + `lockKey`. */
+  /**
+   * Edge-triggered press for the menus and the game's own keys (`GameMode.keyLock`): its lock
+   * is released on the first poll the action is up. The player uses `keyIsDown`.
+   */
   consumePress(action: ControlAction): boolean {
     if (this.isDown(action) && !this.locked.has(action)) {
       this.locked.add(action);
@@ -255,5 +266,26 @@ export class InputController {
 
   lock(action: ControlAction): void {
     this.locked.add(action);
+  }
+
+  /** `PlayerController.keyIsDown`: held and not locked by the controller; locks it. */
+  keyIsDown(action: ControlAction): boolean {
+    if (this.isDown(action) && !this.ctrlLocked.has(action)) {
+      this.ctrlLocked.add(action);
+      return true;
+    }
+    return false;
+  }
+
+  /** `PlayerController.lockKey` */
+  lockKey(action: ControlAction): void {
+    this.ctrlLocked.add(action);
+  }
+
+  /** The start of `PlayerController.getControls`: unlocks the keys no longer held. */
+  releaseControllerLocks(): void {
+    for (const act of [...this.ctrlLocked]) {
+      if (!this.isDown(act)) this.ctrlLocked.delete(act);
+    }
   }
 }

@@ -1,6 +1,7 @@
 import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { Data } from './Data';
 import type { IGameContext } from './GameContext';
+import { BaseEntity } from './entity/Entity';
 import { Particle } from './entity/Particle';
 
 /**
@@ -208,7 +209,7 @@ export class FxManager {
     if (fx) {
       fx.mc._xscale *= 1.5;
       fx.mc._yscale = fx.mc._xscale;
-      fx.mc._xscale *= this.game.rand.next() < 0.5 ? -1 : 1;
+      fx.mc._xscale *= this.game.rand.random(2) * 2 - 1;
     }
     return fx;
   }
@@ -242,21 +243,36 @@ export class FxManager {
     return a;
   }
 
+  /**
+   * `FxManager.dust`: dust falling from a slab. The original skips it in low detail (2C.5).
+   * The draws happen even when `attachFx` returns null (AS2 evaluates them, then sets nothing).
+   */
   dust(cx: number, cy: number): void {
-    const x = cx * Data.CASE_WIDTH + Data.CASE_WIDTH * 0.5;
-    const y = cy * Data.CASE_HEIGHT + Data.CASE_HEIGHT;
+    const rand = this.game.rand;
+    const x = BaseEntity.x_ctr(cx);
+    const y = BaseEntity.y_ctr(cy);
+    const n = 7;
     let xMin = x - Data.CASE_WIDTH * 0.5;
     let xMax = x + Data.CASE_WIDTH * 0.5;
-    if (this.game.world.getCase(cx - 1, cy) === Data.GROUND) xMin -= Data.CASE_WIDTH;
-    if (this.game.world.getCase(cx + 1, cy) === Data.GROUND) xMax += Data.CASE_WIDTH;
-    const wid = Math.max(1, Math.round(xMax - xMin));
-
-    for (let i = 0; i < 6; i++) {
-      const fx = this.attachFx(xMin + this.game.rand.random(wid), y, 'hammer_fx_dust');
+    if (this.game.world.getCase(cx - 1, cy) === Data.GROUND) {
+      xMin -= Data.CASE_WIDTH;
+    }
+    if (this.game.world.getCase(cx + 1, cy) === Data.GROUND) {
+      xMax += Data.CASE_WIDTH;
+    }
+    const wid = Math.round(xMax - xMin);
+    for (let i = 0; i < n; i++) {
+      const fx = this.attachFx(xMin + rand.random(wid), y, 'hammer_fx_dust');
+      // `Std.random(50)+50*(...)`: the sign applies to the 50 only, as the original reads
+      const xscale = rand.random(50) + 50 * (rand.random(2) * 2 - 1);
+      const yscale = rand.random(80) + 10;
+      const alpha = rand.random(50) + 50;
+      const frame = rand.random(5) + 5;
       if (fx) {
-        fx.mc._xscale = (50 + this.game.rand.random(50)) * (this.game.rand.next() < 0.5 ? -1 : 1);
-        fx.mc._yscale = 20 + this.game.rand.random(70);
-        fx.mc._alpha = 50 + this.game.rand.random(50);
+        fx.mc._xscale = xscale;
+        fx.mc._yscale = yscale;
+        fx.mc._alpha = alpha;
+        fx.mc.gotoAndStop(String(frame));
       }
     }
   }

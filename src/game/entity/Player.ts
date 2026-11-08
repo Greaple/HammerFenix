@@ -1005,6 +1005,9 @@ export class PlayerEntity extends PhysicsEntity {
   private updateControls(): void {
     const input = this.game.input;
 
+    // Last keys held: their locks go only here, so not while the controls are locked
+    input.releaseControllerLocks();
+
     if (this.fl_stable) {
       this.waterJump = 3;
     }
@@ -1054,7 +1057,7 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     // Water air-jumps
-    if (this.game.fl_aqua && this.waterJump > 0 && !this.fl_stable && input.consumePress('jump')) {
+    if (this.game.fl_aqua && this.waterJump > 0 && !this.fl_stable && input.keyIsDown('jump')) {
       this.airJump();
       this.waterJump--;
     }
@@ -1070,12 +1073,12 @@ export class PlayerEntity extends PhysicsEntity {
         this.getScore(this, 10);
       }
       this.game.statsMan.inc(Data.STAT_JUMP, 1);
-      input.lock('jump');
+      input.lockKey('jump');
     }
 
     // Attack / bomb drop / bomb kick
     // The key is read (and locked) before the cooldown test, as in `keyIsDown(attack) && coolDown==0`
-    if (input.consumePress('attack') && this.coolDown === 0) {
+    if (input.keyIsDown('attack') && this.coolDown === 0) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
 
@@ -1091,7 +1094,7 @@ export class PlayerEntity extends PhysicsEntity {
       } else {
         this.kickBomb(bombList, 1.0);
       }
-    } else if (input.consumePress('down') && this.fl_upKick) {
+    } else if (input.keyIsDown('down') && this.fl_upKick) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
       const bombList = this.game.getClose(Data.BOMB, this.x, this.y, dist, false) as BombEntity[];

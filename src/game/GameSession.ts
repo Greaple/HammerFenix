@@ -1114,10 +1114,13 @@ export class GameSession implements IGameContext {
     return out;
   }
 
+  /**
+   * `GameMode.getOne`: a random entity of `type`, or null. On an empty list `Std.random(0)` is 0
+   * and draws nothing (Flash's `random`, as Ruffle's `action_random_number`), as here.
+   */
   getOne(type: number): BaseEntity | null {
-    const list = this.getList(type);
-    if (list.length === 0) return null;
-    return list[this.rand.random(list.length)];
+    const l = this.getList(type);
+    return l[this.rand.random(l.length)] ?? null;
   }
 
   /** A random entity of `type` other than `e`, or null when there is no other one. */

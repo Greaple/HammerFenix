@@ -7,8 +7,8 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-08):
 
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
-2. 2C.2 (open audit deviations that change play), so the spot checks compare the final behavior. 2C.1 is done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way.
-3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md).
+2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
+3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md). Next.
 4. The rest of Phase 2C and the solo controller (G.1), in any order.
 5. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
@@ -88,13 +88,13 @@ The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer,
 What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. Not the other modes (Phase 4). Each task: port from the original, test it, update PORT_STATUS.md (move the item from "Open" to "Fixed").
 
 - [x] 2C.1 The original's dev keys, behind the dev switch: `GameMode.getDebugControls` and `Player.getDebugControls` (Ctrl and three numpad digits go to a level, the digits alone spawn an item, N, K, I, W, G, numpad / + - *), H (hurry up 21 times faster), Shift and Home (`Timer.tmod` 0.3 and 1.0: held only, `game.swf`'s `Timer` recomputes `tmod` each frame), the bosses' K, Enter and Shift, F (FPS) and B (build time) to the console, debug infos on the pause screen. Listed in the help dialog when the dev switch is on. Off while recording or replaying (not in the action mask); the top-row digits count as the numpad's. Not ported: Escape giving up the game, Ctrl+Shift+M (co-op, Phase 4), the entity mouse handlers. Details in PORT_STATUS.md "Dev keys".
-- [ ] 2C.2 Open audit deviations that change play or the random sequence:
-  - key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked);
-  - `getOne` draws a random number even on an empty list; then drop the boss-only workaround in `resetHurry`, `onKillBad` and `onExplode`;
-  - the float random draws left in `FxManager` go through the seeded source;
-  - `Spear`'s spawn puff when created after the first second; `Bad.onDeathLine` attaches a bare clip, not through `fxMan`.
+- [x] 2C.2 Open audit deviations that change play or the random sequence:
+  - the player's key locks are released only when the controller runs (not while controls are locked), in a lock set apart from the menus'; no replay changed;
+  - `getOne` was not a deviation: `Std.random(0)` draws nothing in Flash (Ruffle's `action_random_number`), as in the port, and the boss lookups sit where the original has them; `getOne` is now written as the original's;
+  - `FxManager`: `attachShine`'s flip uses `Std.random(2)`, and `dust` was rewritten from the original (7 clips, its scales, a start frame); 4 replay snapshots changed with the random sequence and were accepted;
+  - `Spear`'s spawn puff after the first second; `Bad.onDeathLine` attaches a bare clip at plan `Data.FX`.
 
-  Check the replay snapshot diffs and accept them.
+  Tested in `tests/controls.test.ts`.
 
 - [ ] 2C.3 Disguises: the D key cycles the player's head (`GameMode.main`, `fl_disguise`, true in Adventure only), skipping the heads whose family the profile lacks: 109 afro, 110 cerbère, 111 piou, 112 mario, 113 Tuberculoz cape. Add the `HEAD_*` constants from `Data.mt`. Name the key in the help and the pause screen if the original does.
 - [ ] 2C.4 World map: `GameMode.onMap` (key C when `fl_map`; find what sets it), the `hammer_map` clip ("Strates supérieures...", its text from `Lang`), `attachMapIcon`, `getMapY`, `registerMapEvent` and the map events (`EVENT_EXIT_*`, `EVENT_BACK_*`, `EVENT_DEATH`, `EVENT_EXTEND`, `EVENT_TIME`) sent by portals, deaths and extends.

@@ -187,7 +187,7 @@ Ported line by line (tasks 2.8, 2.9, 2026-11-05). Tested in `tests/bosses.test.t
 - Tuberculoz life bar: `bar` is a mask (`SwfMovieClip.getMask`), scaled to show the fill.
 - Bullet time (`GameMode.bulletTime`, Tuberculoz's death): the original sets `Timer.tmod` to 0.3 for 2 s. Logic here always steps by 1, so the loop's clock slows to 0.3 (`FixedGameLoop.bulletScale`) for about 20 ticks: same moves, but movie clips slow down too (in Flash they kept 40 fps).
 - The exit arrow attached at level start (no enemies in the level data) stays during both fights, as the original's code reads. Not checked in Ruffle.
-- The original's `getOne` draws a random number even on an empty list; the port's does not (older difference). So the boss lookups added to `resetHurry`, `onKillBad` and `onExplode` draw only on boss levels.
+- Boss lookups (`getOne(Data.BOSS)`) are where the original has them: always in `resetHurry`, only on Tuberculoz's level in `onKillBad` and `onExplode`. On an empty list `Std.random(0)` gives 0 and draws nothing (Flash's `random`, as Ruffle's `action_random_number` reads), as the port's `getOne` does (2C.2).
 - Dev keys of the original: K kills the Bat, Enter kills Tuberculoz, Shift takes one of his lives per frame (2C.1, see "Dev keys").
 
 ## Audit 1.5: Player and enemies
@@ -216,15 +216,16 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - Random draws use the original's integer forms (`Std.random(1000) < chance`, `Std.random(2)*2-1`), and Bombe draws its unused random duration.
 - Session: the HUD reads the new player's lives and score on each new game; `shake()` keeps a stronger running shake (`||`, not `&&`).
 - `Physics` portals: a portal case that matches no portal calls `onPortal(null)`, as the original does (the player is refused, a bomb destroyed). No level has such a case (2B.1).
+- Key locks (2C.2): the player's (`PlayerController.keyLocks`) are a set of their own (`InputController.keyIsDown`, `lockKey`), released at the start of the controller's update only, so not while the controls are locked: a bomb key pressed again during a lock drops nothing until it is released. The menus' and the game's keys (`consumePress`, `GameMode.keyLock`) still release on every tick. No replay changed.
+- `Spear` attached after the level's first second (script cycle above `Data.SECOND`) appears with a `hammer_fx_pop` (2C.2).
+- `Bad.onDeathLine` attaches `hammer_fx_death` as a bare clip at plan `Data.FX` (512, an entity type the original uses as a plan, so above everything), which plays at 40 Hz and removes itself, not as an fx stepped by the logic (2C.2).
 - Particles (2.5): every call uses its original type, count and position. Added the missing ones: Bombe's sparks, Crawler's attack and landing (with its squash), Saw's stun, hits, wake-up and stun sparks, the portal opening, the Guu doll's rain (with the player shrinking, growing back and dying too small) and the aqua bubbles.
 
 ### Open
 
 - Options for the multiplayer modes (Phase 4): `fl_bombControl` (`WalkingBomb`, `MultiCoop`), life sharing, kick control (`Soccer`).
-- Key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked).
 - `Jumper.checkClimb` skips a null or zero climb height; the original would jump with a NaN speed.
-- `Spear`: no spawn puff when created after the first second; `Kiwi.clearMines` is never called in the original, not ported.
-- Visual: `Bad.onDeathLine` attaches its fx through `fxMan` instead of a bare clip.
+- `Kiwi.clearMines` is never called in the original, not ported.
 
 ## Audit 1.6: session, bombs, shots, items
 
@@ -246,6 +247,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - Bombs: no invented "already exploded" guards (only `Green` has one), `duplicate()` no longer sets owner and parent, red bomb and mine no longer clear `fl_stable`, the mine calls `blinkLife()`.
 - Shots: rewritten from the original. Speeds, cooldowns (2 s for the player's arrow, fire ball and pearl), offsets and hit rules were invented: the player's fire ball and pearl go through enemies, pips and zests do not disappear on hit, a missed ball goes back to a random Fraise.
 - World keys from quest families 5000-5099; `setBaseAnims` ported.
+- `FxManager` (2C.2): `attachShine` draws its flip with `Std.random(2)`, and `dust` was rewritten from the original: 7 clips (not 6), `Std.random(50)+50*(±1)` as x scale (the sign applies to the 50 only), y scale 10 to 89, a start frame 5 to 9, and the draws happen even when the fx is not attached (the game is locked). Its low detail skip waits for 2C.5. The 4 replays with dust changed their random sequence.
 
 ### Open
 
@@ -255,7 +257,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - `F=` in the history is the port's version (`package.json`); the original sent the site's `$version` parameter. The two `GameManager` constructor entries (`$B` build time, `$using sysfam`) are not logged; they are dropped at the game over anyway.
 - `GameManager.KEY` is drawn from the game's seed with its own generator, so the main random sequence does not move.
 - `ScoreItem` gives 500 points for an unknown id; the original stops with a fatal error.
-- Float random draws remain in `FxManager`.
 
 ## Audit 1.7: level script, world and view
 

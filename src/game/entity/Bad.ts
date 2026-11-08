@@ -202,7 +202,11 @@ export class BadEntity extends MoverEntity {
   }
 
   override onDeathLine(): void {
-    this.game.fxMan.attachFx(this.x, Data.GAME_HEIGHT * 0.5, 'hammer_fx_death');
+    // A bare clip, not an fx: it plays on its own and removes itself (frame 13). Its plan is
+    // `Data.FX`, an entity type (512), so it shows above everything, as in the original.
+    const mc = this.game.depthMan.attach('hammer_fx_death', Data.FX);
+    mc._x = this.x;
+    mc._y = Data.GAME_HEIGHT * 0.5;
     this.game.shake(10, 3);
     this.game.audio.playSound('sound_bad_death', Data.CHAN_BAD);
     this.deathTimer = 0;
@@ -1426,6 +1430,15 @@ export class SpearBad extends BadEntity {
 
     const ss = this.game.getDynamicVar('$SPEAR_SKIN');
     this.sub?.gotoAndStop(ss ?? '1');
+
+    // A spear added after the level's first second (by a script) appears with a puff
+    if ((this.game.scriptRunner?.cycle ?? 0) > Data.SECOND) {
+      this.game.fxMan.attachFx(
+        this.x + Data.CASE_WIDTH * 0.5,
+        this.y + Data.CASE_HEIGHT * 0.5,
+        'hammer_fx_pop',
+      );
+    }
   }
 
   override freeze(_d: number): void {}
