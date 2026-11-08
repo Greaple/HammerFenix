@@ -321,6 +321,24 @@ function mapFlashBlendMode(mode?: number): BLEND_MODES {
 }
 
 /**
+ * Frame scripts of frames reached by `gotoAndStop`, `nextFrame` or `prevFrame` from game code.
+ * Flash queues them and runs them once the running script ends, so the code still sees the frame
+ * it asked for. E.g. `Animation.update` reads the shield's last frame and goes back to frame 1, and
+ * only then does that frame's `gotoAndPlay("loop")` run, which skips the intro.
+ */
+const queuedActions: { clip: SwfMovieClip; frame: number }[] = [];
+
+/** Runs the queued frame scripts. Call it after each piece of game code (a tick, a step). */
+export function runQueuedFrameActions(): void {
+  // A script can queue more; the cap stops two frames that send the clip to each other
+  for (let i = 0; i < queuedActions.length && i < 10000; i++) {
+    const { clip, frame } = queuedActions[i];
+    clip.runQueuedActions(frame);
+  }
+  queuedActions.length = 0;
+}
+
+/**
  * Flash AVM1-compatible `MovieClip` runtime built on PixiJS v8 `Container`.
  *
  * Replays `DefineSprite` timelines, supports nested named clips (`mc.sub`,
@@ -541,7 +559,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   gotoAndStop(frameOrLabel: number | string): void {
     const target = this.resolveFrame(frameOrLabel);
     this.playing = false;
-    this.seekToFrame(target, false);
+    this.seekAndQueue(target);
   }
 
   gotoAndPlay(frameOrLabel: number | string): void {
@@ -553,15 +571,28 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   nextFrame(): void {
     this.playing = false;
     if (this.curFrame < this.def.frameCount) {
-      this.seekToFrame(this.curFrame + 1, false);
+      this.seekAndQueue(this.curFrame + 1);
     }
   }
 
   prevFrame(): void {
     this.playing = false;
     if (this.curFrame > 1) {
-      this.seekToFrame(this.curFrame - 1, false);
+      this.seekAndQueue(this.curFrame - 1);
     }
+  }
+
+  /** A goto from game code: the target frame's scripts run later (`runQueuedFrameActions`). */
+  private seekAndQueue(target: number): void {
+    if (target === this.curFrame) return;
+    this.seekToFrame(target, false);
+    if (this.def.frames[target - 1]?.actions) queuedActions.push({ clip: this, frame: target });
+  }
+
+  /** Runs a queued frame's scripts, as Flash does, even if the clip has left that frame since. */
+  runQueuedActions(frame: number): void {
+    if (this.removed || this.destroyed) return;
+    this.runFrameActions(frame, 0);
   }
 
   removeMovieClip(): void {

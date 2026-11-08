@@ -3,6 +3,7 @@ import { AudioEngine } from './engine/Audio';
 import { loadGameFonts } from './engine/Fonts';
 import { InputController, type ControlAction } from './engine/Input';
 import { SwfLibrary } from './engine/swf/SwfLibrary';
+import { runQueuedFrameActions } from './engine/swf/SwfMovieClip';
 import { GameDataStore } from './game/Data';
 import { GameSession } from './game/GameSession';
 import { SymbolBrowser } from './ui/SymbolBrowser';
@@ -154,7 +155,10 @@ async function main(): Promise<void> {
   new MutationObserver(() => shell.refresh()).observe(document.documentElement, {
     attributeFilter: ['class'],
   });
-  app.ticker.add(() => shell.update());
+  app.ticker.add(() => {
+    shell.update();
+    runQueuedFrameActions();
+  });
   // Render only when the picture can have changed (port addition, for phones and 120 Hz screens):
   // the game changes only on its 32 Hz logic ticks. Screens, fades and a stopped loop (debug
   // stepping) render every frame.

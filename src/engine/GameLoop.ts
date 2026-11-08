@@ -1,3 +1,5 @@
+import { runQueuedFrameActions } from './swf/SwfMovieClip';
+
 /**
  * Deterministic fixed-timestep game loop matching Motion Twin's `Timer.wantedFPS = 32`
  * (`Data.SECOND = 32` cycles per second, `tmod = 1.0` per fixed step).
@@ -67,11 +69,13 @@ export class FixedGameLoop {
   /** Runs one logic tick, plus the animation steps that fall in it. */
   stepSingleFrame(): void {
     this.onLogicStep();
+    runQueuedFrameActions();
     this.steps++;
     this.logicTicks++;
     const target = Math.floor((this.logicTicks * FixedGameLoop.ANIM_HZ) / FixedGameLoop.LOGIC_HZ);
     while (this.animTicks < target) {
       this.onAnimStep();
+      runQueuedFrameActions();
       this.animTicks++;
     }
   }

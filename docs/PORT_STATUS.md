@@ -28,6 +28,7 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 
 - Blend modes: Flash `LAYER` is `SwfMovieClip.setLayerBlend` (an `AlphaFilter` that also carries `_alpha`), `ERASE` is Pixi's `erase`. Only set from code (the darkness); timeline blend modes other than multiply, screen and add still draw as normal.
 - SWF frame scripts: 86 of 89 run in `src/engine/swf/Avm1.ts`. Not run: 2 particle emitters (`_gfx` #234, `_anims` #150) and a ghost effect (`_anims` #3200), which define functions.
+- Frame scripts of a frame reached by `gotoAndStop`, `nextFrame` or `prevFrame` from game code are queued and run after the logic tick or animation step (`runQueuedFrameActions`), as Flash runs them once the running script ends. This lets FX stepped by `Animation.update` loop from their own label (the shield, `hammer_fx_exit`, `hammer_fx_pointer`) and FX that end in `removeMovieClip` remove themselves. `gotoAndPlay` and AVM1 gotos still run them at once.
 - Backward timeline seeks keep children that stay on the same depth, as Flash does.
 - Text fields bound to a variable (`DefineEditText` `variableName`, e.g. `label`, `_parent.label`) show it: `SwfMovieClip.setVariable` (the original's `mc.label = ...`) updates them, and a field placed later reads it (3.4). HTML fields start with their text, not their markup. HTML text is drawn without its tags (no bold).
 - `_width` / `_height` are the exact vector bounds, hidden children included, as in Flash. Hit boxes no longer include the 1 px rasterization margin.
