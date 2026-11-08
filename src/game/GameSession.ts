@@ -1548,7 +1548,7 @@ export class GameSession implements IGameContext {
   }
 
   /** `GameMode.usePortal`: false when the portal leads nowhere. Map events are not ported. */
-  usePortal(pid: number, e: BaseEntity | null): boolean {
+  usePortal(pid: number | null, e: BaseEntity | null): boolean {
     if (this.nextLink !== null) return false;
     const link = this.dataStore.portalLinks.links.find(
       (l) =>
@@ -1562,7 +1562,7 @@ export class GameSession implements IGameContext {
 
     if (e === null) {
       // Floating portal: players are pulled in, then shrink (see update)
-      const portal = this.portalMcList[pid];
+      const portal = pid === null ? undefined : this.portalMcList[pid];
       for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
         if (portal) {
           p.dx = (portal.x - p.x) * 0.018;

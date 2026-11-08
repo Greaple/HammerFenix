@@ -104,7 +104,7 @@ export class BombEntity extends MoverEntity {
     }
   }
 
-  override onPortal(pid: number): void {
+  override onPortal(pid: number | null): void {
     super.onPortal(pid);
     this.game.fxMan.attachFx(this.x, this.y - Data.CASE_HEIGHT * 0.5, 'hammer_fx_shine');
     this.destroy();

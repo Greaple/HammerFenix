@@ -6,7 +6,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-08):
 
-1. 2B.0 to 2B.3: the automated checks of every level, then the level jump for Ruffle.
+1. 2B.2 and 2B.3: the level images, then the level jump for Ruffle (2B.0 and 2B.1 are done). Hiko can't be reached by portal in the original, so its spot checks need the level jump.
 2. 2C.1 (the original's dev keys, which make the spot checks faster) and 2C.2 (open audit deviations that change play), so the spot checks compare the final behavior.
 3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md).
 4. The rest of Phase 2C and the solo controller (G.1), in any order.
@@ -66,8 +66,8 @@ Levels are data run by shared code, and Phases 1 and 2 audited that code line by
 
 Start games for comparisons from the debug toolbar: they use the no-site item families (`0,7,1000,18`, found in 3.2a) and no options, as the Ruffle side-by-side does.
 
-- [ ] 2B.0 Automated data pass over every set in `xml/levels/`: compare the built level data with the original XML (tiles, enemy and item slots, scripts, backgrounds, player start) and report differences as a test. Level scripts are already checked by `tests/scripts.test.ts` (1.7).
-- [ ] 2B.1 Portal test: every link in `xml/portalLinks.xml` points to a set, level and portal id that exist, and every portal a level script opens (`e_portal`, `e_openPortal`) has a link. Then, headless, enter each linked portal and check the player arrives in the target level at the target portal.
+- [x] 2B.0 Automated data pass over every set in `xml/levels/`, in `tests/level-data.test.ts`. All 662 levels of the 17 sets decode losslessly (encoding them again gives the original strings), the built JSON matches, every value is in range, the port reads each level as the original does (mirrored too), and every background, tile skin, field and enemy id has its SWF frame or class. No difference found. Also found: the original game loads only 14 sets (`swfmake.xml`); `adventure_english`, `basicAdventure` and `bumdum` are not in it, so LEVELS.md lost its bumdum row.
+- [x] 2B.1 Portal test, in `tests/portals.test.ts`. Every link joins existing levels and starts at a portal. The 95 usable links are taken headless, normal and mirrored (field portals entered, floating portals opened by their own script trigger), and the player arrives in the target level on the case `getPortalEntrance` gives. All pass. Quirks of the original data, kept and pinned by the test: the village's link to hiko comes after its link to deepnight (same portal; `getLink` takes the first), so no portal leads to hiko; `main51 > d_temple` arrives at a portal that is only a floating one there (the player lands at the level start); ayame 28 and 34 open portals with no link. Fixed on the way (from 2C.2): a portal case that matches no portal calls `onPortal(null)`, so the player is refused, as in the original.
 - [ ] 2B.2 Render every level to an image (a tool, headless or in the browser) and build one contact sheet per set, for:
   - the 124 background and tile skin pairs, each checked once;
   - Adventure 0 to 99 against the original's world map thumbnails in `assets-src/original/worldmap/niveauNNN.jpg` (52×66, so layout and background only);
@@ -90,7 +90,6 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
 - [ ] 2C.1 The original's dev keys, behind the dev switch: `GameMode.getDebugControls` and `Player.getDebugControls` (look up what each key does), H (hurry up comes faster), Shift and Home (`Timer.tmod` 0.3 and 1.0), the bosses' K, Enter and Shift (`Boss.ts`), F (FPS) and B (build time) to the console. List them in the dev part of the help dialog. Useful for the 2B spot checks.
 - [ ] 2C.2 Open audit deviations that change play or the random sequence:
   - key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked);
-  - `Physics` calls `onPortal(null)` when no portal matches; the port does nothing;
   - `getOne` draws a random number even on an empty list; then drop the boss-only workaround in `resetHurry`, `onKillBad` and `onExplode`;
   - the float random draws left in `FxManager` go through the seeded source;
   - `Spear`'s spawn puff when created after the first second; `Bad.onDeathLine` attaches a bare clip, not through `fxMan`.

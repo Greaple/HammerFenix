@@ -746,7 +746,8 @@ export class PhysicsEntity extends AnimatorEntity {
             pid = i;
           }
         }
-        if (pid !== null) this.onPortal(pid);
+        // Called even with no portal found (pid null): the player is then refused (usePortal)
+        this.onPortal(pid);
       } else {
         this.onPortalRefusal();
       }
@@ -820,7 +821,7 @@ export class PhysicsEntity extends AnimatorEntity {
     this.dy = 0;
   }
   onTeleport(): void {}
-  onPortal(_pid: number): void {}
+  onPortal(_pid: number | null): void {}
   onPortalRefusal(): void {}
   onBump(): void {}
 

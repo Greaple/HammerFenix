@@ -125,7 +125,7 @@ export interface IGameContext {
   attachItemName(id: number): void;
 
   onEnterCase(cx: number, cy: number): void;
-  usePortal(pid: number, entity: BaseEntity | null): boolean;
+  usePortal(pid: number | null, entity: BaseEntity | null): boolean;
   openPortal(cx: number, cy: number, pid: number): boolean;
 
   setDynamicVar(name: string, value: string): void;

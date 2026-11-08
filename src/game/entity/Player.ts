@@ -840,7 +840,7 @@ export class PlayerEntity extends PhysicsEntity {
     }
   }
 
-  override onPortal(pid: number): void {
+  override onPortal(pid: number | null): void {
     super.onPortal(pid);
     if (!this.game.usePortal(pid, this)) {
       this.onPortalRefusal();

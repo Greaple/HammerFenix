@@ -56,6 +56,8 @@ Status: **done** = faithful port · **partial** = ported with gaps · **approx**
 | `levels/ViewLight.mt`                                        |                                          | skipped | Wireframe level preview used only by the `Browser` dev tool (out of scope). The darkness is `GameMode.updateDarkness`, ported in 2.7                             |
 | `levels/PortalLink.mt`, `PortalData.mt`, `TeleporterData.mt` | `levels/LevelWorld.ts`, `GameSession.ts` | partial | Portals follow the original (arrival portal, late players, floating portal pull-in, side scroll or fade). Map events (`EVENT_EXIT_*`) not ported                 |
 
+**Level data and portals (2B.0, 2B.1).** `tests/level-data.test.ts` checks the 662 levels of the 17 sets: `PersistCodec` decodes each one losslessly (encoding it again gives the original string), the built JSON holds the same data, every value is in range, the port reads each level as `SetManager.unserialize` + `parseWalls` do (mirrored too), and every background, tile skin, field and enemy id has its SWF frame or class. `tests/portals.test.ts` checks the 96 links of `portalLinks.xml` and takes the 95 that can be used headless, normal and mirrored: the player enters the portal (field portals, or floating ones opened by their own script trigger, given the key when locked) and must arrive at the target level, on the case `getPortalEntrance` gives. Quirks of the original data, kept: the village's portal has two links and `getLink` takes the first (deepnight), so the link to hiko is never used and no portal leads to hiko; `main51 > d_temple` arrives at portal 0, which is only a floating portal there, so the player starts at the level start; ayame 28 and 34 open portals that have no link. The original game only loads 14 sets (`swfmake.xml`): `adventure_english`, `basicAdventure` and `bumdum` are not in it.
+
 ## Enemies (`entity/Bad.ts`)
 
 All 21 species are registered in the factory at the end of `Bad.ts`.
@@ -200,6 +202,7 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - FireBall anger uses `diffFactor`; its eye frame clamps instead of wrapping.
 - Random draws use the original's integer forms (`Std.random(1000) < chance`, `Std.random(2)*2-1`), and Bombe draws its unused random duration.
 - Session: the HUD reads the new player's lives and score on each new game; `shake()` keeps a stronger running shake (`||`, not `&&`).
+- `Physics` portals: a portal case that matches no portal calls `onPortal(null)`, as the original does (the player is refused, a bomb destroyed). No level has such a case (2B.1).
 - Particles (2.5): every call uses its original type, count and position. Added the missing ones: Bombe's sparks, Crawler's attack and landing (with its squash), Saw's stun, hits, wake-up and stun sparks, the portal opening, the Guu doll's rain (with the player shrinking, growing back and dying too small) and the aqua bubbles.
 
 ### Open
@@ -208,7 +211,6 @@ Line-by-line comparison of `Player.ts` and `Bad.ts` (and the `Entity`, `Animator
 - Player: debug keys (`getDebugControls`) are not ported.
 - Key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked).
 - `Jumper.checkClimb` skips a null or zero climb height; the original would jump with a NaN speed.
-- `Physics` portals: the original calls `onPortal(null)` when no portal matches; the port does nothing.
 - `Spear`: no spawn puff when created after the first second; `Kiwi.clearMines` is never called in the original, not ported.
 - Visual: `Bad.onDeathLine` attaches its fx through `fxMan` instead of a bare clip.
 
