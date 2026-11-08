@@ -440,6 +440,35 @@ body:not(.dev) .dev-only {
   position: relative;
 }
 
+.pad-notice {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 2;
+  max-width: 90%;
+  padding: 7px 16px;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--gold-light);
+  white-space: nowrap;
+  background: rgba(63, 44, 27, 0.92);
+  border: 2px solid var(--parchment-edge);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(10, 30, 70, 0.4);
+  transform: translate(-50%, -8px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.pad-notice.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 .loading {
   position: absolute;
   inset: 0;
@@ -537,6 +566,11 @@ html.touch {
 
 html.touch .touch-controls {
   display: flex;
+}
+
+/* A controller is in use: its buttons replace the touch ones (they keep their room) */
+html[data-input='gamepad'] .touch-controls {
+  visibility: hidden;
 }
 
 .touch-btn {
@@ -1245,6 +1279,63 @@ dialog.parchment-dialog::backdrop {
 
 .parchment-dialog kbd.wide {
   min-width: 84px;
+}
+
+.controls-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+html[data-input='gamepad'] .controls-pad {
+  order: -1;
+}
+
+.parchment-dialog .about-section h4 {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+/* Controller buttons (labels and colors set by main.ts for the controller in use) */
+.parchment-dialog kbd.pad {
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 24px;
+  border-radius: 50%;
+  color: var(--pad-color, #fff);
+  background: #2b2622;
+  border-color: #14110f;
+  box-shadow: 0 2px 0 #14110f;
+}
+
+.parchment-dialog kbd.pad-menu {
+  padding: 0 9px;
+  border-radius: 13px;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.parchment-dialog kbd.pad-menu.short {
+  padding: 0;
+  font-size: 1rem;
+}
+
+.parchment-dialog kbd.pad-dpad {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  vertical-align: middle;
+}
+
+.pad-dpad-icon {
+  width: 18px;
+  height: 18px;
+  fill: #d9d0c4;
 }
 
 .parchment-dialog .alt {

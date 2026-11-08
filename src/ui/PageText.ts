@@ -1,8 +1,9 @@
 /**
- * Texts of the page around the game frame (header, help, touch buttons) in the three languages
- * of the original. The story is section 1 of each site's guide (`guide.html` of hammerfest.fr,
- * hfest.net and hammerfest.es, in `assets-src/site-archive/`); the control names reuse the pause
- * screen's (`Lang` statics 7 to 10) where it has them. The rest is the port's own.
+ * Texts of the page around the game frame (header, help, touch buttons, controller notices) in
+ * the three languages of the original. The story is section 1 of each site's guide (`guide.html`
+ * of hammerfest.fr, hfest.net and hammerfest.es, in `assets-src/site-archive/`); the control
+ * names reuse the pause screen's (`Lang` statics 7 to 10) where it has them. The rest is the
+ * port's own.
  *
  * Elements opt in with attributes: `data-i18n` (text), `data-i18n-html` (trusted markup from
  * this file) and `data-i18n-label` (`aria-label` and `title`). The loading texts are the
@@ -42,6 +43,14 @@ const TEXT: Record<Lang, PageTexts> = {
     pauseKey: 'Pause',
     musicKey: 'Couper ou remettre la musique',
     quitKey: 'Abandonner la partie (elle est enregistrée)',
+    keysTitle: 'Clavier',
+    padTitle: 'Manette',
+    padStick: 'stick gauche',
+    padUp: 'croix ↑',
+    padMenus: 'Menus : valider, revenir',
+    padConnected: 'Manette connectée',
+    padLost: 'Manette débranchée',
+    padLostPaused: 'Manette débranchée : partie en pause',
     creditsTitle: 'Crédits',
     credits:
       '<strong>Hammerfest</strong> a été créé par <strong>Motion Twin</strong> en 2006. Son code source et ses graphismes ont été publiés sous licence CC BY-NC-SA 4.0. HammerFenix est un remake indépendant et non commercial, pour préserver le jeu ; les graphismes, sons et niveaux restent ceux de Motion Twin.',
@@ -96,6 +105,14 @@ const TEXT: Record<Lang, PageTexts> = {
     pauseKey: 'Pause',
     musicKey: 'Music on / off',
     quitKey: 'Give up the game (it is saved)',
+    keysTitle: 'Keyboard',
+    padTitle: 'Controller',
+    padStick: 'left stick',
+    padUp: 'D-pad ↑',
+    padMenus: 'Menus: confirm, back',
+    padConnected: 'Controller connected',
+    padLost: 'Controller unplugged',
+    padLostPaused: 'Controller unplugged: game paused',
     creditsTitle: 'Credits',
     credits:
       '<strong>Hammerfest</strong> was made by <strong>Motion Twin</strong> in 2006. Its source code and graphics were released under the CC BY-NC-SA 4.0 license. HammerFenix is an independent, non-commercial remake to preserve the game; the graphics, sounds and levels are still Motion Twin’s.',
@@ -150,6 +167,14 @@ const TEXT: Record<Lang, PageTexts> = {
     pauseKey: 'Pausa',
     musicKey: 'Activar o quitar la música',
     quitKey: 'Abandonar la partida (se guarda)',
+    keysTitle: 'Teclado',
+    padTitle: 'Mando',
+    padStick: 'stick izquierdo',
+    padUp: 'cruceta ↑',
+    padMenus: 'Menús: aceptar, volver',
+    padConnected: 'Mando conectado',
+    padLost: 'Mando desconectado',
+    padLostPaused: 'Mando desconectado: partida en pausa',
     creditsTitle: 'Créditos',
     credits:
       '<strong>Hammerfest</strong> fue creado por <strong>Motion Twin</strong> en 2006. Su código fuente y sus gráficos se publicaron con la licencia CC BY-NC-SA 4.0. HammerFenix es un remake independiente y sin ánimo de lucro para preservar el juego; los gráficos, sonidos y niveles siguen siendo de Motion Twin.',

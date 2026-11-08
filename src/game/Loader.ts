@@ -47,6 +47,11 @@ export interface LoaderHost {
   getLangStr(id: number): string;
   /** `GameManager` is built and starts its mode: the end of `Loader.startGame`. */
   startGameInstance(): void;
+  /**
+   * Port addition: the text that replaces "click to start" (`Lang` static 53) for a controller
+   * player, or null to keep it.
+   */
+  startText?(): string | null;
 }
 
 /**
@@ -219,7 +224,7 @@ export class Loader {
       this.setText('km', this.host.getLangStr(52));
       if (frame === 2) {
         // click to start
-        this.setText('bottom', this.host.getLangStr(53));
+        this.refreshStartText();
         if (this.mode === 'tutorial' || this.mode === 'soccer') {
           // free modes
           this.setText('subBottom', this.host.getLangStr(58));
@@ -238,6 +243,12 @@ export class Loader {
       this.setText('bottom', this.host.getLangStr(55));
       this.setText('subBottom', this.host.getLangStr(56));
     }
+  }
+
+  /** "Click to start", or the controller's button when one is in use (port addition). */
+  refreshStartText(): void {
+    if (this.loadingFrame !== 2) return;
+    this.setText('bottom', this.host.startText?.() ?? this.host.getLangStr(53));
   }
 
   private setText(name: string, text: string): void {

@@ -96,6 +96,8 @@
         <div id="game-wrapper" class="game-wrapper">
           <div id="game-canvas-container" class="game-canvas-container" role="application">
             <!-- PixiJS canvas injected dynamically -->
+            <!-- A controller was plugged in or unplugged (main.ts) -->
+            <div id="pad-notice" class="pad-notice" role="status" aria-live="polite"></div>
             <div id="loading" class="loading" role="status">
               <img class="loading-logo" src="/images/mainTitle.webp" alt="" />
               <p class="loading-text" data-i18n="loading">Travelling to Hammerfest…</p>
@@ -171,20 +173,52 @@
 
           <section class="about-section">
             <h3 data-i18n="controlsTitle">Controls</h3>
-            <dl class="controls-grid">
-              <dt><kbd>←</kbd> <kbd>→</kbd> <span class="alt">· A D · Q D</span></dt>
-              <dd data-i18n="move">Move</dd>
-              <dt><kbd>↑</kbd> <span class="alt">· W · Z</span></dt>
-              <dd data-i18n="jumpKey">Jump</dd>
-              <dt><kbd class="wide" data-i18n="spaceKey">Space</kbd></dt>
-              <dd data-i18n="bombKey">Place a bomb, or kick one you stand next to</dd>
-              <dt><kbd>P</kbd> <span class="alt">· Esc</span></dt>
-              <dd data-i18n="pauseKey">Pause</dd>
-              <dt><kbd>M</kbd></dt>
-              <dd data-i18n="musicKey">Music on / off</dd>
-              <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd></dt>
-              <dd data-i18n="quitKey">Give up the game (it is saved)</dd>
-            </dl>
+            <!-- The device in use comes first (html[data-input], set by main.ts) -->
+            <div class="controls-blocks">
+              <div class="controls-keys">
+                <h4 data-i18n="keysTitle">Keyboard</h4>
+                <dl class="controls-grid">
+                  <dt><kbd>←</kbd> <kbd>→</kbd> <span class="alt">· A D · Q D</span></dt>
+                  <dd data-i18n="move">Move</dd>
+                  <dt><kbd>↑</kbd> <span class="alt">· W · Z</span></dt>
+                  <dd data-i18n="jumpKey">Jump</dd>
+                  <dt><kbd class="wide" data-i18n="spaceKey">Space</kbd></dt>
+                  <dd data-i18n="bombKey">Place a bomb, or kick one you stand next to</dd>
+                  <dt><kbd>P</kbd> <span class="alt">· Esc</span></dt>
+                  <dd data-i18n="pauseKey">Pause</dd>
+                  <dt><kbd>M</kbd></dt>
+                  <dd data-i18n="musicKey">Music on / off</dd>
+                  <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd></dt>
+                  <dd data-i18n="quitKey">Give up the game (it is saved)</dd>
+                </dl>
+              </div>
+              <div class="controls-pad">
+                <h4 data-i18n="padTitle">Controller</h4>
+                <dl class="controls-grid">
+                  <dt>
+                    <kbd class="pad pad-dpad"
+                      ><svg class="pad-dpad-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" /></svg
+                    ></kbd>
+                    <span class="alt">· <span data-i18n="padStick">left stick</span></span>
+                  </dt>
+                  <dd data-i18n="move">Move</dd>
+                  <dt>
+                    <kbd class="pad" data-pad="a"></kbd>
+                    <span class="alt">· <span data-i18n="padUp">D-pad ↑</span></span>
+                  </dt>
+                  <dd data-i18n="jumpKey">Jump</dd>
+                  <dt><kbd class="pad" data-pad="b"></kbd> <kbd class="pad" data-pad="x"></kbd></dt>
+                  <dd data-i18n="bombKey">Place a bomb, or kick one you stand next to</dd>
+                  <dt><kbd class="pad pad-menu" data-pad="start"></kbd></dt>
+                  <dd data-i18n="pauseKey">Pause</dd>
+                  <dt><kbd class="pad pad-menu" data-pad="back"></kbd></dt>
+                  <dd data-i18n="musicKey">Music on / off</dd>
+                  <dt><kbd class="pad" data-pad="a"></kbd> <kbd class="pad" data-pad="b"></kbd></dt>
+                  <dd data-i18n="padMenus">Menus: confirm, back</dd>
+                </dl>
+              </div>
+            </div>
           </section>
 
           <section class="about-section dev-only">

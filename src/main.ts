@@ -14,6 +14,7 @@ import { QuestEngine } from './game/Quests';
 import { Shell } from './ui/Shell';
 import { pickLang } from './ui/Language';
 import { applyPageText, pageText } from './ui/PageText';
+import { type PadButton, padColor, padLabel } from './game/gui/PadGlyphs';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -208,7 +209,7 @@ async function main(): Promise<void> {
   // addition: the Flash game kept running behind other tabs.
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (session.loader.gameRunning && !session.fl_pause) session.onPause();
+      session.requestPause();
       audio.setSuspended(true);
     } else {
       audio.setSuspended(false);
@@ -364,7 +365,44 @@ async function main(): Promise<void> {
     }
   };
 
-  // 8. Bind On-Screen Touch Controls
+  // 8. Controllers (roadmap G.1): the screens show the buttons of the device in use
+  const notice = new PadNotice();
+  const showDevice = () => {
+    document.documentElement.dataset.input = input.device;
+    const layout = input.padLayout;
+    document.querySelectorAll<HTMLElement>('kbd[data-pad]').forEach((el) => {
+      const b = el.dataset.pad as PadButton;
+      el.textContent = padLabel(b, layout);
+      el.classList.toggle('short', el.textContent.length <= 1);
+      el.style.setProperty('--pad-color', `#${padColor(b, layout).toString(16).padStart(6, '0')}`);
+    });
+  };
+  showDevice();
+  input.onDeviceChange = () => {
+    showDevice();
+    shell.refresh();
+  };
+  input.onPadConnect = () => {
+    showDevice();
+    notice.show(pageText(lang(), 'padConnected'));
+  };
+  // Unplugged during a game: the game pauses
+  input.onPadDisconnect = () => {
+    const playing = session.loader.gameRunning && !session.fl_pause;
+    if (playing) session.requestPause();
+    notice.show(pageText(lang(), playing ? 'padLostPaused' : 'padLost'));
+  };
+  // In a dialog: A, B or Start close it (as Escape does), the D-pad scrolls it
+  input.onDialogPad = (action) => {
+    const dialog = document.querySelector<HTMLDialogElement>('dialog[open]');
+    if (!dialog) return;
+    if (action === 'ok' || action === 'back') dialog.close();
+    const body = dialog.querySelector('.dialog-body');
+    if (action === 'up') body?.scrollBy({ top: -80, behavior: 'smooth' });
+    if (action === 'down') body?.scrollBy({ top: 80, behavior: 'smooth' });
+  };
+
+  // 9. Bind On-Screen Touch Controls
   const bindTouch = (id: string, action: ControlAction) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -466,6 +504,20 @@ function initTouch(): void {
     },
     { passive: true },
   );
+}
+
+/** A short notice over the game frame when a controller is plugged in or unplugged. */
+class PadNotice {
+  private readonly el = document.getElementById('pad-notice');
+  private timer = 0;
+
+  show(text: string): void {
+    if (!this.el) return;
+    this.el.textContent = text;
+    this.el.classList.add('show');
+    window.clearTimeout(this.timer);
+    this.timer = window.setTimeout(() => this.el?.classList.remove('show'), 2500);
+  }
 }
 
 /** The loading screen over the game frame, until the menu shows (`#loading`). */

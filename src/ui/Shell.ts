@@ -29,6 +29,7 @@ import {
 import type { InputController } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
+import { padGlyph } from '../game/gui/PadGlyphs';
 import type { GameResult } from '../game/Loader';
 import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
 import type { Lang } from './Language';
@@ -423,7 +424,10 @@ export class Shell {
     if (this.screen) this.render();
   }
 
-  /** Keys, once per frame while a screen shows: arrows choose, space confirms. */
+  /**
+   * Keys, once per frame while a screen shows: arrows choose, space confirms. A controller
+   * moves with its D-pad or stick, confirms with A and goes back with B.
+   */
   update(): void {
     if (this.fadeReady) {
       const now = performance.now();
@@ -442,12 +446,12 @@ export class Shell {
     if (!this.screen) return;
     const inp = this.input;
     inp.poll();
-    const up = inp.consumePress('jump');
-    const down = inp.consumePress('down');
-    const left = inp.consumePress('left');
-    const right = inp.consumePress('right');
-    const ok = inp.consumePress('attack');
-    const esc = inp.consumePress('pause');
+    const up = inp.consumeMenu('up');
+    const down = inp.consumeMenu('down');
+    const left = inp.consumeMenu('left');
+    const right = inp.consumeMenu('right');
+    const ok = inp.consumeMenu('ok');
+    const esc = inp.consumeMenu('back');
     switch (this.screen) {
       case 'menu': {
         const entries = this.menuEntries();
@@ -462,7 +466,7 @@ export class Shell {
         break;
       }
       case 'result':
-        if (ok || up) this.showMenu();
+        if (ok || up || esc) this.showMenu();
         break;
       case 'quests':
         if (up) this.selectQuest(this.questSel - 1);
@@ -728,9 +732,15 @@ export class Shell {
   /**
    * The screen's main action: a wood button at the bottom of the panel, centered on `cy`, as
    * the help dialog's (`.parchment-btn`). With a keyboard, a keycap says the space bar does it
-   * too. `action` null draws it disabled.
+   * too; with a controller, its A button (B for `back`). `action` null draws it disabled.
    */
-  private actionButton(label: string, cy: number, action: (() => void) | null, w = 220): void {
+  private actionButton(
+    label: string,
+    cy: number,
+    action: (() => void) | null,
+    w = 220,
+    back = false,
+  ): void {
     const h = 36;
     const x = W / 2 - w / 2;
     const y = cy - h / 2;
@@ -748,10 +758,11 @@ export class Shell {
       color: on ? C.gold : C.todo,
       parent: face,
     });
-    // The keycap, sized to its text
+    // The keycap, sized to its text, or the controller's button
     let capW = 0;
     const cap = new Container();
-    if (on && hasKeyboard()) {
+    const device = this.input.device;
+    if (on && device === 'keyboard') {
       const k = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
         align: 'left',
         size: 9,
@@ -768,6 +779,12 @@ export class Shell {
         0,
       );
       k.position.set(6, (17 - k.height) / 2);
+      face.addChild(cap);
+    } else if (on && device === 'gamepad') {
+      const g = padGlyph(back ? 'b' : 'a', this.input.padLayout, 20, 0xfffaf0);
+      g.position.set(10, 9);
+      cap.addChild(g);
+      capW = 20;
       face.addChild(cap);
     }
     const gap = capW > 0 ? 10 : 0;
@@ -1111,7 +1128,7 @@ export class Shell {
     else
       this.text(t.questRule, 'body', W / 2, sepY + 20, { width: 340, size: 11, color: C.inkSoft });
 
-    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170);
+    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true);
   }
 
   /** The selected quest: its items with "found / needed", and its reward once done. */
@@ -1265,7 +1282,7 @@ export class Shell {
     });
     if (!known && n > 0) this.bar(104, dy + 60, 160, 5, n / need, C.progress);
 
-    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170);
+    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true);
   }
 
   // --------------------------------------------------------------- results
@@ -1365,11 +1382,6 @@ function fmt(s: string, ...args: (string | number)[]): string {
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */
 function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-/** A keyboard is likely: not a touch screen (`html.touch`, set by main.ts). */
-function hasKeyboard(): boolean {
-  return typeof document === 'undefined' || !document.documentElement.classList.contains('touch');
 }
 
 /**

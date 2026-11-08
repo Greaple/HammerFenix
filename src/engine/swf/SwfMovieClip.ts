@@ -600,6 +600,11 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     return this.mcDepth;
   }
 
+  /** The display object the timeline placed at `depth`, if any. */
+  childAtDepth(depth: number): Container | undefined {
+    return this.depthSlots.get(depth)?.node;
+  }
+
   swapDepths(target: number | SwfMovieClip): void {
     if (typeof target === 'number') {
       this.mcDepth = target;

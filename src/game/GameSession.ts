@@ -1,11 +1,11 @@
-import { type Container, type Renderer, Sprite, type Texture } from 'pixi.js';
+import { Container, type Renderer, Sprite, type Texture } from 'pixi.js';
 import { AudioEngine } from '../engine/Audio';
 import { DepthManager } from '../engine/DepthManager';
 import { FixedGameLoop } from '../engine/GameLoop';
 import { InputController } from '../engine/Input';
 import { InputPlayer, InputRecorder, type Replay } from '../engine/InputRecording';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
-import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
+import { type SwfMovieClip, SwfTextField } from '../engine/swf/SwfMovieClip';
 import { Data, GameDataStore } from './Data';
 import type { LevelData, LevelSet, PortalLink } from './data/types';
 import { BaseEntity } from './entity/Entity';
@@ -25,6 +25,7 @@ import { RandomManager } from './RandomManager';
 import { StatsManager } from './StatsManager';
 import { Chrono, realTimer } from './Chrono';
 import { GameHud } from './gui/GameHud';
+import { type PadButton, padGlyph, padStartText } from './gui/PadGlyphs';
 import type { IGameContext } from './GameContext';
 import { LevelView } from './levels/LevelView';
 import { LevelWorld } from './levels/LevelWorld';
@@ -46,6 +47,17 @@ export interface GameHost {
   /** Draws the level snapshots of the transitions; absent when headless. */
   readonly renderer?: Renderer;
 }
+
+/**
+ * Depths of the keyboard keys on frame 1 of `hammer_interf_instructions` (the pause screen),
+ * per row: the arrow keys, the space bar and its text, the P key. A controller's buttons
+ * replace them (`showPausePrompts`).
+ */
+const PAUSE_KEYS = {
+  move: [9, 12, 14, 17, 19, 22],
+  attack: [26, 29],
+  pause: [34, 37],
+} as const;
 
 /** `Timer.tmod` during bullet time (`GameMode.main`). */
 const BULLET_TMOD = 0.3;
@@ -238,6 +250,11 @@ export class GameSession implements IGameContext {
   private pointerMC: SwfMovieClip | null = null;
   private itemNameMC: SwfMovieClip | null = null;
   private pauseMC: SwfMovieClip | null = null;
+  /** What the pause screen's key pictures show: `keys`, or `pad:` and the layout. */
+  private pausePrompts = 'keys';
+  private pausePadLayer: Container | null = null;
+  /** `requestPause` waits for the controls to be unlocked. */
+  private pauseAsked = false;
   /** Placeholder shown once the game has ended, until the results screen (3.1c). */
   private darknessMC: SwfMovieClip | null = null;
   /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
@@ -302,6 +319,10 @@ export class GameSession implements IGameContext {
         this.initGame(0);
         this.siteMode = this.readyMode;
       },
+      startText: () =>
+        this.input.device === 'gamepad'
+          ? padStartText(this.dataStore.langId, this.input.padLayout)
+          : null,
     });
     this.loader.onResult = (r) => this.onGameEnd(r);
 
@@ -1965,6 +1986,77 @@ export class GameSession implements IGameContext {
 
   // ------------------------------------------------------- Pause & Instructions
 
+  /**
+   * Port addition: pauses the game from outside it (a hidden tab, the controller unplugged).
+   * During a level change the controls are locked and `onPause` does nothing, so the pause
+   * waits for the next tick that allows it.
+   */
+  requestPause(): void {
+    if (!this.loader.gameRunning || this.fl_pause) return;
+    this.onPause();
+    if (!this.fl_pause) this.pauseAsked = true;
+  }
+
+  /**
+   * Port addition: with a controller, the pause screen shows its buttons instead of the
+   * keyboard's (`PAUSE_KEYS`), and follows the device the player uses.
+   */
+  private showPausePrompts(): void {
+    const mc = this.pauseMC;
+    if (!mc) return;
+    const pad = this.input.device === 'gamepad';
+    const shown = pad ? `pad:${this.input.padLayout}` : 'keys';
+    if (shown === this.pausePrompts) return;
+    this.pausePrompts = shown;
+    this.pausePadLayer?.destroy({ children: true });
+    this.pausePadLayer = null;
+    const groups = Object.entries(PAUSE_KEYS).map(([row, depths]) => {
+      const nodes = depths.map((d) => mc.childAtDepth(d)).filter((n) => n !== undefined);
+      for (const n of nodes) n.visible = true;
+      return { row: row as keyof typeof PAUSE_KEYS, nodes };
+    });
+    if (!pad) return;
+    if (this.lib.headless) {
+      for (const { nodes } of groups) for (const n of nodes) n.visible = false;
+      return;
+    }
+    const layer = new Container();
+    for (const { row, nodes } of groups) {
+      // The keys' place in the clip, then hidden under the controller's buttons
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      let y0 = Infinity;
+      let y1 = -Infinity;
+      for (const n of nodes) {
+        if (n instanceof SwfTextField) continue; // on its key
+        const b = n.getBounds();
+        const p0 = mc.toLocal({ x: b.minX, y: b.minY });
+        const p1 = mc.toLocal({ x: b.maxX, y: b.maxY });
+        x0 = Math.min(x0, p0.x);
+        y0 = Math.min(y0, p0.y);
+        x1 = Math.max(x1, p1.x);
+        y1 = Math.max(y1, p1.y);
+      }
+      for (const n of nodes) n.visible = false;
+      if (x0 > x1) continue;
+      const buttons: PadButton[] =
+        row === 'move' ? ['dpad', 'a'] : row === 'attack' ? ['b', 'x'] : ['start'];
+      const size = row === 'move' ? 32 : 26;
+      const gap = 10;
+      const glyphs = buttons.map((b) => padGlyph(b, this.input.padLayout, size));
+      const total = glyphs.reduce((w, g) => w + g.width, 0) + gap * (glyphs.length - 1);
+      let x = (x0 + x1) / 2 - total / 2;
+      for (const g of glyphs) {
+        g.position.set(x + g.width / 2, (y0 + y1) / 2);
+        x += g.width + gap;
+        layer.addChild(g);
+      }
+    }
+    layer.zIndex = 1000; // above the clip's timeline depths
+    mc.addChild(layer);
+    this.pausePadLayer = layer;
+  }
+
   togglePause(): void {
     if (this.fl_pause) this.onUnpause();
     else this.onPause();
@@ -1979,6 +2071,8 @@ export class GameSession implements IGameContext {
 
     const mc = this.depthMan.attach('hammer_interf_instructions', Data.DP_INTERF);
     this.pauseMC = mc;
+    this.pausePrompts = 'keys';
+    this.pausePadLayer = null;
     mc.gotoAndStop('1');
     mc._x = Data.GAME_WIDTH * 0.5;
     mc._y = Data.GAME_HEIGHT * 0.5;
@@ -2009,6 +2103,7 @@ export class GameSession implements IGameContext {
     if (tipField) tipField.htmlText = `<b>${lang(300)}</b>${tip}`;
 
     if (!this.fl_mute) this.setMusicVolume(0.5);
+    this.showPausePrompts();
 
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: true });
   }
@@ -2091,8 +2186,12 @@ export class GameSession implements IGameContext {
     if (!this.loader.gameRunning) {
       this.input.poll();
       // Port addition: the space bar starts the game as a click does, since the menu is left
-      // with it ("click to start" alone sent keyboard players to the mouse)
-      if (this.loader.waitingStart && this.input.consumePress('attack')) this.clickStart();
+      // with it ("click to start" alone sent keyboard players to the mouse), and so does a
+      // controller's A, which the text then names
+      if (this.loader.waitingStart) {
+        this.loader.refreshStartText();
+        if (this.input.consumeMenu('ok')) this.clickStart();
+      }
       return;
     }
 
@@ -2103,6 +2202,12 @@ export class GameSession implements IGameContext {
     if (this.input.consumePress('pause')) {
       this.togglePause();
     }
+    // A pause asked from outside the game (hidden tab, controller unplugged), once allowed
+    if (this.pauseAsked && !this.fl_lock) {
+      this.pauseAsked = false;
+      if (!this.fl_pause) this.onPause();
+    }
+    if (this.fl_pause) this.showPausePrompts();
 
     // Music (M)
     if (!this.fl_lock && this.fl_music && this.input.consumePress('music')) {

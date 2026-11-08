@@ -1,4 +1,13 @@
+import { type MenuAction, PadReader, type PadLayout } from './Gamepad';
 import { ACTION_BITS, type InputPlayer, type InputRecorder } from './InputRecording';
+
+export type { MenuAction } from './Gamepad';
+
+/**
+ * The device the player used last: the screens show its buttons (a keycap, a controller
+ * button, or nothing on a touch screen).
+ */
+export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
 
 /**
  * `music` is M and `suicide` Ctrl+Shift+K, the keys `GameMode.main` reads besides the controls
@@ -67,9 +76,25 @@ function actionOf(e: KeyboardEvent): ControlAction | undefined {
   return KEY_MAP[e.code];
 }
 
+/** The keyboard's and touch buttons' menu moves: the arrows, the bomb key confirms, pause goes back. */
+const MENU_OF: [MenuAction, ControlAction][] = [
+  ['up', 'jump'],
+  ['down', 'down'],
+  ['left', 'left'],
+  ['right', 'right'],
+  ['ok', 'attack'],
+  ['back', 'pause'],
+];
+
+/** A touch screen with no mouse: the page starts with touch prompts. */
+function startDevice(): InputDevice {
+  if (typeof window === 'undefined') return 'keyboard';
+  return window.matchMedia?.('(hover: none) and (pointer: coarse)').matches ? 'touch' : 'keyboard';
+}
+
 /**
  * Unified input controller combining Keyboard (QWERTY + AZERTY + Arrows),
- * Gamepad API, and on-screen touch controls.
+ * player 1's controller (`Gamepad.ts`), and on-screen touch controls.
  *
  * Implements Hammerfest's lockable edge-triggered presses (`consumePress` for menus and game
  * keys, `keyIsDown` for the player's controller) alongside continuous `isDown(action)` (used
@@ -81,7 +106,18 @@ function actionOf(e: KeyboardEvent): ControlAction | undefined {
 export class InputController {
   private readonly keyHeld = new Set<ControlAction>();
   private readonly touchHeld = new Set<ControlAction>();
-  private readonly padHeld = new Set<ControlAction>();
+  private padHeld = new Set<ControlAction>();
+  private padMenu = new Set<MenuAction>();
+  private readonly pad = new PadReader();
+  /**
+   * Set while a dialog is open, and after until the controller is let go: its buttons then
+   * act on the dialog (`onDialogPad`), not on the game or the menu under it.
+   */
+  private padBlocked = false;
+  private padDialogHeld = new Set<MenuAction>();
+  /** Menu moves held this sample, and their locks (`consumeMenu`). */
+  private menuSampled = new Set<MenuAction>();
+  private readonly menuLocked = new Set<MenuAction>();
   private readonly locked = new Set<ControlAction>();
   /**
    * The player's key locks (`PlayerController.keyLocks`), apart from the menus' and the game's:
@@ -104,7 +140,59 @@ export class InputController {
 
   onAnyGesture?: () => void;
 
+  /** The device the player used last. */
+  device: InputDevice = startDevice();
+  /** The last device that was not a controller, for when it is unplugged. */
+  private otherDevice: InputDevice = this.device;
+  onDeviceChange?: (device: InputDevice) => void;
+  /** Player 1's controller was plugged in, or unplugged. */
+  onPadConnect?: (id: string) => void;
+  onPadDisconnect?: (id: string) => void;
+  /** A controller press while a dialog is open. */
+  onDialogPad?: (action: MenuAction) => void;
+
+  constructor() {
+    this.pad.onConnect = (id) => this.onPadConnect?.(id);
+    this.pad.onDisconnect = (id) => {
+      if (this.device === 'gamepad') this.setDevice(this.otherDevice);
+      this.onPadDisconnect?.(id);
+    };
+  }
+
+  /** How player 1's controller names its buttons. */
+  get padLayout(): PadLayout {
+    return this.pad.layout;
+  }
+
+  get padConnected(): boolean {
+    return this.pad.connected;
+  }
+
+  setDevice(device: InputDevice): void {
+    if (device !== 'gamepad') this.otherDevice = device;
+    if (device === this.device) return;
+    this.device = device;
+    this.onDeviceChange?.(device);
+  }
+
+  /**
+   * A click or touch switches the prompts once it is over: redrawing a screen under a pointer
+   * that is down would lose the click.
+   */
+  private readonly handlePointerDown = (e: PointerEvent) => {
+    this.pointerDevice = e.pointerType === 'touch' ? 'touch' : 'keyboard';
+  };
+
+  private readonly handlePointerUp = () => {
+    const d = this.pointerDevice;
+    this.pointerDevice = null;
+    if (d) window.setTimeout(() => this.setDevice(d), 0);
+  };
+
+  private pointerDevice: InputDevice | null = null;
+
   private readonly handleKeyDown = (e: KeyboardEvent) => {
+    this.setDevice('keyboard');
     const tag = (e.target as HTMLElement | null)?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if (document.querySelector('dialog[open]')) return;
@@ -139,6 +227,7 @@ export class InputController {
     this.touchHeld.clear();
     this.padHeld.clear();
     this.locked.clear();
+    this.menuLocked.clear();
     this.ctrlLocked.clear();
   };
 
@@ -146,12 +235,18 @@ export class InputController {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
     window.addEventListener('blur', this.handleBlur);
+    window.addEventListener('pointerdown', this.handlePointerDown, true);
+    window.addEventListener('pointerup', this.handlePointerUp, true);
+    window.addEventListener('pointercancel', this.handlePointerUp, true);
   }
 
   detach(): void {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
     window.removeEventListener('blur', this.handleBlur);
+    window.removeEventListener('pointerdown', this.handlePointerDown, true);
+    window.removeEventListener('pointerup', this.handlePointerUp, true);
+    window.removeEventListener('pointercancel', this.handlePointerUp, true);
   }
 
   /** Holds or releases a key by its Flash key code, as the keyboard does (for tests). */
@@ -162,31 +257,17 @@ export class InputController {
 
   setTouch(action: ControlAction, pressed: boolean): void {
     this.onAnyGesture?.();
-    if (pressed) this.touchHeld.add(action);
-    else this.touchHeld.delete(action);
+    if (pressed) {
+      this.setDevice('touch');
+      this.touchHeld.add(action);
+    } else {
+      this.touchHeld.delete(action);
+    }
   }
 
-  /** Polls connected gamepads and updates lock states once per simulation tick. */
+  /** Polls player 1's controller and updates lock states once per simulation tick. */
   poll(): void {
-    this.padHeld.clear();
-    if (typeof navigator !== 'undefined' && navigator.getGamepads) {
-      const pads = navigator.getGamepads();
-      for (const pad of pads) {
-        if (!pad) continue;
-        const axX = pad.axes[0] ?? 0;
-        const axY = pad.axes[1] ?? 0;
-        if (axX < -0.35 || pad.buttons[14]?.pressed) this.padHeld.add('left');
-        if (axX > 0.35 || pad.buttons[15]?.pressed) this.padHeld.add('right');
-        if (axY < -0.45 || pad.buttons[12]?.pressed || pad.buttons[0]?.pressed) {
-          this.padHeld.add('jump');
-        }
-        if (axY > 0.45 || pad.buttons[13]?.pressed) this.padHeld.add('down');
-        if (pad.buttons[1]?.pressed || pad.buttons[2]?.pressed || pad.buttons[3]?.pressed) {
-          this.padHeld.add('attack');
-        }
-        if (pad.buttons[9]?.pressed) this.padHeld.add('pause');
-      }
-    }
+    this.pollPad();
 
     let mask = 0;
     for (const [act, bit] of Object.entries(ACTION_BITS) as [ControlAction, number][]) {
@@ -201,11 +282,44 @@ export class InputController {
     this.codesSampled =
       this.devKeys && !this.recorder && !this.player ? new Set(this.codesHeld) : new Set();
 
+    // Menu moves: live input, never a replay's
+    this.menuSampled = new Set(this.padMenu);
+    for (const [m, act] of MENU_OF) {
+      if (this.keyHeld.has(act) || this.touchHeld.has(act)) this.menuSampled.add(m);
+    }
+    for (const m of [...this.menuLocked]) {
+      if (!this.menuSampled.has(m)) this.menuLocked.delete(m);
+    }
+
     for (const act of [...this.locked]) {
       if (!this.isDown(act)) {
         this.locked.delete(act);
       }
     }
+  }
+
+  /**
+   * Reads player 1's controller into `padHeld` and `padMenu`. While a dialog is open its
+   * presses go to `onDialogPad` instead, and the game and menus see nothing until it is let
+   * go, so the press that closed the dialog does not act again under it.
+   */
+  private pollPad(): void {
+    const state = this.pad.read();
+    if (state.active) this.setDevice('gamepad');
+    const dialogOpen =
+      typeof document !== 'undefined' && document.querySelector('dialog[open]') !== null;
+    if (dialogOpen) {
+      if (this.padBlocked) {
+        for (const m of state.menu) if (!this.padDialogHeld.has(m)) this.onDialogPad?.(m);
+      }
+      this.padBlocked = true;
+      this.padDialogHeld = state.menu;
+    } else if (this.padBlocked && !state.active) {
+      this.padBlocked = false;
+    }
+    const usable = !this.padBlocked;
+    this.padHeld = usable ? state.actions : new Set();
+    this.padMenu = usable ? state.menu : new Set();
   }
 
   isDown(action: ControlAction): boolean {
@@ -249,6 +363,7 @@ export class InputController {
   resetState(): void {
     this.sampled = 0;
     this.locked.clear();
+    this.menuLocked.clear();
     this.ctrlLocked.clear();
   }
 
@@ -266,6 +381,19 @@ export class InputController {
 
   lock(action: ControlAction): void {
     this.locked.add(action);
+  }
+
+  /**
+   * Edge-triggered menu move (the site screens, the loader): the keyboard's arrows, bomb key
+   * (confirm) and pause key (back), or the controller's D-pad and stick, A or Start (confirm)
+   * and B (back). Locked until released, apart from the game's actions.
+   */
+  consumeMenu(action: MenuAction): boolean {
+    if (this.menuSampled.has(action) && !this.menuLocked.has(action)) {
+      this.menuLocked.add(action);
+      return true;
+    }
+    return false;
   }
 
   /** `PlayerController.keyIsDown`: held and not locked by the controller; locks it. */

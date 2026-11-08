@@ -9,7 +9,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
 3. 2B.4 is done (Adventure rows of [LEVELS.md](LEVELS.md); its "needs play" rows wait for the user). Next: 2B.5 (enemies) and 2B.6 (dimensions).
-4. The rest of Phase 2C and the solo controller (G.1), in any order.
+4. G.1 is done (solo controller, prompts follow the device in use). Next: the rest of Phase 2C. A real controller has not been tried yet: the tests and the browser check used a fake `navigator.getGamepads`.
 5. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
 Working notes:
@@ -116,9 +116,9 @@ Accepted deviations, not to port: the Loader's server parts (sending scores, ret
 
 ## Controllers
 
-Port addition: the Flash game had the keyboard only. Today `InputController.poll` merges every connected gamepad into one input, with a fixed mapping and no menu navigation. Controllers go through the same per-tick action mask as the keyboard, so recordings and replays keep working.
+Port addition: the Flash game had the keyboard only. Controllers go through the same per-tick action mask as the keyboard, so recordings and replays keep working.
 
-- [ ] G.1 Solo controller:
+- [x] G.1 Solo controller (`src/engine/Gamepad.ts`, PORT_STATUS.md "Engine"). The screens show the buttons of the device used last (keyboard, controller or touch): the menu button, the pause screen, the Loader's start text, the help dialog and the touch buttons. In dialogs, A, B or Start close them. Not done: a give-up combination on the controller (Ctrl+Shift+K has none).
   - standard mapping (`Gamepad.mapping === 'standard'`): D-pad and left stick move (dead zone with some hysteresis), A or up jumps, B or X drops a bomb, down is down, Start pauses, Back or Select switches the music;
   - the first controller is player 1; the others are ignored until G.2;
   - the site screens (`Shell.ts`) and the loader's "click to continue" work with the D-pad, A (confirm) and B (back);
