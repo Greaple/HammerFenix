@@ -4,7 +4,20 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-The UI and UX polish batches U.1 to U.4 are done (section below); left there: English and Spanish title logos, and a check of the phone layouts on a real device. Phases 1, 2 and 3 are done. Phase 3 (the site screens, quests and profile, game options and localization; see PORT_STATUS.md "Site screens", "Quests and profile", "Game options" and "Localization (3.4)") was done before Phase 2B. Next is Phase 2B (rewritten on 2026-11-08: automated checks of every level, then spot checks of a short list in [LEVELS.md](LEVELS.md)), starting with the data pass (2B.0) and the portal test (2B.1); the spot checks need the level jump for Ruffle (2B.3). Level changes now take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that. After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`. Open deviations from the audits are listed in PORT_STATUS.md ("Audit 1.5" to "Audit 1.7"). Phase 5 (polish) is done: audio (5.1), performance and mobile (5.2), offline play (5.3); none of it is tried on a real phone yet. A settings page for the site's "Paramètres" (`$volume`, `$sound`, `$music`, `$detail`, `$shake`) is still missing; the volumes in `GameParameters` take it as an argument.
+Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-08):
+
+1. 2B.0 to 2B.3: the automated checks of every level, then the level jump for Ruffle.
+2. 2C.1 (the original's dev keys, which make the spot checks faster) and 2C.2 (open audit deviations that change play), so the spot checks compare the final behavior.
+3. 2B.4 to 2B.6: the spot checks in [LEVELS.md](LEVELS.md).
+4. The rest of Phase 2C and the solo controller (G.1), in any order.
+5. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
+
+Working notes:
+
+- Start games for comparisons from the debug toolbar: they use the no-site item families and no options, as the Ruffle side-by-side does.
+- Level changes take 57 frames (IA parse + scroll) and a new game 17, so tests that start a level must step past that.
+- After any behavior fix, check the replay snapshot diff and accept it with `npx vitest run -u`.
+- Nothing has been tried on a real phone yet (5.4).
 
 ## Bugs (found in play)
 
@@ -70,6 +83,53 @@ Bugs found by playing go in "Bugs (found in play)" at the top, not here.
 
 The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer, fjv: 79 levels) get their data from 2B.0 and their spot checks with their mode in Phase 4.
 
+## Phase 2C: Close the open gaps
+
+What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. Not the other modes (Phase 4). Each task: port from the original, test it, update PORT_STATUS.md (move the item from "Open" to "Fixed").
+
+- [ ] 2C.1 The original's dev keys, behind the dev switch: `GameMode.getDebugControls` and `Player.getDebugControls` (look up what each key does), H (hurry up comes faster), Shift and Home (`Timer.tmod` 0.3 and 1.0), the bosses' K, Enter and Shift (`Boss.ts`), F (FPS) and B (build time) to the console. List them in the dev part of the help dialog. Useful for the 2B spot checks.
+- [ ] 2C.2 Open audit deviations that change play or the random sequence:
+  - key locks are released on every tick; the original releases them only when the controller runs (not while controls are locked);
+  - `Physics` calls `onPortal(null)` when no portal matches; the port does nothing;
+  - `getOne` draws a random number even on an empty list; then drop the boss-only workaround in `resetHurry`, `onKillBad` and `onExplode`;
+  - the float random draws left in `FxManager` go through the seeded source;
+  - `Spear`'s spawn puff when created after the first second; `Bad.onDeathLine` attaches a bare clip, not through `fxMan`.
+
+  Check the replay snapshot diffs and accept them.
+
+- [ ] 2C.3 Disguises: the D key cycles the player's head (`GameMode.main`, `fl_disguise`, true in Adventure only), skipping the heads whose family the profile lacks: 109 afro, 110 cerbère, 111 piou, 112 mario, 113 Tuberculoz cape. Add the `HEAD_*` constants from `Data.mt`. Name the key in the help and the pause screen if the original does.
+- [ ] 2C.4 World map: `GameMode.onMap` (key C when `fl_map`; find what sets it), the `hammer_map` clip ("Strates supérieures...", its text from `Lang`), `attachMapIcon`, `getMapY`, `registerMapEvent` and the map events (`EVENT_EXIT_*`, `EVENT_BACK_*`, `EVENT_DEATH`, `EVENT_EXTEND`, `EVENT_TIME`) sent by portals, deaths and extends.
+- [ ] 2C.5 Settings page, the site's "Paramètres": volume, sound, music, detail and shake, saved in `localStorage` and read through `GameParameters` (`$volume`, `$sound`, `$music`, `$detail`, `$shake`). Port what low detail turns off (`FxManager` lines 237 and 288, `GameInterface.lightMode`, `GameParameters` lines 70 to 85) and what `fl_shaky` turns off. Reached from the mode menu, as on the site.
+- [ ] 2C.6 Glows and SWF runtime leftovers:
+  - `FxManager.addGlow` (the soccer ball's glow, used again in 4.4) and item 86's ghost glow on the player and the enemies, with `SwfMovieClip.setGlow` from 2.8;
+  - the 3 frame scripts that define functions (particle emitters `_gfx` #234 and `_anims` #150, ghost effect `_anims` #3200): function definitions in `Avm1.ts`;
+  - bold in HTML text fields;
+  - timeline blend modes other than multiply, screen and add (list the symbols that use them first);
+  - item 84's 4 px box blur (now a gaussian blur).
+- [ ] 2C.7 Timing gaps:
+  - bullet time (Tuberculoz's death) slows the movie clips too; in Flash they kept 40 fps. Needs logic steps with `tmod` below 1;
+  - the shield shows frame 20 after its jump to frame 19, the original likely 19;
+  - `Chrono.formatTime` hour fix-up (computed as in UTC+1);
+  - the aqua screen wobble (`fl_aqua`, `GameMode.main` near line 2398) and the wind timer (`GameMode.wind`; the original never starts wind, so only its reset).
+- [ ] 2C.8 `Data.mt` leftovers: add `CURSE_*`, `STAT_*` and `EXT_*`, and replace the literal numbers the port uses for them, so every value is checked against the original.
+
+Accepted deviations, not to port: the Loader's server parts (sending scores, retries, redirections), `View`'s bitmap cache and editor grid, `ViewLight`, `ScoreItem`'s 500 points for an unknown id (the original stops with a fatal error), `Adventure.saveScore`'s set checksum, the history's `F=` version and the `KEY` generator, Ruffle's double nested trigger on deepnight 184, `Jumper.checkClimb` with no climb height, `Kiwi.clearMines`, `fl_stickRot` and `fl_stickBound` (no caller), `MineFrozen` and `PoireBombFrozen`, `Coward` and `Hunter` (never created by the original).
+
+## Controllers
+
+Port addition: the Flash game had the keyboard only. Today `InputController.poll` merges every connected gamepad into one input, with a fixed mapping and no menu navigation. Controllers go through the same per-tick action mask as the keyboard, so recordings and replays keep working.
+
+- [ ] G.1 Solo controller:
+  - standard mapping (`Gamepad.mapping === 'standard'`): D-pad and left stick move (dead zone with some hysteresis), A or up jumps, B or X drops a bomb, down is down, Start pauses, Back or Select switches the music;
+  - the first controller is player 1; the others are ignored until G.2;
+  - the site screens (`Shell.ts`) and the loader's "click to continue" work with the D-pad, A (confirm) and B (back);
+  - a short notice when a controller connects; unplugging it during a game pauses the game;
+  - the help dialog shows the controller layout (FR/EN/ES in `PageText.ts`);
+  - tests with a fake `navigator.getGamepads`; log the addition in PORT_STATUS.md "Engine".
+- [ ] G.2 One input per player, before Phase 4: `InputController` keeps one action mask per player and each `PlayerController` reads its own. Keyboard keys per player as the original's modes set them (`setKeys`, `setAlt`): MultiCoop player 1 on the arrows and Enter, player 2 on R, F, D, G and A; TimeAttackMulti and Soccer have their own (`TimeAttackMulti.mt`, `Soccer.mt`). Controllers are given to players in connection order. Recordings store one mask per player; old replays still play. Tested headless with two players.
+- [ ] G.3 Co-op on controllers, with 4.2: when a 2-player mode starts, each controller or keyboard side presses a button to join (player 1, then player 2), shown in the 2-player interface; a controller unplugged during the game pauses it until it is back. The same for Time Attack multi (4.3) and Soccer (4.4).
+- [ ] G.4 Optional: remapping keys and buttons, saved in `localStorage`. Check first the SWF's unused key setup screen (`#910`).
+
 ## Phase 3: Shell and progression
 
 - 3.1 Screens that replace the hammerfest.fr site. In the original, the title, the mode menu, the results page after a game and the end-of-game page were all on the website, not in the client (see `HammerClient.as`, `GameManager.mt`, `Loader.mt`). They cannot be ported from the source, so they share one research task and one design.
@@ -89,7 +149,7 @@ The sets of the other modes (tutorial, shareware, timeAttack, multiTime, soccer,
 Time Attack and two-player co-op are unlocked by quests (`give mode=` in `quests.xml`), through the profile from 3.2.
 
 - [ ] 4.1 Time Attack (`TimeAttack.mt`) and its interface (`initTime` in `gui/GameInterface.mt`)
-- [ ] 4.2 Two-player co-op (`MultiCoop.mt`), 2-player interface (`initMulti`)
+- [ ] 4.2 Two-player co-op (`MultiCoop.mt`), 2-player interface (`initMulti`), with co-op on controllers (G.3)
 - [ ] 4.3 Time Attack multi (`TimeAttackMulti.mt`)
 - [ ] 4.4 Soccer (`Soccer.mt`, `SoccerSelector.mt`, `gui/SoccerInterface.mt`)
 - [ ] 4.5 Boss Rush (`BossRush.mt`)
@@ -109,6 +169,8 @@ The page around the game frame and the site screens, from an audit of every scre
 - [x] 5.1 Audio mix parity (channels, priorities, music switching). Done: `src/engine/Audio.ts` is now a port of `mtypes`' `SoundManager` (from github.com/motion-twin/mtypes). Sounds on a channel overlap instead of cutting each other (Flash `Sound.start`), each channel has its own volume as `GameManager` sets them (enemies and interface 10 lower), at most 32 sounds at once, the music at the original's level (0.65 of the sounds', `Mode.setMusicVolume` rounding) and restarted when asked again. There are no priorities in the original. The volumes use the site's default settings, as no settings page exists yet. Sounds are fetched at start and decoded on the first gesture, so the first of each no longer plays late. Tested in `tests/audio.test.ts`. See PORT_STATUS.md "Engine".
 - [x] 5.2 Performance and mobile pass. Measured on a Mac: a logic tick costs 0.12 ms and a render 0.5 ms (about 370 display objects on a level), so the game itself is light. Done: the page renders only when the game stepped (32 Hz) instead of at every screen refresh (60 or 120 Hz on phones), except while a site screen, a fade or a stopped loop shows (`main.ts`, `FixedGameLoop.stepCount`). Bug fixed: a page opened in a hidden tab stayed on the loading screen, as `Shell.load` waited on `img.decode()`, which Chrome fails or never settles there; it now waits for `load`. Touch: the buttons no longer let a moving thumb scroll, zoom or pull to refresh (`touch-action: none`, `overscroll-behavior: none`), which cancelled the press; the D-pad follows the finger from arrow to arrow, and keeps its arrow when the thumb drifts off. Checked: the touch buttons and their blur never cover the game in either orientation. Left as is: vector shapes are drawn into textures on first use (0.13 ms each on average, 14 ms at worst, so a short hitch on a slow phone when a large one first shows), and `library.json` is 9 MB (2.7 MB gzipped, mostly path data). Not yet tried on a real phone.
 - [x] 5.3 Offline play (PWA). Done: the build writes a service worker (`tools/vite-plugin-offline.ts`, `sw.js`) that caches all 307 files of the build (about 17.7 MB; not the Ruffle side-by-side or the source maps) once the game has loaded, and serves them first, so the game starts and plays with no network; the dev server never registers it. Its cache is named from a hash of the files, so a deploy that changes a file replaces the cache, and an unchanged build keeps it (the font builder now writes fixed timestamps, `fixTimestamps` in `tools/build-fonts.ts`, which made every build different). A manifest (`public/manifest.webmanifest`) and icons make it installable; the icons are the hammerfest.fr site's own favicon, a 16 x 16 ice cube, scaled pixel for pixel (`tools/build-icons.ts`, `public/icons/`). This also fixes the favicon, which pointed at a missing file. Tested in `tests/offline.test.ts`, and in the browser with the build served by the "preview" launch config, then the server stopped: the page reloads, a game starts, another level set loads and the sounds are there. Not tried: installing it on a phone.
+- [ ] 5.4 Real-device check: a phone in both orientations (touch controls and the layouts of U.3), installing the PWA, load time and the first draw of large shapes (5.2).
+- [ ] 5.5 English and Spanish versions of the title logo (left from U.2; it says "Les Cavernes de"). Needs artwork from the maintainer.
 
 ## Out of scope
 
