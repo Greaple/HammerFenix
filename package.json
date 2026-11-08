@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "assets": "tsx tools/build-data.ts && tsx tools/build-swf.ts && tsx tools/build-fonts.ts && tsx tools/build-site.ts && tsx tools/build-icons.ts",
+    "assets": "tsx tools/build-data.ts && tsx tools/build-swf.ts && tsx tools/build-fonts.ts && tsx tools/build-site.ts && tsx tools/build-icons.ts && tsx tools/build-pad-icons.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "orig": "tsx tools/normalize-original.ts"

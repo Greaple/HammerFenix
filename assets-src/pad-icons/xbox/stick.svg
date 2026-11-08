@@ -1,0 +1,21 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="32" height="32" fill="#1E1E1E"/>
+<g id="2">
+<rect width="250" height="250" transform="translate(-85 -86)" fill="#1C212A"/>
+<g id="left-joystick">
+<g id="Group 130">
+<circle id="Ellipse 35" cx="16" cy="16" r="12" fill="#D6E1F6"/>
+<circle id="Ellipse 34" cx="16" cy="16" r="11.0769" fill="#1C212A"/>
+<circle id="Ellipse 36" cx="16" cy="16" r="10.1538" fill="#D6E1F6"/>
+<g id="L">
+<mask id="path-4-outside-1_0_1" maskUnits="userSpaceOnUse" x="13" y="9" width="8" height="14" fill="black">
+<rect fill="white" x="13" y="9" width="8" height="14"/>
+<path d="M20.4502 22H13.3613V10.0967H16.0425V19.8252H20.4502V22Z"/>
+</mask>
+<path d="M20.4502 22H13.3613V10.0967H16.0425V19.8252H20.4502V22Z" fill="#1C212A"/>
+<path d="M20.4502 22V22.1H20.5502V22H20.4502ZM13.3613 22H13.2613V22.1H13.3613V22ZM13.3613 10.0967V9.99668H13.2613V10.0967H13.3613ZM16.0425 10.0967H16.1425V9.99668H16.0425V10.0967ZM16.0425 19.8252H15.9425V19.9252H16.0425V19.8252ZM20.4502 19.8252H20.5502V19.7252H20.4502V19.8252ZM20.4502 21.9H13.3613V22.1H20.4502V21.9ZM13.4613 22V10.0967H13.2613V22H13.4613ZM13.3613 10.1967H16.0425V9.99668H13.3613V10.1967ZM15.9425 10.0967V19.8252H16.1425V10.0967H15.9425ZM16.0425 19.9252H20.4502V19.7252H16.0425V19.9252ZM20.3502 19.8252V22H20.5502V19.8252H20.3502Z" fill="#1C212A" mask="url(#path-4-outside-1_0_1)"/>
+</g>
+</g>
+</g>
+</g>
+</svg>

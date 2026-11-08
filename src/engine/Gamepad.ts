@@ -14,6 +14,8 @@ export const PAD = {
   B: 1,
   X: 2,
   Y: 3,
+  /** Right trigger (R2, RT, ZR). */
+  R2: 7,
   BACK: 8,
   START: 9,
   UP: 12,
@@ -112,7 +114,7 @@ export class PadReader {
     if (right) actions.add('right');
     if (up || btn(PAD.A)) actions.add('jump');
     if (down) actions.add('down');
-    if (btn(PAD.B) || btn(PAD.X)) actions.add('attack');
+    if (btn(PAD.B) || btn(PAD.X) || btn(PAD.R2)) actions.add('attack');
     if (btn(PAD.START)) actions.add('pause');
     if (btn(PAD.BACK)) actions.add('music');
 

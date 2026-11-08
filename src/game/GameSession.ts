@@ -2040,9 +2040,9 @@ export class GameSession implements IGameContext {
       for (const n of nodes) n.visible = false;
       if (x0 > x1) continue;
       const buttons: PadButton[] =
-        row === 'move' ? ['dpad', 'a'] : row === 'attack' ? ['b', 'x'] : ['start'];
-      const size = row === 'move' ? 32 : 26;
-      const gap = 10;
+        row === 'move' ? ['dpad', 'a'] : row === 'attack' ? ['b', 'x', 'r2'] : ['start'];
+      const size = row === 'move' ? 30 : 24;
+      const gap = row === 'attack' ? 6 : 10;
       const glyphs = buttons.map((b) => padGlyph(b, this.input.padLayout, size));
       const total = glyphs.reduce((w, g) => w + g.width, 0) + gap * (glyphs.length - 1);
       let x = (x0 + x1) / 2 - total / 2;

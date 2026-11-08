@@ -4,7 +4,7 @@ import { InputController } from '../src/engine/Input';
 import { Data } from '../src/game/Data';
 import type { SwfMovieClip } from '../src/engine/swf/SwfMovieClip';
 import type { GameSession } from '../src/game/GameSession';
-import { padLabel, padStartText } from '../src/game/gui/PadGlyphs';
+import { PAD_THEMES, padIconHtml, padLabel, padStartText } from '../src/game/gui/PadGlyphs';
 import { createHeadlessSession } from './helpers/headless';
 
 /** A fake controller with the standard mapping. */
@@ -65,6 +65,7 @@ describe('controller mapping (G.1)', () => {
       [PAD.DOWN, 'down'],
       [PAD.B, 'attack'],
       [PAD.X, 'attack'],
+      [PAD.R2, 'attack'],
       [PAD.START, 'pause'],
       [PAD.BACK, 'music'],
     ];
@@ -194,6 +195,21 @@ describe('controller mapping (G.1)', () => {
     expect(padLabel('start', 'nintendo')).toBe('+');
     expect(padStartText('fr', 'xbox')).toBe('Appuyez sur A pour commencer...');
     expect(padStartText('en', 'playstation')).toBe('Press ✕ to start...');
+  });
+});
+
+describe('controller icons (assets-src/pad-icons)', () => {
+  it('draws the Figma icons in the screen colors, with fallbacks', () => {
+    const a = padIconHtml('a', 'xbox', 24)!;
+    expect(a).toMatch(/^<svg width="32" height="32"/); // a 24 px button in its 32 px frame
+    expect(a).toContain(PAD_THEMES.onLight.body);
+    expect(a).not.toContain('__');
+    // An unknown controller: Xbox's buttons, its own Start drawn as a label
+    expect(padIconHtml('a', 'generic', 24)).toBe(a);
+    expect(padIconHtml('start', 'generic', 24)).toBeNull();
+    // The D-pad falls back to Xbox's; face buttons never take another maker's
+    expect(padIconHtml('dpad', 'playstation', 24)).toBe(padIconHtml('dpad', 'xbox', 24));
+    expect(padIconHtml('x', 'playstation', 24)).not.toBe(padIconHtml('x', 'xbox', 24));
   });
 });
 

@@ -45,7 +45,6 @@ const TEXT: Record<Lang, PageTexts> = {
     quitKey: 'Abandonner la partie (elle est enregistrée)',
     keysTitle: 'Clavier',
     padTitle: 'Manette',
-    padStick: 'stick gauche',
     padUp: 'croix ↑',
     padMenus: 'Menus : valider, revenir',
     padConnected: 'Manette connectée',
@@ -57,6 +56,7 @@ const TEXT: Record<Lang, PageTexts> = {
     linkOriginal: 'Code source original (Motion Twin)',
     linkPort: 'Code source de HammerFenix',
     linkLicense: 'Licence CC BY-NC-SA 4.0',
+    padIcons: 'Icônes de manettes, de Figma Community (CC BY 4.0) :',
     devKeysTitle: 'Touches de développement',
     devKeysNote:
       'Celles du jeu original en mode développeur. Les chiffres sont ceux du pavé numérique ou de la rangée du haut. Elles ne marchent pas pendant un enregistrement ou un replay, et les lettres gardent leur usage normal (W saute aussi).',
@@ -107,7 +107,6 @@ const TEXT: Record<Lang, PageTexts> = {
     quitKey: 'Give up the game (it is saved)',
     keysTitle: 'Keyboard',
     padTitle: 'Controller',
-    padStick: 'left stick',
     padUp: 'D-pad ↑',
     padMenus: 'Menus: confirm, back',
     padConnected: 'Controller connected',
@@ -119,6 +118,7 @@ const TEXT: Record<Lang, PageTexts> = {
     linkOriginal: 'Original source code (Motion Twin)',
     linkPort: 'HammerFenix source code',
     linkLicense: 'CC BY-NC-SA 4.0 license',
+    padIcons: 'Controller icons, from Figma Community (CC BY 4.0):',
     devKeysTitle: 'Developer keys',
     devKeysNote:
       'The original game’s own dev mode keys. Digits are the numpad’s or the top row’s. They are off while recording or replaying, and letters keep their game use (W also jumps).',
@@ -169,7 +169,6 @@ const TEXT: Record<Lang, PageTexts> = {
     quitKey: 'Abandonar la partida (se guarda)',
     keysTitle: 'Teclado',
     padTitle: 'Mando',
-    padStick: 'stick izquierdo',
     padUp: 'cruceta ↑',
     padMenus: 'Menús: aceptar, volver',
     padConnected: 'Mando conectado',
@@ -181,6 +180,7 @@ const TEXT: Record<Lang, PageTexts> = {
     linkOriginal: 'Código fuente original (Motion Twin)',
     linkPort: 'Código fuente de HammerFenix',
     linkLicense: 'Licencia CC BY-NC-SA 4.0',
+    padIcons: 'Iconos de mandos, de Figma Community (CC BY 4.0):',
     devKeysTitle: 'Teclas de desarrollo',
     devKeysNote:
       'Las del modo desarrollador del juego original. Las cifras son las del teclado numérico o de la fila de arriba. No funcionan durante una grabación o una repetición, y las letras siguen con su uso normal (W también salta).',

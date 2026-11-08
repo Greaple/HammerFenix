@@ -781,10 +781,10 @@ export class Shell {
       k.position.set(6, (17 - k.height) / 2);
       face.addChild(cap);
     } else if (on && device === 'gamepad') {
-      const g = padGlyph(back ? 'b' : 'a', this.input.padLayout, 20, 0xfffaf0);
-      g.position.set(10, 9);
+      const g = padGlyph(back ? 'b' : 'a', this.input.padLayout, 18, 'onDark');
+      g.position.set(g.width / 2, 9);
       cap.addChild(g);
-      capW = 20;
+      capW = g.width;
       face.addChild(cap);
     }
     const gap = capW > 0 ? 10 : 0;

@@ -1,131 +1,192 @@
-import { Container, Graphics, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, ImageSource, Sprite, Text, TextStyle, Texture } from 'pixi.js';
 import type { PadLayout } from '../../engine/Gamepad';
+import { PAD_ICON_DATA, type PadIconData } from './padIconData';
 
 /**
  * Controller buttons as the screens show them (roadmap G.1). Port addition: the Flash game had
  * the keyboard only. Buttons are named by their place in the standard mapping (`a` is the
- * bottom face button, `b` the right one, `x` the left one, `y` the top one), and drawn with the
- * labels of the controller in use: Xbox letters, PlayStation shapes or Nintendo letters (which
+ * bottom face button, `b` the right one, `x` the left one, `y` the top one), and shown as the
+ * controller in use labels them: Xbox letters, PlayStation shapes or Nintendo letters (which
  * swap A and B, X and Y).
+ *
+ * They are the icons of three Figma Community sheets (`assets-src/pad-icons/`), drawn in the
+ * colors of the screen under them (`PadTheme`). A button with no icon is drawn here instead.
  */
-export type PadButton = 'a' | 'b' | 'x' | 'y' | 'start' | 'back' | 'dpad';
+export type PadButton = 'a' | 'b' | 'x' | 'y' | 'r2' | 'start' | 'back' | 'dpad' | 'stick';
 
 type Face = 'a' | 'b' | 'x' | 'y';
 
-/** Face button label and color per layout. PlayStation labels are drawn as shapes. */
-const XBOX = {
-  a: { label: 'A', color: 0x6cc24a },
-  b: { label: 'B', color: 0xe5484d },
-  x: { label: 'X', color: 0x3e8ed0 },
-  y: { label: 'Y', color: 0xf2c230 },
-};
+/** Face button labels per layout. */
+const XBOX: Record<Face, string> = { a: 'A', b: 'B', x: 'X', y: 'Y' };
 
-const FACE: Record<PadLayout, Record<Face, { label: string; color: number }>> = {
+const FACE: Record<PadLayout, Record<Face, string>> = {
   xbox: XBOX,
   generic: XBOX,
-  playstation: {
-    a: { label: '✕', color: 0x8fb4f0 },
-    b: { label: '○', color: 0xf07a80 },
-    x: { label: '□', color: 0xe59ad8 },
-    y: { label: '△', color: 0x52c9a8 },
-  },
-  nintendo: {
-    a: { label: 'B', color: 0xe8e8e8 },
-    b: { label: 'A', color: 0xe8e8e8 },
-    x: { label: 'Y', color: 0xe8e8e8 },
-    y: { label: 'X', color: 0xe8e8e8 },
-  },
+  playstation: { a: '✕', b: '○', x: '□', y: '△' },
+  nintendo: { a: 'B', b: 'A', x: 'Y', y: 'X' },
 };
 
-/** Start and Back / Select, as each maker names them. */
-const MENU: Record<PadLayout, { start: string; back: string }> = {
-  xbox: { start: 'MENU', back: 'VIEW' },
-  generic: { start: 'START', back: 'SELECT' },
-  playstation: { start: 'OPTIONS', back: 'SHARE' },
-  nintendo: { start: '+', back: '−' },
+/** The other buttons' names, as each maker prints them. */
+const OTHER: Record<PadLayout, Record<'r2' | 'start' | 'back' | 'stick', string>> = {
+  xbox: { r2: 'RT', start: 'MENU', back: 'VIEW', stick: 'L' },
+  generic: { r2: 'R2', start: 'START', back: 'SELECT', stick: 'L' },
+  playstation: { r2: 'R2', start: 'OPTIONS', back: 'SHARE', stick: 'L' },
+  nintendo: { r2: 'ZR', start: '+', back: '−', stick: 'L' },
 };
 
-/** The text label of a button (the help dialog). The D-pad has none. */
+/** The text label of a button (texts, and buttons with no icon). The D-pad has none. */
 export function padLabel(button: PadButton, layout: PadLayout): string {
-  if (button === 'start' || button === 'back') return MENU[layout][button];
   if (button === 'dpad') return '';
-  return FACE[layout][button].label;
+  if (button in FACE[layout]) return FACE[layout][button as Face];
+  return OTHER[layout][button as keyof (typeof OTHER)['xbox']];
 }
-
-/** The color of a face button's label. */
-export function padColor(button: PadButton, layout: PadLayout): number {
-  return button in FACE[layout] ? FACE[layout][button as Face].color : 0xffffff;
-}
-
-const BODY = 0x2b2622;
-const RIM = 0x14110f;
-const FONT = '"Franklin Gothic Heavy", "Arial Black", Impact, sans-serif';
 
 /**
- * A button drawn `size` px tall, centered on (0, 0). `rim` outlines it, so it reads on a dark
- * background.
+ * The colors of a button: `onDark` on the wood buttons (a parchment button with wood letters),
+ * `onLight` on parchment (a wood button with parchment letters).
  */
+export type PadTheme = 'onDark' | 'onLight';
+
+export const PAD_THEMES: Record<PadTheme, { body: string; ink: string }> = {
+  onDark: { body: '#fffaf0', ink: '#5f452c' },
+  onLight: { body: '#3f2c1b', ink: '#f3e2bd' },
+};
+
+/**
+ * The icon of a button. An unknown controller has Xbox's, but its own Start and Select; the
+ * D-pad and the stick fall back to Xbox's, as all makers draw them alike.
+ */
+function iconOf(button: PadButton, layout: PadLayout): PadIconData | undefined {
+  if (layout === 'generic') {
+    return button === 'start' || button === 'back' ? undefined : PAD_ICON_DATA.xbox?.[button];
+  }
+  const own = PAD_ICON_DATA[layout]?.[button];
+  if (own || (button !== 'dpad' && button !== 'stick')) return own;
+  return PAD_ICON_DATA.xbox?.[button];
+}
+
+/** The icon's SVG in `body` and `ink` colors, `height` px tall for its button. */
+function iconSvg(icon: PadIconData, body: string, ink: string, height: number): string {
+  const s = height / icon.box;
+  return icon.svg
+    .replace(/__BODY__/g, body)
+    .replace(/__INK__/g, ink)
+    .replace(
+      /^<svg width="[\d.]+" height="[\d.]+"/,
+      `<svg width="${icon.w * s}" height="${icon.h * s}"`,
+    );
+}
+
+/**
+ * The SVG markup of a button for the page (the help dialog), its button `height` px tall, or
+ * null when it has no icon.
+ */
+export function padIconHtml(
+  button: PadButton,
+  layout: PadLayout,
+  height: number,
+  theme: PadTheme = 'onLight',
+): string | null {
+  const icon = iconOf(button, layout);
+  if (!icon) return null;
+  const t = PAD_THEMES[theme];
+  return iconSvg(icon, t.body, t.ink, height);
+}
+
+/** Icons are drawn this many times their frame size, so they stay sharp on a large frame. */
+const ICON_RES = 6;
+const textures = new Map<string, Texture>();
+
+/**
+ * Draws every icon once per theme, as textures (the browser draws the SVG: it has masks and
+ * letters with holes). Until it is done, and in Node, the buttons are drawn by `padGlyph`.
+ */
+export async function loadPadIcons(): Promise<void> {
+  if (typeof Image === 'undefined') return;
+  const jobs: Promise<void>[] = [];
+  for (const [layout, icons] of Object.entries(PAD_ICON_DATA)) {
+    for (const [button, icon] of Object.entries(icons)) {
+      for (const theme of Object.keys(PAD_THEMES) as PadTheme[]) {
+        const t = PAD_THEMES[theme];
+        const svg = iconSvg(icon, t.body, t.ink, icon.box * ICON_RES);
+        const img = new Image();
+        const done = new Promise<void>((resolve) => {
+          img.onload = () => {
+            const source = new ImageSource({ resource: img, autoGenerateMipmaps: true });
+            textures.set(`${layout}/${button}/${theme}`, new Texture({ source }));
+            resolve();
+          };
+          img.onerror = () => resolve();
+        });
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        jobs.push(done);
+      }
+    }
+  }
+  await Promise.all(jobs);
+}
+
+/** A button whose own part is `size` px tall, centered on (0, 0). */
 export function padGlyph(
   button: PadButton,
   layout: PadLayout,
   size: number,
-  rim: number = RIM,
+  theme: PadTheme = 'onLight',
 ): Container {
+  const icon = iconOf(button, layout);
+  if (icon) {
+    // The icon's layout: Xbox's for the shared ones
+    const from = PAD_ICON_DATA[layout]?.[button] === icon ? layout : 'xbox';
+    const tex = textures.get(`${from}/${button}/${theme}`);
+    if (tex) {
+      const sp = new Sprite(tex);
+      sp.anchor.set(0.5);
+      const s = size / icon.box;
+      sp.width = icon.w * s;
+      sp.height = icon.h * s;
+      const c = new Container();
+      c.addChild(sp);
+      return c;
+    }
+  }
+  return drawGlyph(button, layout, size, theme);
+}
+
+/** A button drawn in the icons' style, for the ones with no icon. */
+function drawGlyph(button: PadButton, layout: PadLayout, size: number, theme: PadTheme): Container {
+  const body = PAD_THEMES[theme].body;
+  const ink = PAD_THEMES[theme].ink;
   const c = new Container();
-  const rimW = Math.max(1, size / (rim === RIM ? 16 : 10));
   if (button === 'dpad') {
     const t = size / 3;
     const h = size / 2;
-    const g = new Graphics()
-      .roundRect(-t / 2, -h, t, size, t * 0.25)
-      .roundRect(-h, -t / 2, size, t, t * 0.25)
-      .fill(BODY)
-      .stroke({ color: rim, width: rimW });
-    // An arrow tip on each arm
-    const a = t * 0.28;
-    const e = h - t * 0.3;
-    for (const [dx, dy] of [
-      [0, -1],
-      [0, 1],
-      [-1, 0],
-      [1, 0],
-    ]) {
-      const tipX = dx * e;
-      const tipY = dy * e;
-      const baseX = dx * (e - a * 1.3);
-      const baseY = dy * (e - a * 1.3);
-      g.poly([tipX, tipY, baseX - dy * a, baseY - dx * a, baseX + dy * a, baseY + dx * a]).fill(
-        0xd9d0c4,
-      );
-    }
-    c.addChild(g);
-    return c;
-  }
-  if (button === 'start' || button === 'back') {
-    const label = MENU[layout][button];
-    const txt = text(label, size * 0.42, 0xffffff);
-    const h = size * 0.7;
-    const w = Math.max(h * 1.4, txt.width + size * 0.5);
     c.addChild(
       new Graphics()
-        .roundRect(-w / 2, -h / 2, w, h, h / 2)
-        .fill(BODY)
-        .stroke({ color: rim, width: rimW }),
-      txt,
+        .roundRect(-t / 2, -h, t, size, t * 0.15)
+        .roundRect(-h, -t / 2, size, t, t * 0.15)
+        .fill(body),
     );
     return c;
   }
+  const label = padLabel(button, layout);
+  if (button === 'start' || button === 'back' || button === 'r2') {
+    const txt = text(label, size * (label.length > 2 ? 0.42 : 0.6), ink);
+    const h = size * (button === 'r2' ? 1 : 0.7);
+    const w = Math.max(h * 1.2, txt.width + size * 0.5);
+    c.addChild(new Graphics().roundRect(-w / 2, -h / 2, w, h, h * 0.3).fill(body), txt);
+    return c;
+  }
   const r = size / 2;
-  const { label, color } = FACE[layout][button];
-  c.addChild(new Graphics().circle(0, 0, r).fill(BODY).stroke({ color: rim, width: rimW }));
-  if (layout === 'playstation') c.addChild(psShape(button, r * 0.42, color));
-  else c.addChild(text(label, size * 0.56, color));
+  c.addChild(new Graphics().circle(0, 0, r).fill(body));
+  if (layout === 'playstation' && button !== 'stick')
+    c.addChild(psShape(button as Face, r * 0.42, ink));
+  else c.addChild(text(label, size * 0.56, ink));
   return c;
 }
 
 /** The PlayStation shapes, `s` px from the center to their edge. */
-function psShape(button: Face, s: number, color: number): Graphics {
-  const w = Math.max(1.5, s * 0.34);
+function psShape(button: Face, s: number, color: string): Graphics {
+  const w = Math.max(1.5, s * 0.4);
   const g = new Graphics();
   if (button === 'a') {
     g.moveTo(-s, -s).lineTo(s, s).moveTo(s, -s).lineTo(-s, s);
@@ -136,10 +197,12 @@ function psShape(button: Face, s: number, color: number): Graphics {
   } else {
     g.poly([0, -s, s, s * 0.75, -s, s * 0.75]);
   }
-  return g.stroke({ color, width: w, cap: 'round', join: 'round' });
+  return g.stroke({ color, width: w, join: 'round' });
 }
 
-function text(s: string, size: number, color: number): Text {
+const FONT = '"Franklin Gothic Heavy", "Arial Black", Impact, sans-serif';
+
+function text(s: string, size: number, color: string): Text {
   const t = new Text({
     text: s,
     style: new TextStyle({ fontFamily: FONT, fontSize: size, fill: color }),

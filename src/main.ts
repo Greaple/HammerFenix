@@ -14,7 +14,7 @@ import { QuestEngine } from './game/Quests';
 import { Shell } from './ui/Shell';
 import { pickLang } from './ui/Language';
 import { applyPageText, pageText } from './ui/PageText';
-import { type PadButton, padColor, padLabel } from './game/gui/PadGlyphs';
+import { loadPadIcons, type PadButton, padIconHtml, padLabel } from './game/gui/PadGlyphs';
 
 const SOUNDS: Record<string, string> = {
   sound_bad_death: 'sfx/sound_bad_death.mp3',
@@ -112,6 +112,7 @@ async function main(): Promise<void> {
     GameDataStore.load(baseUrl, startLang),
     SwfLibrary.load(baseUrl, (f) => loading.progress(f)),
     loadGameFonts(baseUrl),
+    loadPadIcons(),
   ]);
 
   // 3. Initialize Audio & Input engines
@@ -372,9 +373,11 @@ async function main(): Promise<void> {
     const layout = input.padLayout;
     document.querySelectorAll<HTMLElement>('kbd[data-pad]').forEach((el) => {
       const b = el.dataset.pad as PadButton;
-      el.textContent = padLabel(b, layout);
-      el.classList.toggle('short', el.textContent.length <= 1);
-      el.style.setProperty('--pad-color', `#${padColor(b, layout).toString(16).padStart(6, '0')}`);
+      const icon = padIconHtml(b, layout, 22);
+      el.classList.toggle('icon', icon !== null);
+      if (icon) el.innerHTML = icon;
+      else el.textContent = padLabel(b, layout);
+      el.title = padLabel(b, layout);
     });
   };
   showDevice();
