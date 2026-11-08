@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Level sheets</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #222;
+        color: #ddd;
+        font:
+          14px system-ui,
+          sans-serif;
+      }
+      img {
+        display: block;
+        margin: 8px 0 24px;
+        max-width: 100%;
+      }
+      a {
+        color: #9cf;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Level contact sheets (roadmap 2B.2)</h1>
+    <p>
+      <a href="?sheet=skins">Skin pairs</a> ·
+      <a href="?sheet=worldmap">Adventure 0 to 99 vs the world map</a> · One set:
+      <a href="?sheet=set&set=adventure">adventure</a>,
+      <a href="?sheet=set&set=deepnight">deepnight</a>, <a href="?sheet=set&set=hiko">hiko</a>,
+      <a href="?sheet=set&set=ayame">ayame</a>, <a href="?sheet=set&set=hk">hk</a>,
+      <a href="?sheet=set&set=tutorial">tutorial</a> · Add <code>&amp;full=1</code> to keep enemies,
+      items and darkness.
+    </p>
+    <p id="status">Loading…</p>
+    <div id="out"></div>
+    <script type="module" src="./level-sheets.ts"></script>
+  </body>
+</html>

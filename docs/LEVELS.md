@@ -8,25 +8,26 @@ Result: **ok** = matches the original · **fixed** = was different, fixed · **o
 
 ## Adventure (2B.4)
 
-| Level          | What to check                                                                          | Result | Notes |
-| -------------- | -------------------------------------------------------------------------------------- | ------ | ----- |
-| 0              | Village: hidden borders, menu decor, ninja timer, bucket warp to level 10, door portal |        |       |
-| 1              | Hidden borders, dimension door and lock (key 10)                                       |        |       |
-| 2              | Code trigger, portal, messages                                                         |        |       |
-| 30             | First boss warning: music change, message                                              |        |       |
-| 40, 60, 70, 90 | Boss warnings: music change, message                                                   |        |       |
-| 47             | Enemies spawned by script (Bombe)                                                      |        |       |
-| 49             | `multi` block                                                                          |        |       |
-| 50             | Boss warning with music, `night` block                                                 |        |       |
-| 53, 75         | Tiles removed and added by script (`e_rem`, `e_add`)                                   |        |       |
-| 78             | Item line (`e_itemLine`), decor                                                        |        |       |
-| 80             | Boss warning with music; first Baleine                                                 |        |       |
-| 82, 83, 84     | Special effects by script (`e_spec`), portal at 82                                     |        |       |
-| 86             | `mirror` block, enemies spawned by script, portal                                      |        |       |
-| 87             | Enemies spawned by script                                                              |        |       |
-| 100            | Boss Bat: music, fight, exit; Bat glow and exit arrow (left from Phase 2)              |        |       |
-| 101            | Boss Tuberculoz: music, fight, exit arrow                                              |        |       |
-| 102 to 106     | The ending: code triggers, `night` and `multi` at 103, special effects                 |        |       |
+| Level          | What to check                                                                                                               | Result | Notes |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------- | ------ | ----- |
+| 0              | Village: hidden borders, menu decor, ninja timer, bucket warp to level 10, door portal                                      |        |       |
+| 1              | Hidden borders, dimension door and lock (key 10)                                                                            |        |       |
+| 2              | Code trigger, portal, messages                                                                                              |        |       |
+| 30             | First boss warning: music change, message                                                                                   |        |       |
+| 40, 60, 70, 90 | Boss warnings: music change, message                                                                                        |        |       |
+| 47             | Enemies spawned by script (Bombe)                                                                                           |        |       |
+| 49             | `multi` block                                                                                                               |        |       |
+| 50             | Boss warning with music, `night` block                                                                                      |        |       |
+| 54             | Torches beside the hell door (`$birth` trigger): the hamm4all screenshot has none                                           |        |       |
+| 53, 75         | Tiles removed and added by script (`e_rem`, `e_add`)                                                                        |        |       |
+| 78             | Item line (`e_itemLine`), decor                                                                                             |        |       |
+| 80             | Boss warning with music; first Baleine                                                                                      |        |       |
+| 82, 83, 84     | Special effects by script (`e_spec`), portal at 82                                                                          |        |       |
+| 86             | `mirror` block, enemies spawned by script, portal                                                                           |        |       |
+| 87             | Enemies spawned by script                                                                                                   |        |       |
+| 100            | Boss Bat: music, fight, exit; Bat glow and exit arrow (left from Phase 2)                                                   |        |       |
+| 101            | Boss Tuberculoz: music, fight, exit arrow                                                                                   |        |       |
+| 102 to 106     | The ending: code triggers, `night` and `multi` at 103, special effects; door at 102 (12, 6), not in the hamm4all screenshot |        |       |
 
 ## Enemies (2B.5)
 

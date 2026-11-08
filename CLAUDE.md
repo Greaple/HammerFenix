@@ -14,6 +14,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `npm test`, `npm run typecheck`, `npm run format:check` (CI runs all three plus `npm run assets` and the build)
 - `npm run assets`: rebuild `public/data`, `public/gfx`, `public/fonts` (the SWF's fonts) and `public/images` from `assets-src/original`
 - `npm run orig`: write a greppable copy of the original source to `.cache/original/` (gitignored)
+- `/tools/level-sheets.html` on the dev server: level contact sheets (2B.2), saved to `.cache/level-sheets/`; options in `tools/level-sheets.ts`
 - `npx tsx tools/scan-scripts.ts [--all]`: list what level scripts use that the engine does not handle (`tests/scripts.test.ts` fails on new problems)
 
 ## Original source (`assets-src/original`, identical to github.com/motion-twin/hammerfest)
