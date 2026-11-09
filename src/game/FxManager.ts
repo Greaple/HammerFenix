@@ -1,5 +1,5 @@
 import { Timer } from '../engine/Timer';
-import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
+import type { SwfMovieClip, SwfTextField } from '../engine/swf/SwfMovieClip';
 import { Data } from './Data';
 import type { IGameContext } from './GameContext';
 import { BaseEntity } from './entity/Entity';
@@ -114,6 +114,7 @@ export class FxManager {
     mc._y = Data.GAME_HEIGHT - 1;
     const field = mc.getText('field');
     if (field) field.text = name;
+    FxManager.addGlow(mc, 0x0, 2);
     const label = mc.getText('label');
     if (label) label.text = flLabel ? this.game.dataStore.getStatic(13) : '';
     this.levelName = mc;
@@ -176,11 +177,12 @@ export class FxManager {
     this.mcList.push(mc);
   }
 
-  attachScorePop(color: number, _glowColor: number, x: number, y: number, txt: string): void {
+  attachScorePop(color: number, glowColor: number, x: number, y: number, txt: string): void {
     const anim = this.attachFx(x, y, 'popScore');
     if (!anim) return;
     anim.fl_loop = false;
     const formatted = Data.formatNumberStr(txt);
+    FxManager.addGlow(anim.mc, glowColor, 2);
     const tf = anim.mc.getClip('label')?.getText('field');
     if (tf) tf.textColor = color;
     anim.mc.setVariable('value', formatted);
@@ -226,6 +228,7 @@ export class FxManager {
     if (label) label.text = this.game.dataStore.getStatic(40);
     const field = mc.getText('field');
     if (field) field.text = this.game.dataStore.lang.keys[kid] ?? `#${kid}`;
+    FxManager.addGlow(mc, 0x0, 2);
     this.igMsg = mc;
     this.igMsgTimer = Data.SECOND * 2;
   }
@@ -237,8 +240,14 @@ export class FxManager {
     if (label) label.text = this.game.dataStore.getStatic(41);
     const field = mc.getText('field');
     if (field) field.text = this.game.dataStore.lang.keys[kid] ?? `#${kid}`;
+    FxManager.addGlow(mc, 0x0, 2);
     this.igMsg = mc;
     this.igMsgTimer = Data.SECOND * 3;
+  }
+
+  /** `FxManager.addGlow`: an outline (glow of strength 100) `length` px wide. */
+  static addGlow(mc: SwfMovieClip | SwfTextField, color: number, length: number): void {
+    mc.setGlow(color, 1, length, length, 100);
   }
 
   attachFx(x: number, y: number, link: string, depth: number = Data.DP_FX): FxAnim | null {

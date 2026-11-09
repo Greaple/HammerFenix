@@ -140,12 +140,6 @@ export class SwfTextField extends Container {
       align: def.align === 'justify' ? 'left' : def.align,
       wordWrap: Boolean(def.multiline) || this.boxWidth > 60,
       wordWrapWidth: this.boxWidth,
-      dropShadow: {
-        color: '#000000',
-        alpha: 0.65,
-        blur: 1,
-        distance: 1,
-      },
     });
 
     this.pixiText = new Text({ text: '', style });
@@ -190,6 +184,18 @@ export class SwfTextField extends Container {
 
   set textColor(hex: number) {
     this.pixiText.style.fill = hex;
+  }
+
+  /** Flash `filters = [new GlowFilter(...)]` on a text field. Skipped when headless. */
+  setGlow(color: number, alpha: number, blurX: number, blurY: number, strength: number): void {
+    if (this.headless) return;
+    const g = new GlowFilter();
+    g.color = color;
+    g.alpha = alpha;
+    g.blurX = blurX;
+    g.blurY = blurY;
+    g.strength = strength;
+    this.filters = [g];
   }
 
   get textWidth(): number {

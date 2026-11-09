@@ -1213,9 +1213,15 @@ export class PlayerEntity extends PhysicsEntity {
         }
         this.clouds = [];
         break;
-      // *** 86. ghost candy: the glow filters are not ported
-      case 86:
+      // *** 86. ghost candy
+      case 86: {
+        for (const b of this.game.getList(Data.BAD)) {
+          b.alpha = 100;
+          b.mc.clearGlow(); // filters = null
+        }
+        this.mc.clearGlow();
         break;
+      }
       // *** 88. pokute
       case 88:
         this.unstick();
@@ -1913,12 +1919,16 @@ export class PlayerEntity extends PhysicsEntity {
         break;
       }
 
-      // *** 86. ghost candy: ghostbuster mode. The glow filters on the player and the enemies
-      // are not ported.
-      case 86:
+      // *** 86. ghost candy: ghostbuster mode, each enemy gives 666 points
+      case 86: {
+        this.mc.setGlow(0x8cc0ff, 0.5, 2, 2, 100);
         this.temporary(id, Data.SECOND * 60);
         game.fxMan.attachBg(Data.BG_GHOSTS, null, Data.SECOND * 57);
+        for (const b of game.getList(Data.BAD)) {
+          b.mc.setGlow(0xff5500, 1.0, 2, 2, 100);
+        }
         break;
+      }
 
       // *** 87. blue larva: turns a random enemy into a blue larva
       case 87: {

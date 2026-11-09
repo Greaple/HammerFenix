@@ -1,5 +1,6 @@
 import type { SwfMovieClip, SwfTextField } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
+import { FxManager } from '../FxManager';
 import type { IGameContext } from '../GameContext';
 
 const BASE_X = 92;
@@ -12,6 +13,8 @@ const MAX_LIVES = 8;
  * life icons (`hammer_interf_life`), C-R-Y-S-T-A-L extend letters, and level number.
  */
 export class GameHud {
+  static readonly GLOW_COLOR = 0x70658d;
+
   readonly game: IGameContext;
   readonly mc: SwfMovieClip;
 
@@ -37,8 +40,10 @@ export class GameHud {
     this.scoreField = this.mc.getText('score0');
     this.levelField = this.mc.getText('level');
 
+    if (this.levelField) FxManager.addGlow(this.levelField, GameHud.GLOW_COLOR, 2);
     if (this.scoreField) {
       this.scoreField.textColor = Data.BASE_COLORS[0];
+      FxManager.addGlow(this.scoreField, GameHud.GLOW_COLOR, 2);
     }
 
     for (let i = 0; i < 7; i++) {

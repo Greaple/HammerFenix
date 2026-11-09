@@ -1,6 +1,7 @@
 import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
+import { FxManager } from '../FxManager';
 import type { IGameContext } from '../GameContext';
 import { type BadEntity, createBad } from './Bad';
 import { BaseEntity, MoverEntity } from './Entity';
@@ -866,7 +867,7 @@ export class SoccerBall extends PlayerBomb {
   /** `init` runs before `initBomb` moves the ball, so the shine appears at (0, 0). */
   override initBomb(x: number, y: number): void {
     this.register(Data.SOCCERBALL);
-    // FxManager.addGlow(this, 0x808080, 2): glow filters are not ported
+    FxManager.addGlow(this.mc, 0x808080, 2);
     this.game.fxMan.attachShine(this.x, this.y - Data.CASE_HEIGHT * 0.5);
     super.initBomb(x, y);
   }
