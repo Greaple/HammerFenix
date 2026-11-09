@@ -32,4 +32,4 @@ Figma node of each icon:
   (ZR), `start` 66:24315 (+), `back` 66:24316 (−), `dpad` 72:37065 (+Control Pad), `stick`
   66:24371 (Left Stick).
 
-Missing files: the screens draw that button themselves (`padGlyph` in `PadGlyphs.ts`).
+Missing files: the screens draw that button themselves (`padGlyph` in `PadGlyphs.ts`). Missing today: `l1` (the left bumper: LB, L1, L), which opens the world map; export it from each sheet into the three folders and `npm run assets` picks it up.

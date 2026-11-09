@@ -68,6 +68,8 @@ describe('controller mapping (G.1)', () => {
       [PAD.R2, 'attack'],
       [PAD.START, 'pause'],
       [PAD.BACK, 'music'],
+      [PAD.Y, 'disguise'],
+      [PAD.L1, 'map'],
     ];
     for (const [button, action] of cases) {
       pad.press(button);
@@ -75,8 +77,8 @@ describe('controller mapping (G.1)', () => {
       pad.press(button, false);
       expect(poll(input).isDown(action as never)).toBe(false);
     }
-    // Y does nothing
-    pad.press(PAD.Y);
+    // The other buttons (R1, L2, the sticks' clicks) do nothing
+    for (const b of [5, 6, 10, 11]) pad.press(b);
     poll(input);
     for (const [, action] of cases) expect(input.isDown(action as never)).toBe(false);
   });
@@ -193,6 +195,11 @@ describe('controller mapping (G.1)', () => {
     expect(padLabel('a', 'playstation')).toBe('✕');
     expect(padLabel('a', 'nintendo')).toBe('B'); // the bottom button
     expect(padLabel('start', 'nintendo')).toBe('+');
+    expect(['xbox', 'playstation', 'nintendo'].map((l) => padLabel('l1', l as never))).toEqual([
+      'LB',
+      'L1',
+      'L',
+    ]);
     expect(padStartText('fr', 'xbox')).toBe('Appuyez sur A pour commencer...');
     expect(padStartText('en', 'playstation')).toBe('Press ✕ to start...');
   });

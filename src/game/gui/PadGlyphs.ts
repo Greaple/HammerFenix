@@ -17,6 +17,8 @@ export type PadButton =
   | 'b'
   | 'x'
   | 'y'
+  /** The left bumper: no sheet icon yet, drawn as a labelled pill (`drawGlyph`). */
+  | 'l1'
   | 'r2'
   | 'start'
   | 'back'
@@ -38,11 +40,11 @@ const FACE: Record<PadLayout, Record<Face, string>> = {
 };
 
 /** The other buttons' names, as each maker prints them. */
-const OTHER: Record<PadLayout, Record<'r2' | 'start' | 'back' | 'stick', string>> = {
-  xbox: { r2: 'RT', start: 'MENU', back: 'VIEW', stick: 'L' },
-  generic: { r2: 'R2', start: 'START', back: 'SELECT', stick: 'L' },
-  playstation: { r2: 'R2', start: 'OPTIONS', back: 'SHARE', stick: 'L' },
-  nintendo: { r2: 'ZR', start: '+', back: '−', stick: 'L' },
+const OTHER: Record<PadLayout, Record<'l1' | 'r2' | 'start' | 'back' | 'stick', string>> = {
+  xbox: { l1: 'LB', r2: 'RT', start: 'MENU', back: 'VIEW', stick: 'L' },
+  generic: { l1: 'L1', r2: 'R2', start: 'START', back: 'SELECT', stick: 'L' },
+  playstation: { l1: 'L1', r2: 'R2', start: 'OPTIONS', back: 'SHARE', stick: 'L' },
+  nintendo: { l1: 'L', r2: 'ZR', start: '+', back: '−', stick: 'L' },
 };
 
 /** The text label of a button (texts, and buttons with no icon). The D-pad has none. */
@@ -218,9 +220,9 @@ function drawGlyph(button: PadButton, layout: PadLayout, size: number, theme: Pa
     return c;
   }
   const label = padLabel(button, layout);
-  if (button === 'start' || button === 'back' || button === 'r2') {
+  if (button === 'start' || button === 'back' || button === 'r2' || button === 'l1') {
     const txt = text(label, size * (label.length > 2 ? 0.42 : 0.6), ink);
-    const h = size * (button === 'r2' ? 1 : 0.7);
+    const h = size * (button === 'r2' ? 1 : button === 'l1' ? 0.8 : 0.7);
     const w = Math.max(h * 1.2, txt.width + size * 0.5);
     c.addChild(new Graphics().roundRect(-w / 2, -h / 2, w, h, h * 0.3).fill(body), txt);
     return c;

@@ -14,6 +14,8 @@ export const PAD = {
   B: 1,
   X: 2,
   Y: 3,
+  /** Left bumper (L1, LB, L). */
+  L1: 4,
   /** Right trigger (R2, RT, ZR). */
   R2: 7,
   BACK: 8,
@@ -118,6 +120,7 @@ export class PadReader {
     if (btn(PAD.START)) actions.add('pause');
     if (btn(PAD.BACK)) actions.add('music');
     if (btn(PAD.Y)) actions.add('disguise');
+    if (btn(PAD.L1)) actions.add('map');
 
     const menu = new Set<MenuAction>();
     if (left) menu.add('left');
