@@ -83,6 +83,8 @@ async function main(): Promise<void> {
     height: 520,
     backgroundColor: 0x000000,
     antialias: true,
+    // Overlay blends read what is drawn under them (`OverlayFilter`)
+    useBackBuffer: true,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
     autoDensity: true,
   });

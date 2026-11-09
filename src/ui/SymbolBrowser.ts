@@ -192,6 +192,8 @@ export class SymbolBrowser {
       height: 280,
       backgroundAlpha: 0,
       antialias: true,
+      // Overlay blends read what is drawn under them (`OverlayFilter`)
+      useBackBuffer: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
     });
 

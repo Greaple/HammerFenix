@@ -196,16 +196,14 @@ export class FxManager {
     return a;
   }
 
-  /**
-   * `FxManager.attachExplosion`: the explosion zone. The original blends it with `OVERLAY`; not
-   * ported (Pixi's overlay drew it shifted and banded), so it shows as a pale disc (2C.6).
-   */
+  /** `FxManager.attachExplosion`: the explosion zone, blended with `OVERLAY`. */
   attachExplosion(x: number, y: number, radius: number): FxAnim | null {
     if (this.game.fl_lock) return null;
     const a = this.attachFx(x, y, 'explodeZone');
     if (a) {
       a.mc._width = radius * 2;
-      a.mc._height = radius * 2;
+      a.mc._height = a.mc._width;
+      a.mc.setOverlayBlend(); // blendMode = BlendMode.OVERLAY
     }
     return a;
   }

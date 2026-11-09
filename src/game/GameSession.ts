@@ -2303,7 +2303,7 @@ export class GameSession implements IGameContext {
     } else {
       if (ptr) ptr._y = this.getMapY(lid);
       if (pit) {
-        // The original blends it with OVERLAY, which the port lacks (2C.6)
+        pit.setOverlayBlend(); // blendMode = BlendMode.OVERLAY
         pit._alpha = 75;
         pit._yscale = Math.min(100, 100 * (lid / 100));
       }

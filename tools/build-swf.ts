@@ -11,7 +11,7 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { parseSwf } from 'swf-parser';
-import { TagType } from 'swf-types';
+import { FilterType, TagType } from 'swf-types';
 import type {
   BitmapDef,
   CharacterDef,
@@ -21,6 +21,7 @@ import type {
   SpriteDef,
   SpriteFrame,
   SwfLibraryData,
+  TimelineFilter,
   TimelineCmd,
 } from '../src/engine/swf/types';
 import { encodePngRgba } from './lib/png';
@@ -181,6 +182,28 @@ function extractBitmap(tag: any, gid: number, jpegTables: Uint8Array | undefined
   return { kind: 'bitmap', file, w, h };
 }
 
+/** Timeline filters (`PlaceObject3`). Fails on kinds the game's SWFs do not use. */
+function convertFilters(filters: any[]): TimelineFilter[] {
+  return filters.map((f): TimelineFilter => {
+    if (f.filter === FilterType.Glow && !f.inner && !f.knockout) {
+      return {
+        t: 'glow',
+        color: (f.color.r << 16) | (f.color.g << 8) | f.color.b,
+        alpha: round4(f.color.a / 255),
+        blurX: round4(fpVal(f.blurX)),
+        blurY: round4(fpVal(f.blurY)),
+        strength: round4(fpVal(f.strength)),
+        passes: f.passes,
+      };
+    }
+    if (f.filter === FilterType.ColorMatrix) {
+      const m = (f.matrix as number[]).map((v, i) => round4(i % 5 === 4 ? v / 255 : v));
+      return { t: 'cm', m };
+    }
+    throw new Error(`timeline filter not handled: ${JSON.stringify(f)}`);
+  });
+}
+
 function convertCxform(cx: any): Cxform8 | undefined {
   if (!cx) return undefined;
   const rm = round4(fpVal(cx.redMult ?? 1));
@@ -236,7 +259,11 @@ function compileSprite(tag: any, idOffset: number): SpriteDef {
         else if (st.colorTransform && st.isUpdate) place.cx = [1, 1, 1, 1, 0, 0, 0, 0];
         if (st.name) place.n = st.name;
         if (st.clipDepth !== undefined && st.clipDepth > 0) place.clip = st.clipDepth;
-        if (st.blendMode !== undefined && st.blendMode > 1) place.blend = st.blendMode;
+        // Normal is the default; an update states it only to end another blend mode
+        if (st.blendMode !== undefined && (st.blendMode !== 0 || st.isUpdate)) {
+          place.blend = st.blendMode;
+        }
+        if (st.filters !== undefined) place.f = convertFilters(st.filters);
         if (st.visible === false) place.visible = false;
         cmds.push(place);
         break;

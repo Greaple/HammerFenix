@@ -1,4 +1,4 @@
-import type { BLEND_MODES, TextStyleOptions } from 'pixi.js';
+import type { BLEND_MODES, Filter, TextStyleOptions } from 'pixi.js';
 import {
   AlphaFilter,
   BlurFilter,
@@ -13,8 +13,16 @@ import {
 } from 'pixi.js';
 import { type Avm1Clip, runAvm1 } from './Avm1';
 import { GlowFilter } from './GlowFilter';
+import { OverlayFilter } from './OverlayFilter';
 import type { SwfLibrary } from './SwfLibrary';
-import type { Cxform8, DynamicTextDef, Matrix6, PlaceCmd, SpriteDef } from './types';
+import type {
+  Cxform8,
+  DynamicTextDef,
+  Matrix6,
+  PlaceCmd,
+  SpriteDef,
+  TimelineFilter,
+} from './types';
 
 const PROTECTED_PROPS = new Set<string>([
   'x',
@@ -297,7 +305,15 @@ interface DepthSlot {
   node: Container;
   name?: string;
   clipDepth?: number;
+  /** The last color transform placed, kept to rebuild the filters when the timeline's change. */
+  cx?: Cxform8;
   cxFilter?: ColorMatrixFilter;
+  /** The timeline's filters (`PlaceObject3`). */
+  tlFilters?: Filter[];
+  /** `BlendMode.OVERLAY`, drawn as a filter that reads the backdrop. */
+  blendFilter?: OverlayFilter;
+  /** `BlendMode.LAYER`: the children drawn together, then the alpha applied to the result. */
+  layerFilter?: AlphaFilter;
 }
 
 const TMP_MAT = new Matrix();
@@ -371,20 +387,49 @@ interface DepthRecord {
   n?: string;
   clip?: number;
   blend?: number;
+  f?: TimelineFilter[];
   visible?: boolean;
 }
 
+/** `swf-types`' `BlendMode` numbers (see `PlaceCmd.blend`). */
+const BLEND_LAYER = 1;
+const BLEND_OVERLAY = 12;
+
+/**
+ * Blend modes Pixi draws itself. Layer and Overlay are filters (`applyLook`); the others the
+ * game's SWFs never place (Lighten, Darken, Difference, Subtract, Invert, Alpha, Erase, Hardlight)
+ * draw as normal.
+ */
 function mapFlashBlendMode(mode?: number): BLEND_MODES {
   switch (mode) {
-    case 3:
+    case 2:
       return 'multiply';
-    case 4:
+    case 3:
       return 'screen';
-    case 8:
+    case 7:
       return 'add';
     default:
       return 'normal';
   }
+}
+
+/** Pixi filters for timeline filters, at the resolution of the surface they draw on. */
+function makeTimelineFilters(list: TimelineFilter[]): Filter[] {
+  return list.map((f) => {
+    if (f.t === 'glow') {
+      const g = new GlowFilter();
+      g.color = f.color;
+      g.alpha = f.alpha;
+      g.blurX = f.blurX;
+      g.blurY = f.blurY;
+      g.strength = f.strength;
+      g.quality = f.passes;
+      return g;
+    }
+    const cm = new ColorMatrixFilter({ resolution: 'inherit', antialias: 'inherit' });
+    cm.matrix = f.m as ColorMatrixFilter['matrix'];
+    return cm;
+  });
 }
 
 /**
@@ -437,6 +482,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   private namedChildren = new Map<string, Container>();
   private tintFilter: ColorMatrixFilter | null = null;
   private glowFilter: GlowFilter | null = null;
+  /** Set by `setOverlayBlend`. */
+  private overlayFilter: OverlayFilter | null = null;
   /** Set by `setLayerBlend`: carries `_alpha`, applied to the composited layer. */
   private layerFilter: AlphaFilter | null = null;
   mcDepth = 0;
@@ -780,6 +827,13 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     g.strength = strength;
   }
 
+  /** Flash `blendMode = BlendMode.OVERLAY`, kept with the glow and tint. Skipped when headless. */
+  setOverlayBlend(): void {
+    if (this.lib.headless || this.overlayFilter) return;
+    this.overlayFilter = new OverlayFilter();
+    this.applyEntityFilters();
+  }
+
   /** Flash `filters = null` for a glow set by `setGlow`. */
   clearGlow(): void {
     if (this.glowFilter) {
@@ -792,6 +846,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     const l = [];
     if (this.glowFilter) l.push(this.glowFilter);
     if (this.tintFilter) l.push(this.tintFilter);
+    if (this.overlayFilter) l.push(this.overlayFilter);
     this.filters = l;
   }
 
@@ -923,6 +978,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
           if (cmd.cx) prev.cx = cmd.cx;
           if (cmd.visible !== undefined) prev.visible = cmd.visible;
           if (cmd.blend !== undefined) prev.blend = cmd.blend;
+          if (cmd.f !== undefined) prev.f = cmd.f;
           if (cmd.n) prev.n = cmd.n;
         } else if (cmd.id !== undefined) {
           sim.set(cmd.d, {
@@ -932,6 +988,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
             n: cmd.n,
             clip: cmd.clip,
             blend: cmd.blend,
+            f: cmd.f,
             visible: cmd.visible,
           });
         } else if (!cmd.u) {
@@ -951,9 +1008,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         continue;
       }
       this.applyMatrix(slot.node, rec.m ?? IDENTITY_MATRIX);
-      this.applyCxform(slot, rec.cx ?? IDENTITY_CXFORM);
+      this.applyLook(slot, rec.cx ?? IDENTITY_CXFORM, rec.blend ?? 0, rec.f ?? []);
       if (rec.visible !== undefined) slot.node.visible = rec.visible;
-      slot.node.blendMode = mapFlashBlendMode(rec.blend);
       if (rec.n !== slot.name) {
         if (slot.name) this.unregisterName(slot.name, slot.node);
         slot.name = rec.n;
@@ -1187,9 +1243,10 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     // Update existing display object at depth
     if (cmd.u && existing && (cmd.id === undefined || cmd.id === existing.charId)) {
       if (cmd.m) this.applyMatrix(existing.node, cmd.m);
-      if (cmd.cx) this.applyCxform(existing, cmd.cx);
+      if (cmd.cx || cmd.blend !== undefined || cmd.f !== undefined) {
+        this.applyLook(existing, cmd.cx, cmd.blend, cmd.f);
+      }
       if (cmd.visible !== undefined) existing.node.visible = cmd.visible;
-      if (cmd.blend !== undefined) existing.node.blendMode = mapFlashBlendMode(cmd.blend);
       if (cmd.n && cmd.n !== existing.name) {
         if (existing.name) this.unregisterName(existing.name, existing.node);
         existing.name = cmd.n;
@@ -1222,7 +1279,6 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     }
 
     if (cmd.visible === false) node.visible = false;
-    if (cmd.blend !== undefined) node.blendMode = mapFlashBlendMode(cmd.blend);
 
     const slot: DepthSlot = {
       depth: cmd.d,
@@ -1231,7 +1287,9 @@ export class SwfMovieClip extends Container implements Avm1Clip {
       name: cmd.n,
       clipDepth: cmd.clip,
     };
-    if (cmd.cx) this.applyCxform(slot, cmd.cx);
+    if (cmd.cx || cmd.blend !== undefined || cmd.f !== undefined) {
+      this.applyLook(slot, cmd.cx, cmd.blend, cmd.f);
+    }
 
     this.depthSlots.set(cmd.d, slot);
     this.addChild(node);
@@ -1245,45 +1303,79 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     node.setFromMatrix(TMP_MAT);
   }
 
-  private applyCxform(slot: DepthSlot, [rm, gm, bm, am, ra, ga, ba, aa]: Cxform8): void {
+  /**
+   * A slot's color transform, blend mode and filters (each left as it is when undefined). Flash
+   * draws a clip with filters as a bitmap, then applies its color transform and blends the
+   * result: the Pixi filters follow that order. A pure alpha change is `alpha` (so it applies
+   * before the filters, unlike Flash; no timeline fades a clip that has some). Filters are
+   * skipped when headless.
+   */
+  private applyLook(
+    slot: DepthSlot,
+    cx: Cxform8 | undefined,
+    blend: number | undefined,
+    filters: TimelineFilter[] | undefined,
+  ): void {
+    const node = slot.node;
+    if (cx) slot.cx = cx;
+    if (blend !== undefined) node.blendMode = mapFlashBlendMode(blend);
+    const [rm, gm, bm, am, ra, ga, ba, aa] = slot.cx ?? IDENTITY_CXFORM;
     const pureAlpha =
       rm === 1 && gm === 1 && bm === 1 && ra === 0 && ga === 0 && ba === 0 && aa === 0;
+    node.alpha = pureAlpha ? Math.max(0, Math.min(1, am)) : 1;
+    if (this.lib.headless) return;
+    if (filters !== undefined) {
+      slot.tlFilters = filters.length > 0 ? makeTimelineFilters(filters) : undefined;
+    }
+    if (blend !== undefined) {
+      if (blend !== BLEND_OVERLAY) slot.blendFilter = undefined;
+      else slot.blendFilter ??= new OverlayFilter();
+      if (blend !== BLEND_LAYER) slot.layerFilter = undefined;
+      else
+        slot.layerFilter ??= new AlphaFilter({
+          alpha: 1,
+          resolution: 'inherit',
+          antialias: 'inherit',
+        });
+    }
+    if (slot.layerFilter) {
+      slot.layerFilter.alpha = node.alpha;
+      node.alpha = 1;
+    }
+
     if (pureAlpha) {
-      slot.node.alpha = Math.max(0, Math.min(1, am));
-      if (slot.cxFilter) {
-        slot.node.filters = [];
-        slot.cxFilter = undefined;
-      }
-      return;
+      slot.cxFilter = undefined;
+    } else {
+      slot.cxFilter ??= new ColorMatrixFilter({ resolution: 'inherit', antialias: 'inherit' });
+      slot.cxFilter.matrix = [
+        rm,
+        0,
+        0,
+        0,
+        ra / 255,
+        0,
+        gm,
+        0,
+        0,
+        ga / 255,
+        0,
+        0,
+        bm,
+        0,
+        ba / 255,
+        0,
+        0,
+        0,
+        am,
+        aa / 255,
+      ];
     }
-    slot.node.alpha = 1;
-    if (!slot.cxFilter) {
-      if (this.lib.headless) return;
-      slot.cxFilter = new ColorMatrixFilter();
-      slot.node.filters = [slot.cxFilter];
-    }
-    slot.cxFilter.matrix = [
-      rm,
-      0,
-      0,
-      0,
-      ra / 255,
-      0,
-      gm,
-      0,
-      0,
-      ga / 255,
-      0,
-      0,
-      bm,
-      0,
-      ba / 255,
-      0,
-      0,
-      0,
-      am,
-      aa / 255,
-    ];
+
+    const list: Filter[] = [...(slot.tlFilters ?? [])];
+    if (slot.cxFilter) list.push(slot.cxFilter);
+    if (slot.layerFilter) list.push(slot.layerFilter);
+    if (slot.blendFilter) list.push(slot.blendFilter);
+    node.filters = list.length > 0 ? list : null;
   }
 
   private refreshClipMasks(): void {

@@ -88,10 +88,32 @@ export interface PlaceCmd {
   n?: string;
   /** Clipping mask upper depth (inclusive). */
   clip?: number;
-  /** Blend mode id (Flash BlendMode enum). */
+  /**
+   * Blend mode, numbered as `swf-types`' `BlendMode` (Normal 0, Layer 1, Multiply 2, Screen 3,
+   * ... Add 7, ... Overlay 12): one less than the SWF's own byte.
+   */
   blend?: number;
+  /** Filters (`PlaceObject3`); on an update, an empty list removes them. */
+  f?: TimelineFilter[];
   visible?: boolean;
 }
+
+/**
+ * A filter placed by the timeline. The game's SWFs only use outer glows and color matrices.
+ * `cm` is Flash's 4 x 5 matrix, its offsets in 0..1 (Flash's divided by 255).
+ */
+export type TimelineFilter =
+  | {
+      t: 'glow';
+      color: number;
+      alpha: number;
+      blurX: number;
+      blurY: number;
+      strength: number;
+      /** Flash's quality: the number of box blur passes. */
+      passes: number;
+    }
+  | { t: 'cm'; m: number[] };
 
 export interface RemoveCmd {
   op: 'remove';
