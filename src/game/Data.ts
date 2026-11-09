@@ -29,6 +29,7 @@ export const Data = {
   SCROLL_SPEED: 0.04,
   FADE_SPEED: 8,
   MIN_DARKNESS_LEVEL: 16,
+  LEVEL_READ_LENGTH: 1,
 
   // RandomManager table ids (`auto_inc` values in the original)
   RAND_EXTENDS_ID: 23,
@@ -55,6 +56,7 @@ export const Data = {
   DP_SCROLLER: 15,
   DP_INTERF: 16,
   DP_TOP: 17,
+  DP_SOUNDS: 18,
 
   // Sound channels
   CHAN_MUSIC: 0,
@@ -64,6 +66,8 @@ export const Data = {
   CHAN_ITEM: 4,
   CHAN_FIELD: 5,
   CHAN_INTERF: 6,
+  /** Unused: the musics come from `GameManager.musics` (`MUSIC_TRACKS` in `GameSession.ts`). */
+  TRACKS: ['music_ingame', 'music_boss'] as readonly string[],
 
   // Entity type bitflags
   ENTITY: 1 << 0,
@@ -98,6 +102,12 @@ export const Data = {
   STAT_ICEHIT: 6,
   STAT_KNOCK: 7,
   STAT_DEATH: 8,
+
+  // Extends. Unused by the original: `StatsManager.spreadExtend` only reads STAT_MAX_COMBO.
+  EXT_MIN_COMBO: 3,
+  EXT_MAX_BOMBS: 3,
+  EXT_MAX_KICKS: 0,
+  EXT_MAX_JUMPS: 10,
 
   // Level cell types
   GROUND: 1,
@@ -161,11 +171,20 @@ export const Data = {
   BG_GUU: 12,
   BG_SOCCER: 13,
 
-  // Mover actions
-  ACTION_MOVE: 1,
-  ACTION_WALK: 2,
-  ACTION_SHOOT: 3,
-  ACTION_FALLBACK: 4,
+  // Mover actions (`auto_inc` values, after DP_SOUNDS)
+  ACTION_MOVE: 19,
+  ACTION_WALK: 20,
+  ACTION_SHOOT: 21,
+  ACTION_FALLBACK: 22,
+
+  // World map events (`GameMode.registerMapEvent`)
+  EVENT_EXIT_RIGHT: 1,
+  EVENT_BACK_RIGHT: 2,
+  EVENT_EXIT_LEFT: 3,
+  EVENT_BACK_LEFT: 4,
+  EVENT_DEATH: 5,
+  EVENT_EXTEND: 6,
+  EVENT_TIME: 7,
 
   // Player constants
   PLAYER_SPEED: 4.3,
@@ -174,9 +193,11 @@ export const Data = {
   PLAYER_HKICK_Y: 7.4,
   PLAYER_VKICK: 18,
   PLAYER_AIR_JUMP: 7,
+  WBOMB_SPEED: 4.3 * 1.5,
   KICK_DISTANCE: 20,
   AIR_KICK_DISTANCE: 30,
   SHIELD_DURATION: 32 * 5,
+  WEAPON_DURATION: 32 * 30,
   SUPA_DURATION: 32 * 30,
   PLAYER_KNOCK_DURATION: 32 * 2.5,
   TELEPORTER_DISTANCE: 80,
@@ -239,6 +260,7 @@ export const Data = {
   SCORE_ITEM_TIMER: 12 * 32,
   DIAMANT: 8,
   CONVERT_DIAMANT: 17,
+  MAX_ITEMS: 300,
   EXTENDS: ['C', 'R', 'Y', 'S', 'T', 'A', 'L'] as readonly string[],
 
   // Blinking
@@ -313,6 +335,8 @@ export const Data = {
   ANIM_BOMB_DROP: { id: 0, loop: false } as AnimDef,
   ANIM_BOMB_LOOP: { id: 1, loop: true } as AnimDef,
   ANIM_BOMB_EXPLODE: { id: 2, loop: false } as AnimDef,
+  ANIM_WBOMB_STOP: { id: 0, loop: true } as AnimDef,
+  ANIM_WBOMB_WALK: { id: 1, loop: true } as AnimDef,
 
   // IA grid flags
   MAX_ITERATION: 30,
@@ -397,6 +421,15 @@ export const Data = {
     'hammer_bad_framboise',
   ] as readonly string[],
 
+  // Item rarities (the item and quest browsers color by them)
+  __NA: 0,
+  COMM: 2000,
+  UNCO: 1000,
+  RARE: 300,
+  UNIQ: 100,
+  MYTH: 10,
+  CANE: 60,
+  LEGEND: 1,
   RARITY: [0, 2000, 1000, 300, 100, 10, 1, 60] as readonly number[],
 
   // Mode options
@@ -438,6 +471,32 @@ export const Data = {
   HEAD_SANDY: 10,
   HEAD_SANDY_LOSE: 11,
   HEAD_SANDY_CROWN: 12,
+
+  // Level editor (`mode.Editor`, not ported)
+  FIELDS: [
+    null,
+    'BASE ',
+    'noir ',
+    'bleu ',
+    'vert ',
+    'rouge ',
+    'warp ',
+    'portal ',
+    'goal 1',
+    'goal 2',
+    'bumper ',
+    'peace ',
+  ] as readonly (string | null)[],
+  MAX_TILES: 53,
+  MAX_BG: 30,
+  MAX_BADS: 20,
+  MAX_FIELDS: 11,
+  TOOL_TILE: 26,
+  TOOL_BAD: 27,
+  TOOL_FIELD: 28,
+  TOOL_START: 29,
+  TOOL_SPECIAL: 30,
+  TOOL_SCORE: 31,
 
   getCrystalValue(comboIndex: number): number {
     return Math.round(Math.min(50000, 500 * Math.round(Math.pow(comboIndex + 1, 2))));

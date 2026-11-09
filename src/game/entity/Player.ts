@@ -27,8 +27,6 @@ import {
 import { Log } from '../Log';
 import { ArrowSupa, BallSupa, BubbleSupa, IceMeteorSupa, SmokeSupa, TonsSupa } from './Supa';
 
-const WEAPON_DURATION = Data.SECOND * 30;
-
 /**
  * Port of `entity.Player` + `entity.PlayerController` + `SpecialManager`
  * (`class/hammer/entity/Player.mt`, `PlayerController.mt`, `SpecialManager.mt`).
@@ -1637,7 +1635,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 29. gold ring: fireball shots
       case 29:
         this.changeWeapon(Data.WEAPON_S_FIRE);
-        this.temporary(id, WEAPON_DURATION);
+        this.temporary(id, Data.WEAPON_DURATION);
         break;
 
       // *** 30. blue glasses: the screen is mirrored
@@ -1683,7 +1681,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 37. crystal necklace: pearl shots
       case 37:
         this.changeWeapon(Data.WEAPON_S_ICE);
-        this.temporary(id, WEAPON_DURATION);
+        this.temporary(id, Data.WEAPON_DURATION);
         break;
 
       // *** 38. totem
@@ -1762,7 +1760,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 67. emerald ring: arrow shots
       case 67:
         this.changeWeapon(Data.WEAPON_S_ARROW);
-        this.temporary(id, WEAPON_DURATION);
+        this.temporary(id, Data.WEAPON_DURATION);
         break;
 
       // *** 68. candle

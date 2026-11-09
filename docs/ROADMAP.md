@@ -10,7 +10,8 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
 3. 2B.4 to 2B.6 are done (the spot checks in [LEVELS.md](LEVELS.md); its "needs play" rows wait for the user). Phase 2B is done. Next: the rest of Phase 2C.
 4. G.1 is done (solo controller, prompts follow the device in use, tried with a real controller). Next: the rest of Phase 2C.
-5. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
+5. 2C.3 (disguises, key E and controller Y) and 2C.8 (`Data.mt` checked constant by constant) are done. Next: 2C.4 (world map; its `EVENT_*` constants are in), then 2C.5 to 2C.7.
+6. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
 Working notes:
 
@@ -96,7 +97,7 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
 
   Tested in `tests/controls.test.ts`.
 
-- [ ] 2C.3 Disguises: the D key cycles the player's head (`GameMode.main`, `fl_disguise`, true in Adventure only), skipping the heads whose family the profile lacks: 109 afro, 110 cerbère, 111 piou, 112 mario, 113 Tuberculoz cape. Add the `HEAD_*` constants from `Data.mt`. Name the key in the help and the pause screen if the original does.
+- [x] 2C.3 Disguises: a key cycles the player's head (`GameMode.getControls`, `fl_disguise`), skipping the heads whose family the profile lacks: 109 afro, 110 cerbère, 111 piou, 112 mario, 113 Tuberculoz cape. Works in pause, as in the original. The key is E (the original's D moves right with WASD and ZQSD here; the quest texts still say D) and the controller's Y; it is in the recorded action mask. Named in the help dialog; the original's pause screen does not name it. Tested in `tests/disguise.test.ts`.
 - [ ] 2C.4 World map: `GameMode.onMap` (key C when `fl_map`; find what sets it), the `hammer_map` clip ("Strates supérieures...", its text from `Lang`), `attachMapIcon`, `getMapY`, `registerMapEvent` and the map events (`EVENT_EXIT_*`, `EVENT_BACK_*`, `EVENT_DEATH`, `EVENT_EXTEND`, `EVENT_TIME`) sent by portals, deaths and extends.
 - [ ] 2C.5 Settings page, the site's "Paramètres": volume, sound, music, detail and shake, saved in `localStorage` and read through `GameParameters` (`$volume`, `$sound`, `$music`, `$detail`, `$shake`). Port what low detail turns off (`FxManager` lines 237 and 288, `GameInterface.lightMode`, `GameParameters` lines 70 to 85) and what `fl_shaky` turns off. Reached from the mode menu, as on the site.
 - [ ] 2C.6 Glows and SWF runtime leftovers:
@@ -111,7 +112,7 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
   - the shield shows frame 20 after its jump to frame 19, the original likely 19;
   - `Chrono.formatTime` hour fix-up (computed as in UTC+1);
   - the aqua screen wobble (`fl_aqua`, `GameMode.main` near line 2398) and the wind timer (`GameMode.wind`; the original never starts wind, so only its reset).
-- [ ] 2C.8 `Data.mt` leftovers: add `CURSE_*`, `STAT_*` and `EXT_*`, and replace the literal numbers the port uses for them, so every value is checked against the original.
+- [x] 2C.8 `Data.mt` leftovers: `CURSE_*`, `STAT_*` and `HEAD_*` were already in; added `EXT_*` (unused by the original) and the 35 other missing constants (`DP_SOUNDS`, `EVENT_*` for 2C.4, `WEAPON_DURATION`, rarities, walking bomb, editor). `tests/data-constants.test.ts` reads and evaluates `Data.mt` itself and checks all 370 constants against `Data.ts`. Fixed on the way: `ACTION_*` were 1 to 4, the original's are 19 to 22 (only compared to each other: no replay changed); `Player.ts`'s own `WEAPON_DURATION` is now `Data.WEAPON_DURATION`.
 
 Accepted deviations, not to port: the Loader's server parts (sending scores, retries, redirections), `View`'s bitmap cache and editor grid, `ViewLight`, `ScoreItem`'s 500 points for an unknown id (the original stops with a fatal error), `Adventure.saveScore`'s set checksum, the history's `F=` version and the `KEY` generator, Ruffle's double nested trigger on deepnight 184, `Jumper.checkClimb` with no climb height, `Kiwi.clearMines`, `fl_stickRot` and `fl_stickBound` (no caller), `MineFrozen` and `PoireBombFrozen`, `Coward` and `Hunter` (never created by the original).
 

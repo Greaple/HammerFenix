@@ -235,6 +235,11 @@ export class GameSession implements IGameContext {
 
   /** `GameMode.fl_bullet`: bullet time is allowed (always, in the original). */
   fl_bullet = true;
+  /**
+   * `GameMode.fl_disguise`: the disguise key works. True in `GameMode`; only the boss rush,
+   * soccer and co-op modes turn it off.
+   */
+  fl_disguise = true;
   /** Bullet time left, in frames of the original's real time. */
   private bulletTimer = 0;
 
@@ -2159,6 +2164,23 @@ export class GameSession implements IGameContext {
     }
   }
 
+  /** The body of `GameMode.getControls`' disguise key: the next head, skipping the locked ones. */
+  private nextDisguise(p: PlayerEntity): void {
+    const old = p.head;
+    p.head++;
+    if (p.head === Data.HEAD_AFRO && !this.hasFamily(109)) p.head++; // tuft
+    if (p.head === Data.HEAD_CERBERE && !this.hasFamily(110)) p.head++; // cerberus
+    if (p.head === Data.HEAD_PIOU && !this.hasFamily(111)) p.head++; // piou
+    if (p.head === Data.HEAD_MARIO && !this.hasFamily(112)) p.head++; // mario
+    if (p.head === Data.HEAD_TUB && !this.hasFamily(113)) p.head++; // cape
+    if (p.head > Data.HEAD_TUB) {
+      p.head = p.defaultHead;
+    }
+    if (old !== p.head) {
+      p.replayAnim();
+    }
+  }
+
   /** `GameMode.printDebugInfos`, on the pause screen in dev mode (what the port has of it). */
   private printDebugInfos(): void {
     Log.print(`build:${typeof __BUILD_TIME__ === 'undefined' ? '?' : __BUILD_TIME__}`);
@@ -2226,6 +2248,13 @@ export class GameSession implements IGameContext {
         this.destroyList(Data.PLAYER);
         this.onGameOver();
       }
+    }
+
+    // Disguises (`GameMode.getControls`, key D in the original, E here): the next head whose
+    // quest family the profile has. Read every tick, as the original does, even in pause.
+    if (this.fl_disguise && this.input.consumePress('disguise')) {
+      const p = (this.getList(Data.PLAYER) as PlayerEntity[])[0];
+      if (p) this.nextDisguise(p);
     }
 
     // Pause: the dev mode prints its infos

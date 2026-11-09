@@ -117,6 +117,7 @@ export class PadReader {
     if (btn(PAD.B) || btn(PAD.X) || btn(PAD.R2)) actions.add('attack');
     if (btn(PAD.START)) actions.add('pause');
     if (btn(PAD.BACK)) actions.add('music');
+    if (btn(PAD.Y)) actions.add('disguise');
 
     const menu = new Set<MenuAction>();
     if (left) menu.add('left');
