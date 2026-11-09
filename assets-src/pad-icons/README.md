@@ -24,11 +24,11 @@ Figma node of each icon:
 - Xbox: `a` 2:3, `b` 2:15, `x` 2:27, `y` 2:39, `r2` 2:174 (right-trigger), `start` 2:52 (menu),
   `back` 2:58 (view), `dpad` 2:183, `stick` 2:137 (left-joystick).
 - PlayStation: `a` 2:6 (plain-cross), `b` 2:5 (plain-circle), `x` 2:8 (plain-square), `y` 2:4
-  (plain-triangle), `r2` 101:1549 (plain-R2), `start` 1:285 (plain-big-option), `back` 1:288
-  (outline-share, the only share icon). No plain D-pad without an arrow: `dpad` falls back to
-  Xbox's. `stick` 1:175 (plain-L).
-- Switch (Mono, light): `a` 66:24299 (B), `b` 66:24298 (A), `x` 66:24301 (Y), `y` 66:24300 (X),
-  `r2` 66:24307 (ZR), `start` 66:24315 (+), `back` 66:24316 (−), `dpad` 72:37065 (+Control Pad),
-  `stick` 66:24371 (Left Stick).
+  (plain-triangle), `r2` 101:1549 (plain-R2), `dpad` 2:37 (plain-top), `stick` 1:175 (plain-L).
+  `start` (menu) and `back` (Share) are pills exported by the maintainer in the sheet's style,
+  cropped to the pill by the build.
+- Switch (Mono, light): `a` 66:24299 (B), `b` 66:24298 (A), `y` 66:24300 (X), `r2` 66:24307
+  (ZR), `start` 66:24315 (+), `back` 66:24316 (−), `dpad` 72:37065 (+Control Pad), `stick`
+  66:24371 (Left Stick). Missing: `x` (the Y button, 66:24301).
 
 Missing files: the screens draw that button themselves (`padGlyph` in `PadGlyphs.ts`).

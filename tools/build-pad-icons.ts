@@ -15,12 +15,24 @@ const SRC = join(ROOT, 'assets-src/pad-icons');
 const OUT = join(ROOT, 'src/game/gui/padIconData.ts');
 
 /** The icons' light color (the button), per sheet. */
-const BODY = ['#D6E1F6', '#AFC1D1'];
+const BODY = ['#D6E1F6', '#AFC1D1', '#D9D9D9', '#EBEBEB'];
 /** Their dark color (letters and cut-outs, the sheet's background). */
-const INK = ['#1C212A', '#1C1F2A'];
+const INK = ['#1C212A', '#1C1F2A', '#2D2D2D'];
 
-/** Icons in a 32 px frame with no margin: their button is the frame's height. */
-const NO_MARGIN = new Set(['playstation/r2']);
+/**
+ * Icons whose button is not the usual 24 px of a 32 px frame: the PlayStation R2 and stick fill
+ * their frame.
+ */
+const BOX: Record<string, number> = {
+  'playstation/r2': 32,
+  'playstation/stick': 32,
+};
+
+/** Frames cropped to their button (x, y, width, height): the small Options and Share pills. */
+const CROP: Record<string, [number, number, number, number]> = {
+  'playstation/start': [4, 3, 12, 18],
+  'playstation/back': [4, 3, 12, 18],
+};
 
 interface Icon {
   svg: string;
@@ -42,6 +54,13 @@ function clean(file: string, prefix: string, key: string): Icon {
     /<rect width="[\d.]+" height="[\d.]+" transform="translate\([^)]*\)" fill="#[0-9A-Fa-f]+"\/>\n?/,
     '',
   );
+  const crop = CROP[key];
+  if (crop) {
+    s = s.replace(
+      /<svg width="[\d.]+" height="[\d.]+" viewBox="[^"]*"/,
+      `<svg width="${crop[2]}" height="${crop[3]}" viewBox="${crop.join(' ')}"`,
+    );
+  }
   // Ids: the referenced ones made unique, the others (layer names) dropped
   const refs = new Set([...s.matchAll(/url\(#([^)]+)\)/g)].map((r) => r[1]));
   s = s.replace(/ id="([^"]*)"/g, (_, id: string) => (refs.has(id) ? ` id="${prefix}-${id}"` : ''));
@@ -54,7 +73,8 @@ function clean(file: string, prefix: string, key: string): Icon {
     throw new Error(`${file}: unknown color ${c} (add it to BODY or INK)`);
   });
   s = s.replace(/\n+/g, '').replace(/>\s+</g, '><');
-  return { svg: s, w, h, box: w === 32 && h === 32 && !NO_MARGIN.has(key) ? 24 : h };
+  const [cw, ch] = crop ? [crop[2], crop[3]] : [w, h];
+  return { svg: s, w: cw, h: ch, box: BOX[key] ?? (cw === 32 && ch === 32 ? 24 : ch) };
 }
 
 const data: Record<string, Record<string, Icon>> = {};
