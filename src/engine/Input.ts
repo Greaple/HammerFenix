@@ -10,12 +10,22 @@ export type { MenuAction } from './Gamepad';
 export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
 
 /**
- * `music` is M, `suicide` Ctrl+Shift+K and `disguise` E, the keys `GameMode.getControls` reads
- * besides the controls (the music switch, giving up the game, the next disguise). The original's
- * disguise key is D, which moves right here (WASD and ZQSD).
+ * `music` is M, `suicide` Ctrl+Shift+K, `disguise` E and `map` C, the keys
+ * `GameMode.getControls` reads besides the controls (the music switch, giving up the game, the
+ * next disguise, the world map). The original's disguise key is D, which moves right here (WASD
+ * and ZQSD).
  */
 export type ControlAction =
-  'left' | 'right' | 'jump' | 'down' | 'attack' | 'pause' | 'music' | 'suicide' | 'disguise';
+  | 'left'
+  | 'right'
+  | 'jump'
+  | 'down'
+  | 'attack'
+  | 'pause'
+  | 'music'
+  | 'suicide'
+  | 'disguise'
+  | 'map';
 
 const KEY_MAP: Record<string, ControlAction> = {
   ArrowLeft: 'left',
@@ -37,6 +47,7 @@ const KEY_MAP: Record<string, ControlAction> = {
   Escape: 'pause',
   KeyM: 'music',
   KeyE: 'disguise',
+  KeyC: 'map',
 };
 
 /** Flash key codes (`Key.*`) of the keys that are not a letter or a digit. */

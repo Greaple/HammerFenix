@@ -11,6 +11,7 @@ export const ACTION_BITS: Record<ControlAction, number> = {
   music: 1 << 6,
   suicide: 1 << 7,
   disguise: 1 << 8,
+  map: 1 << 9,
 };
 
 /**

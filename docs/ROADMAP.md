@@ -10,7 +10,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
 3. 2B.4 to 2B.6 are done (the spot checks in [LEVELS.md](LEVELS.md); its "needs play" rows wait for the user). Phase 2B is done. Next: the rest of Phase 2C.
 4. G.1 is done (solo controller, prompts follow the device in use, tried with a real controller). Next: the rest of Phase 2C.
-5. 2C.3 (disguises, key E and controller Y) and 2C.8 (`Data.mt` checked constant by constant) are done. Next: 2C.4 (world map; its `EVENT_*` constants are in), then 2C.5 to 2C.7.
+5. 2C.3 (disguises, key E and controller Y), 2C.4 (world map, key C) and 2C.8 (`Data.mt` checked constant by constant) are done. Next: 2C.5 to 2C.7.
 6. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
 Working notes:
@@ -98,7 +98,7 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
   Tested in `tests/controls.test.ts`.
 
 - [x] 2C.3 Disguises: a key cycles the player's head (`GameMode.getControls`, `fl_disguise`), skipping the heads whose family the profile lacks: 109 afro, 110 cerbère, 111 piou, 112 mario, 113 Tuberculoz cape. Works in pause, as in the original. The key is E (the original's D moves right with WASD and ZQSD here; the quest texts still say D) and the controller's Y; it is in the recorded action mask. Named in the help dialog; the original's pause screen does not name it. Tested in `tests/disguise.test.ts`.
-- [ ] 2C.4 World map: `GameMode.onMap` (key C when `fl_map`; find what sets it), the `hammer_map` clip ("Strates supérieures...", its text from `Lang`), `attachMapIcon`, `getMapY`, `registerMapEvent` and the map events (`EVENT_EXIT_*`, `EVENT_BACK_*`, `EVENT_DEATH`, `EVENT_EXTEND`, `EVENT_TIME`) sent by portals, deaths and extends.
+- [x] 2C.4 World map: `GameMode.onMap` on C (`fl_map`, set by `Adventure`, the boss rush and co-op), the `hammer_map` clip (sector name, pointer, pit), `attachMapIcon`, `getMapY` and `registerMapEvent`, sent by portal exits, returns to the main world, deaths and extends (`EVENT_TIME` is the boss rush's, Phase 4). The original's quirks are kept (a return-trip filter that never applies, icon rows repeated per event). The pit lacks its `OVERLAY` blend (2C.6). C is named in the help dialog; the original names it in pause tip 313. Keyboard only. Tested in `tests/map.test.ts`.
 - [ ] 2C.5 Settings page, the site's "Paramètres": volume, sound, music, detail and shake, saved in `localStorage` and read through `GameParameters` (`$volume`, `$sound`, `$music`, `$detail`, `$shake`). Port what low detail turns off (`FxManager` lines 237 and 288, `GameInterface.lightMode`, `GameParameters` lines 70 to 85) and what `fl_shaky` turns off. Reached from the mode menu, as on the site.
 - [ ] 2C.6 Glows and SWF runtime leftovers:
   - `FxManager.addGlow` (the soccer ball's glow, used again in 4.4) and item 86's ghost glow on the player and the enemies, with `SwfMovieClip.setGlow` from 2.8;

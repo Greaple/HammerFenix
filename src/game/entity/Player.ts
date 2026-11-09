@@ -373,6 +373,7 @@ export class PlayerEntity extends PhysicsEntity {
   }
 
   private executeExtend(flPerfect: boolean): void {
+    this.game.registerMapEvent(Data.EVENT_EXTEND, null);
     this.game.logAction('$ext');
     const a = this.game.fxMan.attachFx(
       Data.GAME_WIDTH * 0.5,

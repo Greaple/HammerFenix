@@ -65,6 +65,13 @@ const BULLET_TMOD = 0.3;
 /** `GameManager.musics`: the in-game, boss and hurry-up tracks. */
 export const MUSIC_TRACKS: readonly string[] = ['music_ingame', 'music_boss', 'music_hurry'];
 
+/** An event of the world map (`GameMode.mapEvents`): its main-world level, `Data.EVENT_*`, text. */
+export interface MapEvent {
+  lid: number;
+  eid: number;
+  misc: string | null;
+}
+
 export class GameSession implements IGameContext {
   readonly app: GameHost;
   readonly lib: SwfLibrary;
@@ -240,6 +247,17 @@ export class GameSession implements IGameContext {
    * soccer and co-op modes turn it off.
    */
   fl_disguise = true;
+  /** `GameMode.fl_map`: the C key shows the world map (`Adventure` turns it on). */
+  fl_map = true;
+  /** `GameMode.mapMC` and `mapIcons`: the world map on screen, and its icons. */
+  private mapMC: SwfMovieClip | null = null;
+  private mapIcons: SwfMovieClip[] = [];
+  /**
+   * `GameMode.mapTravels` (portal exits and returns) and `mapEvents` (deaths, extends): what the
+   * world map shows, by main-world level.
+   */
+  mapTravels: MapEvent[] = [];
+  mapEvents: MapEvent[] = [];
   /** Bullet time left, in frames of the original's real time. */
   private bulletTimer = 0;
 
@@ -459,6 +477,7 @@ export class GameSession implements IGameContext {
     // A new GameMode has no pause screen (a restart from the debug toolbar while paused)
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
+    this.removeMap();
     this.pauseAsked = false;
     this.fl_mute = false;
     this.tipId = 0;
@@ -520,6 +539,8 @@ export class GameSession implements IGameContext {
     this.killPortals();
     this.nextLink = null;
     this.keyLock = null;
+    this.mapTravels = [];
+    this.mapEvents = [];
     this.currentTrack = 0;
     this.perfectOrder = [];
     this.perfectCount = 0;
@@ -1389,6 +1410,7 @@ export class GameSession implements IGameContext {
   }
 
   onResurrect(): void {
+    this.registerMapEvent(Data.EVENT_DEATH, null);
     this.destroyList(Data.SUPA);
     this.resetHurry();
     this.updateDarkness();
@@ -1599,7 +1621,7 @@ export class GameSession implements IGameContext {
     this.scriptRunner?.onEnterCase(cx, cy);
   }
 
-  /** `GameMode.usePortal`: false when the portal leads nowhere. Map events are not ported. */
+  /** `GameMode.usePortal`: false when the portal leads nowhere. */
   usePortal(pid: number | null, e: BaseEntity | null): boolean {
     if (this.nextLink !== null) return false;
     const link = this.dataStore.portalLinks.links.find(
@@ -1608,9 +1630,15 @@ export class GameSession implements IGameContext {
     );
     if (!link) return false;
 
+    // `Lang.getLevelName` is undefined for a level with no name: AS2 writes "undefined"
+    const name = this.dataStore.getLevelName(link.to_did, link.to_lid) ?? 'undefined';
+
     // The original reads e.x even when e is null (a floating portal): NaN, so a left portal.
-    // Its map events (EVENT_EXIT_*) are not ported.
     this.fl_rightPortal = e !== null && this.flipCoordReal(e.x) >= Data.GAME_WIDTH * 0.5;
+    this.registerMapEvent(
+      this.fl_rightPortal ? Data.EVENT_EXIT_RIGHT : Data.EVENT_EXIT_LEFT,
+      `${this.world.currentId + 1}. ${name}`,
+    );
 
     if (e === null) {
       // Floating portal: players are pulled in, then shrink (see update)
@@ -1755,6 +1783,14 @@ export class GameSession implements IGameContext {
     for (const p of this.latePlayers) {
       p.knock(Data.SECOND * 1.3);
       p.dx = 0;
+    }
+
+    if (this.world.fl_mainWorld) {
+      if (pt.x >= Data.LEVEL_WIDTH * 0.5) {
+        this.registerMapEvent(Data.EVENT_BACK_RIGHT, null);
+      } else {
+        this.registerMapEvent(Data.EVENT_BACK_LEFT, null);
+      }
     }
   }
 
@@ -2066,6 +2102,141 @@ export class GameSession implements IGameContext {
     this.pausePadLayer = layer;
   }
 
+  // ------------------------------------------------------------- World map
+
+  /** `GameMode.registerMapEvent`: an event of the world map, at the main world's level. */
+  registerMapEvent(eid: number, misc: string | null): void {
+    const lid = this.dimensions[0].currentId;
+
+    if (!this.world.fl_mainWorld) {
+      return;
+    }
+
+    // Leaves out what says nothing new
+    for (const e of this.mapEvents) {
+      // a return trip to the same level
+      if (e.lid === lid && e.eid === Data.EVENT_EXIT_RIGHT && eid === Data.EVENT_BACK_RIGHT) {
+        return;
+      }
+      if (e.lid === lid && e.eid === Data.EVENT_EXIT_LEFT && eid === Data.EVENT_BACK_LEFT) {
+        return;
+      }
+      // left the same level more than once
+      if (e.lid === lid && e.eid === Data.EVENT_EXIT_RIGHT && eid === Data.EVENT_EXIT_RIGHT) {
+        return;
+      }
+      if (e.lid === lid && e.eid === Data.EVENT_EXIT_LEFT && eid === Data.EVENT_EXIT_LEFT) {
+        return;
+      }
+    }
+
+    const e: MapEvent = { lid, eid, misc };
+    if (
+      eid === Data.EVENT_EXIT_LEFT ||
+      eid === Data.EVENT_EXIT_RIGHT ||
+      eid === Data.EVENT_BACK_LEFT ||
+      eid === Data.EVENT_BACK_RIGHT ||
+      eid === Data.EVENT_TIME
+    ) {
+      this.mapTravels.push(e);
+    } else {
+      this.mapEvents.push(e);
+    }
+  }
+
+  /** `GameMode.getMapY`: the map's height for a main-world level. */
+  getMapY(lid: number): number {
+    return 84 + Math.min(350, lid * 3.5);
+  }
+
+  /** `GameMode.attachMapIcon`: an event's icon on the map, `offset` of `offsetTotal` on its level. */
+  private attachMapIcon(
+    eid: number,
+    lid: number,
+    txt: string | null,
+    offset: number | null,
+    offsetTotal: number | null,
+  ): void {
+    let x = Data.GAME_WIDTH * 0.5;
+    const y = this.getMapY(lid);
+    if (offset !== null && offsetTotal !== null) {
+      const wid = 8;
+      x += offset * wid - 0.5 * (offsetTotal - 1) * wid;
+    }
+
+    if (eid === Data.EVENT_EXIT_LEFT || eid === Data.EVENT_BACK_LEFT) {
+      x = Data.GAME_WIDTH * 0.5 - 5;
+    }
+    if (eid === Data.EVENT_EXIT_RIGHT || eid === Data.EVENT_BACK_RIGHT) {
+      x = Data.GAME_WIDTH * 0.5 + 5;
+    }
+
+    const mc = this.depthMan.attach('hammer_interf_mapIcon', Data.DP_INTERF);
+    mc.gotoAndStop(String(eid));
+    mc._x = Math.floor(x);
+    mc._y = Math.floor(y);
+
+    const field = mc.getText('field');
+    if (field) field.text = txt ?? '?';
+    this.mapIcons.push(mc);
+  }
+
+  /** `GameMode.onMap`: pauses the game under the world map. */
+  onMap(): void {
+    this.fl_pause = true;
+    this.lock();
+    this.world.lock();
+    if (!this.fl_mute) {
+      this.setMusicVolume(0.5);
+    }
+
+    this.mapMC?.removeMovieClip();
+    const map = this.depthMan.attach('hammer_map', Data.DP_INTERF);
+    this.mapMC = map;
+    const field = map.getText('field');
+    if (field) field.text = this.dataStore.getSectorName(this.currentDim, this.world.currentId);
+    map._x = -this.xOffset;
+
+    const lid = this.dimensions[0].currentId;
+    const ptr = map.getClip('ptr');
+    const pit = map.getClip('pit');
+    if (lid === 0) {
+      if (ptr) ptr._y = 70;
+      if (pit) pit._visible = false;
+    } else {
+      if (ptr) ptr._y = this.getMapY(lid);
+      if (pit) {
+        // The original blends it with OVERLAY, which the port lacks (2C.6)
+        pit._alpha = 75;
+        pit._yscale = Math.min(100, 100 * (lid / 100));
+      }
+    }
+
+    // Portal crossings
+    for (const e of this.mapTravels) {
+      this.attachMapIcon(e.eid, e.lid, e.misc, null, null);
+    }
+
+    // Icons. The original attaches every event of a level once per event of that level, so a
+    // level with n events gets n copies of its row, stacked at the same place.
+    for (const e of this.mapEvents) {
+      const list = this.mapEvents.filter((m) => m.lid === e.lid);
+      for (let j = 0; j < list.length; j++) {
+        this.attachMapIcon(list[j].eid, list[j].lid, list[j].misc, j, list.length);
+      }
+    }
+
+    this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: true });
+  }
+
+  /** The map part of `GameMode.onUnpause`: the map and its icons go. */
+  private removeMap(): void {
+    this.mapMC?.removeMovieClip();
+    this.mapMC = null;
+    for (const mc of this.mapIcons) mc.removeMovieClip();
+    this.mapIcons = [];
+  }
+
   togglePause(): void {
     if (this.fl_pause) this.onUnpause();
     else this.onPause();
@@ -2124,6 +2295,7 @@ export class GameSession implements IGameContext {
     this.world.unlock();
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
+    this.removeMap();
     if (!this.fl_mute) this.setMusicVolume(1);
     this.onStateChange?.({ isOver: this.fl_gameOver, isPaused: false });
   }
@@ -2234,6 +2406,15 @@ export class GameSession implements IGameContext {
       if (!this.fl_pause) this.onPause();
     }
     if (this.fl_pause) this.showPausePrompts();
+
+    // World map (C): closes the pause or the map when locked, as P does
+    if (this.fl_map && this.input.consumePress('map')) {
+      if (this.fl_lock) {
+        this.onUnpause();
+      } else {
+        this.onMap();
+      }
+    }
 
     // Music (M)
     if (!this.fl_lock && this.fl_music && this.input.consumePress('music')) {

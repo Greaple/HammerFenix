@@ -109,6 +109,8 @@ export interface IGameContext {
   onHurryUp(): SwfMovieClip | null;
   resetHurry(): void;
   onResurrect(): void;
+  /** `GameMode.registerMapEvent`: an event of the world map (`Data.EVENT_*`) at this level. */
+  registerMapEvent(eid: number, misc: string | null): void;
   onGameOver(): void;
   registerScore(pid: number, score: number): void;
   /** `GameManager.logAction` */
