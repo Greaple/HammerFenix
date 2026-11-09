@@ -12,7 +12,18 @@ import { PAD_ICON_DATA, type PadIconData } from './padIconData';
  * They are the icons of three Figma Community sheets (`assets-src/pad-icons/`), drawn in the
  * colors of the screen under them (`PadTheme`). A button with no icon is drawn here instead.
  */
-export type PadButton = 'a' | 'b' | 'x' | 'y' | 'r2' | 'start' | 'back' | 'dpad' | 'stick';
+export type PadButton =
+  | 'a'
+  | 'b'
+  | 'x'
+  | 'y'
+  | 'r2'
+  | 'start'
+  | 'back'
+  | 'dpad'
+  /** The D-pad's up arm, made from the D-pad's icon (no sheet has it in every style). */
+  | 'dpadUp'
+  | 'stick';
 
 type Face = 'a' | 'b' | 'x' | 'y';
 
@@ -37,6 +48,7 @@ const OTHER: Record<PadLayout, Record<'r2' | 'start' | 'back' | 'stick', string>
 /** The text label of a button (texts, and buttons with no icon). The D-pad has none. */
 export function padLabel(button: PadButton, layout: PadLayout): string {
   if (button === 'dpad') return '';
+  if (button === 'dpadUp') return '↑';
   if (button in FACE[layout]) return FACE[layout][button as Face];
   return OTHER[layout][button as keyof (typeof OTHER)['xbox']];
 }
@@ -57,6 +69,10 @@ export const PAD_THEMES: Record<PadTheme, { body: string; ink: string }> = {
  * D-pad and the stick fall back to Xbox's, as all makers draw them alike.
  */
 function iconOf(button: PadButton, layout: PadLayout): PadIconData | undefined {
+  if (button === 'dpadUp') {
+    const dpad = iconOf('dpad', layout);
+    return dpad && { ...dpad, svg: upArm(dpad.svg) };
+  }
   if (layout === 'generic') {
     return button === 'start' || button === 'back' ? undefined : PAD_ICON_DATA.xbox?.[button];
   }
@@ -65,16 +81,49 @@ function iconOf(button: PadButton, layout: PadLayout): PadIconData | undefined {
   return PAD_ICON_DATA.xbox?.[button];
 }
 
+/**
+ * A D-pad icon with its up arm standing out: the arms are faded, then the top of the frame
+ * (above its 3/8, where every sheet's up arm ends) is drawn again in full.
+ */
+function upArm(svg: string): string {
+  const open = svg.indexOf('>') + 1;
+  const end = svg.lastIndexOf('</svg>');
+  const inner = svg.slice(open, end);
+  const vb = /viewBox="([\d.\s-]+)"/.exec(svg)?.[1].split(/\s+/).map(Number) ?? [0, 0, 32, 32];
+  const clip = `<clipPath id="pad-dpad-up"><rect x="${vb[0]}" y="${vb[1]}" width="${vb[2]}" height="${vb[3] * 0.375}"/></clipPath>`;
+  return (
+    `${svg.slice(0, open)}<defs>${clip}</defs><g opacity="0.2">${inner}</g>` +
+    `<g clip-path="url(#pad-dpad-up)">${inner}</g></svg>`
+  );
+}
+
+/**
+ * The margin (in the icon's units) that gives every icon the same room around its button as
+ * the sheets' 32 px frames (a 24 px button): icons cropped to their button get one.
+ */
+function margin(icon: PadIconData): number {
+  return Math.max(0, (icon.box * (32 / 24) - icon.h) / 2);
+}
+
+/** The icon's size on screen for a button `height` px tall, its margin included. */
+function iconSize(icon: PadIconData, height: number): { w: number; h: number } {
+  const s = height / icon.box;
+  const m = margin(icon);
+  return { w: (icon.w + 2 * m) * s, h: (icon.h + 2 * m) * s };
+}
+
 /** The icon's SVG in `body` and `ink` colors, `height` px tall for its button. */
 function iconSvg(icon: PadIconData, body: string, ink: string, height: number): string {
-  const s = height / icon.box;
+  const { w, h } = iconSize(icon, height);
+  const m = margin(icon);
   return icon.svg
     .replace(/__BODY__/g, body)
     .replace(/__INK__/g, ink)
-    .replace(
-      /^<svg width="[\d.]+" height="[\d.]+"/,
-      `<svg width="${icon.w * s}" height="${icon.h * s}"`,
-    );
+    .replace(/^<svg width="[\d.]+" height="[\d.]+" viewBox="([\d.\s-]+)"/, (_, vb: string) => {
+      const [x, y, vw, vh] = vb.split(/\s+/).map(Number);
+      const box = [x - m, y - m, vw + 2 * m, vh + 2 * m].join(' ');
+      return `<svg width="${w}" height="${h}" viewBox="${box}"`;
+    });
 }
 
 /**
@@ -141,9 +190,9 @@ export function padGlyph(
     if (tex) {
       const sp = new Sprite(tex);
       sp.anchor.set(0.5);
-      const s = size / icon.box;
-      sp.width = icon.w * s;
-      sp.height = icon.h * s;
+      const { w, h } = iconSize(icon, size);
+      sp.width = w;
+      sp.height = h;
       const c = new Container();
       c.addChild(sp);
       return c;

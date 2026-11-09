@@ -1322,6 +1322,13 @@ html[data-input='gamepad'] .controls-pad {
   border: none;
 }
 
+/* A row of controller buttons: centered on one line, a little apart */
+.parchment-dialog .controls-pad dt {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .parchment-dialog .alt {
   margin-left: 4px;
   font-size: 0.78rem;

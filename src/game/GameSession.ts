@@ -2042,7 +2042,7 @@ export class GameSession implements IGameContext {
       const buttons: PadButton[] =
         row === 'move' ? ['dpad', 'a'] : row === 'attack' ? ['b', 'x', 'r2'] : ['start'];
       const size = row === 'move' ? 30 : 24;
-      const gap = row === 'attack' ? 6 : 10;
+      const gap = 2; // the icons have their own margin
       const glyphs = buttons.map((b) => padGlyph(b, this.input.padLayout, size));
       const total = glyphs.reduce((w, g) => w + g.width, 0) + gap * (glyphs.length - 1);
       let x = (x0 + x1) / 2 - total / 2;

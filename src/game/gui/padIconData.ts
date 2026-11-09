@@ -92,7 +92,7 @@ export const PAD_ICON_DATA: Record<string, Record<string, PadIconData>> = {
       "box": 32
     },
     "start": {
-      "svg": "<svg width=\"12\" height=\"18\" viewBox=\"4 3 12 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"5\" y=\"4\" width=\"10\" height=\"16\" rx=\"5\" fill=\"__BODY__\"/><rect x=\"6\" y=\"8\" width=\"8\" height=\"2\" rx=\"1\" fill=\"__INK__\"/><rect x=\"6\" y=\"11\" width=\"8\" height=\"2\" rx=\"1\" fill=\"__INK__\"/><rect x=\"6\" y=\"14\" width=\"8\" height=\"2\" rx=\"1\" fill=\"__INK__\"/></svg>",
+      "svg": "<svg width=\"12\" height=\"18\" viewBox=\"4 3 12 18\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><rect x=\"5\" y=\"4\" width=\"10\" height=\"16\" rx=\"5\" fill=\"__BODY__\"/><rect x=\"7\" y=\"8\" width=\"6\" height=\"2\" rx=\"1\" fill=\"__INK__\"/><rect x=\"7\" y=\"11\" width=\"6\" height=\"2\" rx=\"1\" fill=\"__INK__\"/><rect x=\"7\" y=\"14\" width=\"6\" height=\"2\" rx=\"1\" fill=\"__INK__\"/></svg>",
       "w": 12,
       "h": 18,
       "box": 18

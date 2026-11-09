@@ -25,7 +25,8 @@ Figma node of each icon:
   `back` 2:58 (view), `dpad` 2:183, `stick` 2:137 (left-joystick).
 - PlayStation: `a` 2:6 (plain-cross), `b` 2:5 (plain-circle), `x` 2:8 (plain-square), `y` 2:4
   (plain-triangle), `r2` 101:1549 (plain-R2), `dpad` 2:37 (plain-top), `stick` 1:175 (plain-L).
-  `start` (menu) and `back` (Share) are pills exported by the maintainer in the sheet's style,
+  `start` (plain-small-option, the PS5 Options button) and `back` (Share) are pills exported by
+  the maintainer in the sheet's style,
   cropped to the pill by the build.
 - Switch (Mono, light): `a` 66:24299 (B), `b` 66:24298 (A), `y` 66:24300 (X), `r2` 66:24307
   (ZR), `start` 66:24315 (+), `back` 66:24316 (−), `dpad` 72:37065 (+Control Pad), `stick`

@@ -373,7 +373,7 @@ async function main(): Promise<void> {
     const layout = input.padLayout;
     document.querySelectorAll<HTMLElement>('kbd[data-pad]').forEach((el) => {
       const b = el.dataset.pad as PadButton;
-      const icon = padIconHtml(b, layout, 22);
+      const icon = padIconHtml(b, layout, 20);
       el.classList.toggle('icon', icon !== null);
       if (icon) el.innerHTML = icon;
       else el.textContent = padLabel(b, layout);
