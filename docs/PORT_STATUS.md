@@ -68,6 +68,7 @@ All 21 species are registered in the factory at the end of `Bad.ts`.
 - done (2.12): Baleine (a plain `Flyer` in the original too, now its own `BaleineBad` class), Framboise (bursts into `FramBall` fragments and rebuilds at the target; not audited in 1.5, ported line by line in 2.12)
 - unused: `walker/Coward.mt`, `walker/Hunter.mt` (the original's `attachBad` never creates them)
 - All classes above audited line by line in 1.5, see "Audit 1.5" below.
+- Spot checks (2B.5): every species compared with the original in Ruffle at its first level, all match. See [LEVELS.md](LEVELS.md).
 - done (2.8, 2.9): `boss/Bat.mt` (level 100), `boss/Tuberculoz.mt` (level 101), in `entity/Boss.ts`. See "Bosses" below.
 
 ## Bombs and projectiles

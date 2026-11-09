@@ -33,28 +33,32 @@ Result: **ok** = matches the original · **fixed** = was different, fixed · **o
 
 Each type at the first level that has it, in a set players can reach (Saw and Crawler come first in hiko, which no portal leads to). Tzongre is in no level: it comes from item 89 (mutant egg), so spawn the item from the debug toolkit.
 
-| Enemy                            | Level              | Result | Notes |
-| -------------------------------- | ------------------ | ------ | ----- |
-| Cerise                           | adventure 2        |        |       |
-| Orange                           | adventure 4        |        |       |
-| Pomme                            | adventure 7        |        |       |
-| Banane                           | adventure 15       |        |       |
-| Citron                           | adventure 30       |        |       |
-| Spear                            | adventure 33       |        |       |
-| Bombe                            | adventure 40       |        |       |
-| Poire                            | adventure 50       |        |       |
-| Abricot                          | adventure 56       |        |       |
-| Litchi (and LitchiWeak when hit) | adventure 58       |        |       |
-| Fraise                           | adventure 60       |        |       |
-| Abricot2                         | adventure 66       |        |       |
-| Kiwi                             | adventure 70       |        |       |
-| Baleine                          | adventure 80       |        |       |
-| Ananas                           | adventure 90       |        |       |
-| Saw                              | deepnight 55       |        |       |
-| Crawler                          | deepnight 80       |        |       |
-| LitchiWeak (placed directly)     | ayame 51           |        |       |
-| Framboise                        | deepnight 154      |        |       |
-| Tzongre                          | item 89, any level |        |       |
+| Enemy                            | Level              | Result | Notes                                                                                                                                                                                                                                                  |
+| -------------------------------- | ------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cerise                           | adventure 2        | ok     | Look and walk match. A fresh jump from the village shows it in both. With no Cerise, the level was already visited: level 1 is a shaft, so a player who falls into it lands on 2 alone, and a jump back to 2 meets `e_bad`'s visited rule (both games) |
+| Orange                           | adventure 4        | ok     | Same hops, same path; the Cerise beside it walks the same way                                                                                                                                                                                          |
+| Pomme                            | adventure 7        | ok     | Look and walk match; both throw pips (19 in 30 s in the port)                                                                                                                                                                                          |
+| Banane                           | adventure 15       | ok     | Positions, look and walk match                                                                                                                                                                                                                         |
+| Citron                           | adventure 30       | ok     | Wake-up and zests upward at about the same time; sprite matches up close                                                                                                                                                                               |
+| Spear                            | adventure 33       | ok     | Sprite and place match                                                                                                                                                                                                                                 |
+| Bombe                            | adventure 40       | ok     | Hops and walks alike. The darkness (40% from level 16) shows the light hole around the player lighter in the port than in Ruffle: open, see Notes below the table                                                                                      |
+| Poire                            | adventure 50       | ok     | Walk and bomb throws match. Explosions: `OVERLAY` open (2C.6)                                                                                                                                                                                          |
+| Abricot                          | adventure 56       | ok     | Sprite and walk match                                                                                                                                                                                                                                  |
+| Litchi (and LitchiWeak when hit) | adventure 58       | ok     | Item 6 (yin yang, numpad `006` in the original) freezes them: both shed the shell into a LitchiWeak that walks off once thawed; LitchiWeak's sprite matches. A frozen enemy over a gap falls off the level and dies in both (`Bad.onDeathLine`)        |
+| Fraise                           | adventure 60       | ok     | The ball is passed around the same; sprite and ball match up close                                                                                                                                                                                     |
+| Abricot2                         | adventure 66       | ok     | Sprite matches                                                                                                                                                                                                                                         |
+| Kiwi                             | adventure 70       | ok     | Look and movement match                                                                                                                                                                                                                                |
+| Baleine                          | adventure 80       | ok     | Swim and stripes match (same 12-frame clip)                                                                                                                                                                                                            |
+| Ananas                           | adventure 90       | ok     | Climbs to the player, its landing quake knocks the player down in both                                                                                                                                                                                 |
+| Saw                              | deepnight 55       | ok     | Reached in Ruffle through the village door (deepnight 78), then the level jump. Saw on its rail, sprite match                                                                                                                                          |
+| Crawler                          | deepnight 80       | ok     | Wall crawl and fireballs match; sprite matches up close                                                                                                                                                                                                |
+| LitchiWeak (placed directly)     | ayame 51           | ok     | Not opened in Ruffle (no ayame route). Same code path in both (`attachBad` case 19, plain `LitchiWeak.attach`); class and sprite checked at adventure 58                                                                                               |
+| Framboise                        | deepnight 154      | ok     | Walks the maze, bursts into fragments and rebuilds elsewhere in both (42 fragments in 30 s in the port); sprite matches                                                                                                                                |
+| Tzongre                          | item 89, any level | ok     | Checked at adventure 5 (item `089` in the original): an Orange turns into a Tzongre, which flies around and gives 50,000 points on touching the player, in both                                                                                        |
+
+How (2B.5): both games jumped to the level with their dev keys and filmed side by side, one frame a second, plus close-ups of each enemy. The original runs the dev item keys too (three numpad digits: `006` yin yang, `036` extra life, `089` mutant egg). Deepnight is reached in Ruffle by the village door (key K, then the route over the well).
+
+Open from 2B.5: on dark levels the light hole around the player is fully clear in the port out to two thirds of its radius, as the hole's gradient says (`hammer_fx_darknessHole`: solid to 0.67, then fading), while Ruffle leaves it about 70% veiled (level 40: port 83, Ruffle 63, full veil 46 to 51 in brightness, at 20 to 60 px from the player). The port follows the SWF data and the original code (`holeUpdate` is the same), so this may be Ruffle's `ERASE` inside a `LAYER` with `_alpha`; at level 86 (2B.4) the lights matched. To settle with a real Flash Player or a video of the original (2C.6).
 
 ## Dimensions (2B.6)
 

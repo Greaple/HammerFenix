@@ -451,6 +451,10 @@ export class GameSession implements IGameContext {
     this.fl_clear = false;
     this.fl_lock = true; // Mode constructor (its lock() runs before gameChrono exists)
     this.fl_pause = false;
+    // A new GameMode has no pause screen (a restart from the debug toolbar while paused)
+    this.pauseMC?.removeMovieClip();
+    this.pauseMC = null;
+    this.pauseAsked = false;
     this.fl_mute = false;
     this.tipId = 0;
     this.cycle = 0;
