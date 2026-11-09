@@ -494,6 +494,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   private layerFilter: AlphaFilter | null = null;
   mcDepth = 0;
   mcName = '';
+  /** Placed by a script (`duplicateMovieClip`), not by the timeline. */
+  private dynamicDepth = false;
 
   /** Allow dynamic child references (`(mc as any).sub`) matching AS2 semantics. */
   [key: string]: any;
@@ -727,6 +729,36 @@ export class SwfMovieClip extends Container implements Avm1Clip {
       this.parent.removeChild(this);
     }
     this.mcName = '';
+  }
+
+  /**
+   * Flash `duplicateMovieClip`: a new instance of this clip's symbol in the same parent, with its
+   * matrix, alpha and blend mode, from frame 1. It replaces the clip a script put at that depth.
+   * `depth` is the SWF's own numbering (AS2's plus 16384, as the bytecode passes it), so the copy
+   * is above the timeline's children.
+   */
+  duplicateMovieClip(name: string, depth: number): SwfMovieClip | null {
+    const parent = this.parent;
+    if (!(parent instanceof SwfMovieClip) || !Number.isFinite(depth)) return null;
+    for (const c of parent.children) {
+      if (c instanceof SwfMovieClip && c.dynamicDepth && c.mcDepth === depth) {
+        c.removeMovieClip();
+        break;
+      }
+    }
+    const copy = new SwfMovieClip(this.lib, this.def);
+    this.updateLocalTransform();
+    copy.setFromMatrix(this.localTransform);
+    copy.alpha = this.alpha;
+    copy.blendMode = this.blendMode;
+    copy.zIndex = depth;
+    copy.mcDepth = depth;
+    copy.mcName = name;
+    copy.dynamicDepth = true;
+    parent.addChild(copy);
+    parent.registerName(name, copy);
+    if (parent.live) copy.goLive();
+    return copy;
   }
 
   /** Typed lookup for a named child MovieClip (`sub`, `skin`, `maskTile`, etc.). */
@@ -1197,7 +1229,7 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     const host = this.scriptHost;
     if (host && typeof host[name] === 'function') return host[name](...args);
     const fn = this.avmVars.get(name);
-    return typeof fn === 'function' ? fn(...args) : undefined;
+    return typeof fn === 'function' ? fn.apply(this, args) : undefined;
   }
 
   avmRandom(): number {

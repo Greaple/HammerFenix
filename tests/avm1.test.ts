@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { type Avm1Clip, runAvm1 } from '../src/engine/swf/Avm1';
+import { SwfLibrary } from '../src/engine/swf/SwfLibrary';
+import { SwfMovieClip } from '../src/engine/swf/SwfMovieClip';
 import type { SpriteDef, SwfLibraryData } from '../src/engine/swf/types';
 
 const lib = JSON.parse(
@@ -34,6 +36,7 @@ function makePart(host: Record<string, unknown>) {
       play: () => {},
       stop: () => {},
       removeMovieClip: () => {},
+      duplicateMovieClip: () => undefined,
     };
   };
   const player = fake((n) => host[n]);
@@ -73,5 +76,60 @@ describe('AVM1 frame scripts of the player body', () => {
     const b = makePart({ fl_chourou: true });
     runAvm1(frameScript(483), b.part);
     expect(b.calls.visible).toEqual([true]);
+  });
+});
+
+describe('script functions (2C.6)', () => {
+  const swf = SwfLibrary.headless(lib);
+  const clip = (charId: number) => {
+    const mc = swf.instantiateCharacter(20000 + charId) as SwfMovieClip;
+    mc.goLive();
+    return mc;
+  };
+  const num = (mc: SwfMovieClip, name: string) => Number(mc.avmGet(name));
+
+  it("runs the sphinx's particle emitter: init() duplicates 16 particles, main() moves them", () => {
+    const mc = clip(150);
+    mc.stepAnimation(); // frame 2: init()
+    // `for (i = 0; i <= max; i++)` with max = 15
+    const parts = Array.from({ length: 16 }, (_, i) => mc.getClip(`l${i}`)!);
+    expect(parts.every((p) => p !== null)).toBe(true);
+    expect(num(mc, 'max')).toBe(15);
+    const x0 = parts.map((p) => p._x);
+    for (const p of parts) {
+      expect(num(p, 'taille')).toBeGreaterThanOrEqual(50);
+      expect(num(p, 'taille')).toBeLessThan(100);
+      expect(p._xscale).toBeCloseTo(num(p, 'taille'));
+      expect(p._yscale).toBeCloseTo(p._xscale);
+      expect(p._x).toBeGreaterThanOrEqual(0);
+      expect(p._x).toBeLessThan(80);
+      expect(p.zIndex).toBeGreaterThanOrEqual(16384);
+    }
+    mc.stepAnimation(); // frame 3: main()
+    parts.forEach((p, i) => expect(p._x).toBeCloseTo(x0[i] + num(p, 'vit')));
+    // Frame 4 goes back to 3: main() runs every frame, and init() never again
+    for (let i = 0; i < 40; i++) mc.stepAnimation();
+    expect(mc.children.filter((c) => c instanceof SwfMovieClip && c.zIndex >= 16384)).toHaveLength(
+      16,
+    );
+    for (const p of parts) expect(Math.abs(p._x - 40)).toBeLessThan(45);
+  });
+
+  it("places item 86's ghosts with newGhost() and moves them", () => {
+    const mc = clip(3200); // frame 1: newGhost($ghost1, null), newGhost($ghost2, $ghost1)
+    const g1 = mc.getClip('$ghost1')!;
+    const g2 = mc.getClip('$ghost2')!;
+    expect(num(g1, 'sens')).toBe(-1);
+    expect(num(g2, 'sens')).toBe(1);
+    for (const g of [g1, g2]) {
+      expect(num(g, 'speed')).toBeGreaterThanOrEqual(10);
+      expect(num(g, 'speed')).toBeLessThan(20);
+      expect(g._y).toBeGreaterThanOrEqual(50);
+      expect(g._y).toBeLessThan(450);
+    }
+    expect(Math.abs(g2._y - g1._y)).toBeGreaterThanOrEqual(50);
+    const x1 = g1._x;
+    mc.stepAnimation(); // frame 2: each ghost moves by speed * sens
+    expect(g1._x).toBeCloseTo(x1 - num(g1, 'speed'));
   });
 });

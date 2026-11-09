@@ -4,8 +4,10 @@
  *
  * These scripts are short: a body part picks its frame from its owner's fields
  * (`gotoAndStop(_parent._parent.head)`), a pop-up holds a frame until a timer runs out, a clip
- * hides itself (`_visible = _parent._parent.fl_carot`). Function definitions are not supported;
- * `tools/lib/swfShapes.ts` only ships scripts whose opcodes are all handled here.
+ * hides itself (`_visible = _parent._parent.fl_carot`). Three define functions on their clip and
+ * call them from later frames: the particle emitters of the accessories and the sphinx
+ * (`init`, `main`, with `duplicateMovieClip`) and the ghosts of item 86's background
+ * (`newGhost`). `tools/lib/swfShapes.ts` only ships scripts whose opcodes are all handled here.
  */
 
 /** What a script can do to the clip it runs on. Implemented by `SwfMovieClip`. */
@@ -22,7 +24,39 @@ export interface Avm1Clip {
   play(): void;
   stop(): void;
   removeMovieClip(): void;
+  /** `duplicateMovieClip`: a copy in the same parent, at `depth` (the SWF's own numbering). */
+  duplicateMovieClip(name: string, depth: number): unknown;
 }
+
+/** A running action block: a frame script, or a function body. */
+interface Activation {
+  b: Uint8Array;
+  view: DataView;
+  /** The timeline whose variables the code reads and sets. */
+  clip: Avm1Clip;
+  thisObj: unknown;
+  /** A function's local variables; null in a frame script. */
+  locals: Map<string, unknown> | null;
+  regs: unknown[];
+  pool: string[];
+}
+
+/** A function defined by `DefineFunction` or `DefineFunction2`. */
+interface FunctionDef {
+  parent: Activation;
+  start: number;
+  size: number;
+  /** Name, and the register it goes to (0: a local variable). */
+  params: [string, number][];
+  regCount: number;
+  flags: number;
+  pool: string[];
+}
+
+/** Steps left before a script and the functions it calls are stopped (guards against loops). */
+const MAX_STEPS = 10000;
+let steps = 0;
+let runDepth = 0;
 
 function isClip(v: unknown): v is Avm1Clip {
   return typeof v === 'object' && v !== null && 'avmGet' in v;
@@ -76,15 +110,53 @@ function setMember(obj: unknown, name: string, value: unknown): void {
 export function runAvm1(code: string, clip: Avm1Clip): void {
   const b = decode(code);
   const view = new DataView(b.buffer, b.byteOffset, b.byteLength);
-  const stack: unknown[] = [];
+  if (runDepth === 0) steps = 0;
+  runDepth++;
+  try {
+    exec({ b, view, clip, thisObj: clip, locals: null, regs: [], pool: [] }, 0, b.length);
+  } finally {
+    runDepth--;
+  }
+}
+
+/**
+ * Calls a script function. `DefineFunction2`'s flags preload registers from 1, in this order:
+ * `this`, `arguments`, `super`, `_root`, `_parent`, `_global` (`super` and `_root` stay
+ * undefined: no script reads them).
+ */
+function callFunction(d: FunctionDef, thisObj: unknown, args: unknown[]): unknown {
+  const self = thisObj ?? d.parent.thisObj;
   const regs: unknown[] = [];
-  let pool: string[] = [];
+  const locals = new Map<string, unknown>();
+  const fl = d.flags;
+  let r = 1;
+  if (fl & 0x01) regs[r++] = self;
+  if (fl & 0x04) regs[r++] = args;
+  if (fl & 0x10) r++;
+  if (fl & 0x40) r++;
+  if (fl & 0x80) regs[r++] = d.parent.clip.avmGet('_parent');
+  if (fl & 0x100) regs[r++] = GLOBAL;
+  if (!(fl & 0x08)) locals.set('arguments', args);
+  d.params.forEach(([name, reg], i) => {
+    if (reg !== 0) regs[reg] = args[i];
+    else locals.set(name, args[i]);
+  });
+  const a: Activation = { ...d.parent, thisObj: self, locals, regs, pool: d.pool };
+  return exec(a, d.start, d.start + d.size);
+}
+
+/** Runs `a`'s code from `start` to `end`; returns what `Return` gives. */
+function exec(a: Activation, start: number, end: number): unknown {
+  const { b, view, clip } = a;
+  const regs = a.regs;
+  const stack: unknown[] = [];
   const pop = (): unknown => stack.pop();
 
   const getVariable = (name: string): unknown => {
+    if (a.locals?.has(name)) return a.locals.get(name);
     switch (name) {
       case 'this':
-        return clip;
+        return a.thisObj;
       case '_global':
         return GLOBAL;
       case 'Math':
@@ -94,6 +166,11 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
     }
     const v = clip.avmGet(name);
     return v !== undefined ? v : GLOBAL[name];
+  };
+
+  const setVariable = (name: string, value: unknown): void => {
+    if (a.locals?.has(name)) a.locals.set(name, value);
+    else clip.avmSet(name, value);
   };
 
   const resolveTarget = (t: unknown): Avm1Clip | null => {
@@ -106,10 +183,10 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
     return null;
   };
 
-  let pc = 0;
-  for (let steps = 0; pc < b.length && steps < 10000; steps++) {
+  let pc = start;
+  while (pc < end && steps++ < MAX_STEPS) {
     const op = b[pc++];
-    if (op === 0x00) return;
+    if (op === 0x00) return undefined;
     let len = 0;
     if (op >= 0x80) {
       len = view.getUint16(pc, true);
@@ -167,11 +244,18 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
       case 0x1c: // GetVariable
         stack.push(getVariable(String(pop())));
         break;
-      case 0x1d: // SetVariable
-      case 0x3c: {
-        // DefineLocal (frame scripts have no function scope: same as SetVariable)
+      case 0x1d: {
+        // SetVariable
         const value = pop();
-        clip.avmSet(String(pop()), value);
+        setVariable(String(pop()), value);
+        break;
+      }
+      case 0x3c: {
+        // DefineLocal (a frame script has no locals: it sets the timeline's variable)
+        const value = pop();
+        const name = String(pop());
+        if (a.locals) a.locals.set(name, value);
+        else clip.avmSet(name, value);
         break;
       }
       case 0x22: {
@@ -188,6 +272,13 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
         resolveTarget(pop())?.avmSetProp(index, value);
         break;
       }
+      case 0x24: {
+        // CloneSprite (`duplicateMovieClip`)
+        const depth = toNumber(pop());
+        const name = String(pop());
+        resolveTarget(pop())?.duplicateMovieClip(name, depth);
+        break;
+      }
       case 0x25: // RemoveSprite
         resolveTarget(pop())?.removeMovieClip();
         break;
@@ -200,9 +291,11 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
         const n = toNumber(pop());
         const args = Array.from({ length: n }, () => pop());
         const fn = getVariable(name);
-        stack.push(typeof fn === 'function' ? fn(...args) : undefined);
+        stack.push(typeof fn === 'function' ? fn.apply(clip, args) : undefined);
         break;
       }
+      case 0x3e: // Return
+        return pop();
       case 0x47: {
         // Add2
         const y = pop();
@@ -285,12 +378,52 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
         // ConstantPool
         const n = view.getUint16(p, true);
         let q = p + 2;
-        pool = [];
+        a.pool = [];
         for (let k = 0; k < n; k++) {
           const [s, next] = readString(b, q);
-          pool.push(s);
+          a.pool.push(s);
           q = next;
         }
+        break;
+      }
+      case 0x8e: // DefineFunction2
+      case 0x9b: {
+        // DefineFunction: no registers, every parameter is a local
+        const [name, q0] = readString(b, p);
+        let q = q0;
+        const count = view.getUint16(q, true);
+        q += 2;
+        let regCount = 0;
+        let flags = 0;
+        if (op === 0x8e) {
+          regCount = b[q++];
+          flags = view.getUint16(q, true);
+          q += 2;
+        }
+        const params: [string, number][] = [];
+        for (let k = 0; k < count; k++) {
+          const reg = op === 0x8e ? b[q++] : 0;
+          const [s, next] = readString(b, q);
+          params.push([s, reg]);
+          q = next;
+        }
+        const size = view.getUint16(q, true);
+        const d: FunctionDef = {
+          parent: a,
+          start: pc,
+          size,
+          params,
+          regCount,
+          flags,
+          pool: a.pool,
+        };
+        pc += size;
+        const fn = function (this: unknown, ...args: unknown[]) {
+          return callFunction(d, this, args);
+        };
+        if (name === '') stack.push(fn);
+        else if (a.locals) a.locals.set(name, fn);
+        else clip.avmSet(name, fn);
         break;
       }
       case 0x8c: // GoToLabel (stops)
@@ -340,15 +473,15 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
               q += 4;
               break;
             case 8:
-              stack.push(pool[b[q]]);
+              stack.push(a.pool[b[q]]);
               q += 1;
               break;
             case 9:
-              stack.push(pool[view.getUint16(q, true)]);
+              stack.push(a.pool[view.getUint16(q, true)]);
               q += 2;
               break;
             default:
-              return; // unknown type: abort the script
+              return undefined; // unknown type: abort the script
           }
         }
         break;
@@ -366,7 +499,8 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
         break;
       }
       default:
-        return; // unsupported opcode: the build should not ship such scripts
+        return undefined; // unsupported opcode: the build should not ship such scripts
     }
   }
+  return undefined;
 }
