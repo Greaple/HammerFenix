@@ -58,9 +58,9 @@ class BoxBlurPass extends Filter {
 
   override apply(fm: FilterSystem, input: Texture, output: RenderSurface, clear: boolean): void {
     const u = (this.resources.boxUniforms as UniformGroup).uniforms;
-    const px = this.blur * input.source.resolution;
-    u.uBlur = px;
-    u.uSamples = Math.max(1, Math.min(MAX_SAMPLES, Math.ceil(px)));
+    // `uInputSize` is in stage pixels; one sample per texel, up to the cap
+    u.uBlur = this.blur;
+    u.uSamples = Math.max(1, Math.min(MAX_SAMPLES, Math.ceil(this.blur * input.source.resolution)));
     fm.applyFilter(this, input, output, clear);
   }
 }

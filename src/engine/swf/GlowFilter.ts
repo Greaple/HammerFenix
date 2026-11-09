@@ -107,11 +107,10 @@ export class GlowFilter extends Filter {
     output: RenderSurface,
     clearMode: boolean,
   ): void {
-    // The filter texture is at the renderer's resolution: convert the blur to its pixels.
-    const res = input.source.resolution;
+    // `uInputSize` is in stage pixels, whatever the texture's resolution, as the blur is
     const b = this.u.uBlur as Float32Array;
-    b[0] = this.blurX * res;
-    b[1] = this.blurY * res;
+    b[0] = this.blurX;
+    b[1] = this.blurY;
     filterManager.applyFilter(this, input, output, clearMode);
   }
 }
