@@ -17,7 +17,7 @@ export type PadButton =
   | 'b'
   | 'x'
   | 'y'
-  /** The left bumper: no sheet icon yet, drawn as a labelled pill (`drawGlyph`). */
+  /** The left bumper (LB, L1, L). */
   | 'l1'
   | 'r2'
   | 'start'

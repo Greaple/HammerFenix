@@ -20,12 +20,15 @@ const BODY = ['#D6E1F6', '#AFC1D1', '#D9D9D9', '#EBEBEB'];
 const INK = ['#1C212A', '#1C1F2A', '#2D2D2D'];
 
 /**
- * Icons whose button is not the usual 24 px of a 32 px frame: the PlayStation R2 and stick fill
- * their frame.
+ * Icons whose button is not the usual 24 px of a 32 px frame: the PlayStation R2, L1 and stick
+ * fill their frame. The Xbox LB comes cropped to the bumper (30 x 17): it is sized as in a
+ * 32 px frame, so it is drawn as large as the others.
  */
 const BOX: Record<string, number> = {
   'playstation/r2': 32,
+  'playstation/l1': 32,
   'playstation/stick': 32,
+  'xbox/l1': 24,
 };
 
 /** Frames cropped to their button (x, y, width, height): the small Options and Share pills. */
@@ -61,10 +64,15 @@ function clean(file: string, prefix: string, key: string): Icon {
       `<svg width="${crop[2]}" height="${crop[3]}" viewBox="${crop.join(' ')}"`,
     );
   }
-  // Ids: the referenced ones made unique, the others (layer names) dropped
-  const refs = new Set([...s.matchAll(/url\(#([^)]+)\)/g)].map((r) => r[1]));
+  // Ids: the referenced ones (`url(#…)`, `href="#…"`) made unique, the others (layer names)
+  // dropped
+  const refs = new Set([
+    ...[...s.matchAll(/url\(#([^)]+)\)/g)].map((r) => r[1]),
+    ...[...s.matchAll(/href="#([^"]+)"/g)].map((r) => r[1]),
+  ]);
   s = s.replace(/ id="([^"]*)"/g, (_, id: string) => (refs.has(id) ? ` id="${prefix}-${id}"` : ''));
   s = s.replace(/url\(#([^)]+)\)/g, (_, id: string) => `url(#${prefix}-${id})`);
+  s = s.replace(/href="#([^"]+)"/g, (_, id: string) => `href="#${prefix}-${id}"`);
   // Colors
   s = s.replace(/(fill|stroke)="(#[0-9A-Fa-f]{6})"/g, (all, attr: string, c: string) => {
     const u = c.toUpperCase();

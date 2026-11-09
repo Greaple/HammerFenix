@@ -217,7 +217,7 @@ describe('controller icons (assets-src/pad-icons)', () => {
     // Each maker has its own, for every button the screens show
     expect(padIconHtml('dpad', 'playstation', 24)).not.toBe(padIconHtml('dpad', 'xbox', 24));
     for (const layout of ['xbox', 'playstation', 'nintendo'] as const) {
-      for (const b of ['a', 'b', 'x', 'y', 'r2', 'start', 'back', 'dpad', 'stick'] as const) {
+      for (const b of ['a', 'b', 'x', 'y', 'l1', 'r2', 'start', 'back', 'dpad', 'stick'] as const) {
         expect(padIconHtml(b, layout, 24), `${layout} ${b}`).not.toBeNull();
       }
     }
