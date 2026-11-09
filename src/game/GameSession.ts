@@ -210,6 +210,11 @@ export class GameSession implements IGameContext {
   fakeLevelId: number | null = null;
   /** Music track playing: 0 main, 1 boss, 2 hurry up. */
   currentTrack = 0;
+  /**
+   * The track the game asked for last, even with no music (port addition): the sound panel
+   * starts it when the music is switched on during a game.
+   */
+  private wantedTrack: number | null = null;
   /** `Adventure`: kill order of the level's enemies, for the super item (task 2.1). */
   perfectOrder: number[] = [];
   perfectCount = 0;
@@ -317,6 +322,8 @@ export class GameSession implements IGameContext {
   onScoreChange?: (score: number) => void;
   onLivesChange?: (lives: number) => void;
   onStateChange?: (state: { isOver: boolean; isPaused: boolean }) => void;
+  /** Opens the sound panel over the paused game (port addition). */
+  onSoundMenu?: () => void;
 
   constructor(
     app: GameHost,
@@ -613,14 +620,45 @@ export class GameSession implements IGameContext {
     this.config = new GameParameters(families, options, settings);
   }
 
-  /** Changes the player's settings (the settings screen); the next game uses them. */
+  /**
+   * Changes the player's settings (the settings screen); the next game uses them. During a game
+   * (the sound panel of the pause, a port addition) the volumes, sound and music apply at once,
+   * and the details and shaking wait for the next game.
+   */
   setSettings(s: PlayerSettings): void {
     this.settings = { ...s };
     saveSettings(this.settings);
-    this.config = new GameParameters(
-      this.config.families.join(','),
-      this.config.optionList.join(','),
-      this.settings,
+    if (!this.loader.gameRunning) {
+      this.config = new GameParameters(
+        this.config.families.join(','),
+        this.config.optionList.join(','),
+        this.settings,
+      );
+      return;
+    }
+    const hadMusic = this.config.hasMusic();
+    this.config.setSound(this.settings);
+    this.initSoundChannels();
+    if (hadMusic && !this.config.hasMusic()) {
+      this.audio.stopMusic();
+      this.fl_music = false;
+    } else if (!hadMusic && this.config.hasMusic() && this.wantedTrack !== null) {
+      this.playMusicTrack(this.wantedTrack);
+    }
+    this.setMusicVolume(this.fl_mute ? 0 : this.fl_pause ? 0.5 : 1);
+  }
+
+  /**
+   * The sound panel can open: on the pause screen, and not while recording or replaying (it is
+   * not in the original, and its keys would reach the game).
+   */
+  get soundMenuAvailable(): boolean {
+    return (
+      this.loader.gameRunning &&
+      this.fl_pause &&
+      this.pauseMC !== null &&
+      !this.recorder &&
+      !this.input.replaying
     );
   }
 
@@ -2042,9 +2080,13 @@ export class GameSession implements IGameContext {
 
   /** `Mode.playMusic` / `playMusicAt(id, 0)`: tracks are `[music, boss, hurryUp]`. */
   playMusicTrack(trackId: number): void {
-    if (!this.config.hasMusic()) return;
+    if (!this.config.hasMusic()) {
+      this.wantedTrack = trackId;
+      return;
+    }
     if (MUSIC_TRACKS[trackId] === undefined) return;
     if (this.fl_music) this.stopMusic();
+    this.wantedTrack = trackId;
     this.currentTrack = trackId;
     this.audio.playMusic(MUSIC_TRACKS[trackId]);
     this.fl_music = true;
@@ -2053,6 +2095,7 @@ export class GameSession implements IGameContext {
 
   /** `Mode.stopMusic` */
   stopMusic(): void {
+    this.wantedTrack = null;
     if (!this.config.hasMusic()) return;
     this.audio.stopMusic();
     this.fl_music = false;
@@ -2492,6 +2535,11 @@ export class GameSession implements IGameContext {
     if (!this.fl_lock && this.fl_music && this.input.consumePress('music')) {
       this.fl_mute = !this.fl_mute;
       this.setMusicVolume(this.fl_mute ? 0 : 1);
+    }
+
+    // Port addition: the sound panel from the pause (O, or the controller's R1)
+    if (this.input.consumePress('sound') && this.soundMenuAvailable) {
+      this.onSoundMenu?.();
     }
 
     // Suicide (Ctrl+Shift+K): the way to give up a game. The original also waits for

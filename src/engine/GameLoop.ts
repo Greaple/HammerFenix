@@ -110,7 +110,7 @@ export class FixedGameLoop {
     this.logicAccum += dtSec;
 
     let steps = 0;
-    while (this.logicAccum >= logicDt && steps < 4) {
+    while (this.running && this.logicAccum >= logicDt && steps < 4) {
       this.stepSingleFrame();
       this.logicAccum -= logicDt;
       steps++;

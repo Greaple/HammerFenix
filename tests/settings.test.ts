@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { Data } from '../src/game/Data';
 import { ClassicBomb } from '../src/game/entity/Bomb';
 import {
@@ -140,5 +140,96 @@ describe('what the settings turn off in a game', () => {
     expect([s.config.fl_detail, s.config.fl_shaky]).toEqual([false, false]);
     await s.playReplay({ ...replay, detail: undefined, shake: undefined });
     expect([s.config.fl_detail, s.config.fl_shaky]).toEqual([true, true]);
+  });
+});
+
+describe('sound panel from the pause (port addition)', () => {
+  let s: GameSession;
+  beforeAll(async () => {
+    s = await createHeadlessSession();
+  });
+
+  function start(settings: PlayerSettings = DEFAULT_SETTINGS): void {
+    s.setSettings(settings);
+    s.setParameters(SYSTEM_FAMILIES, '');
+    s.initGame(1, 1234);
+    for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
+  }
+
+  function tap(action: 'sound' | 'music'): void {
+    s.input.setTouch(action, true);
+    s.gameLoop.stepSingleFrame();
+    s.input.setTouch(action, false);
+    s.gameLoop.stepSingleFrame();
+  }
+
+  it('opens with O (or R1) on the pause screen only, never while recording', () => {
+    start();
+    let opened = 0;
+    s.onSoundMenu = () => opened++;
+    expect(s.soundMenuAvailable).toBe(false);
+    tap('sound');
+    expect(opened).toBe(0);
+    s.onPause();
+    expect(s.soundMenuAvailable).toBe(true);
+    tap('sound');
+    expect(opened).toBe(1);
+    s.onUnpause();
+
+    s.startRecording(1);
+    for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
+    s.onPause();
+    expect(s.soundMenuAvailable).toBe(false);
+    tap('sound');
+    expect(opened).toBe(1);
+    s.stopRecording();
+    s.onSoundMenu = undefined;
+  });
+
+  it('applies the volume and the sound at once, details and shaking at the next game', () => {
+    start();
+    s.onPause();
+    const vol = vi.spyOn(s.audio, 'setVolume');
+    s.setSettings({ ...DEFAULT_SETTINGS, volume: 80, detail: 0, shake: 0 });
+    let v = new Map(vol.mock.calls);
+    expect([v.get(Data.CHAN_PLAYER), v.get(Data.CHAN_BAD)]).toEqual([40, 30]);
+    expect([s.config.fl_detail, s.config.fl_shaky]).toEqual([true, true]);
+    s.setSettings({ ...DEFAULT_SETTINGS, sound: 0 });
+    v = new Map(vol.mock.calls);
+    expect(v.get(Data.CHAN_PLAYER)).toBe(0);
+    vol.mockRestore();
+    s.setSettings(DEFAULT_SETTINGS);
+  });
+
+  it('stops the music when switched off, and starts the asked track again when on', () => {
+    start();
+    s.onPause();
+    expect(s.fl_music).toBe(true);
+    const stop = vi.spyOn(s.audio, 'stopMusic');
+    s.setSettings({ ...DEFAULT_SETTINGS, music: 0 });
+    expect(stop).toHaveBeenCalled();
+    expect(s.fl_music).toBe(false);
+    const play = vi.spyOn(s.audio, 'playMusic');
+    const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
+    s.setSettings(DEFAULT_SETTINGS);
+    expect(s.fl_music).toBe(true);
+    expect(play).toHaveBeenCalledWith('music_ingame');
+    // still paused: half the music volume
+    expect(musicVol).toHaveBeenLastCalledWith(16);
+    stop.mockRestore();
+    play.mockRestore();
+    musicVol.mockRestore();
+  });
+
+  it('M mutes and unmutes the music in play', () => {
+    start();
+    const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
+    tap('music');
+    expect(s.fl_mute).toBe(true);
+    expect(musicVol).toHaveBeenLastCalledWith(0);
+    tap('music');
+    expect(s.fl_mute).toBe(false);
+    expect(musicVol).toHaveBeenLastCalledWith(33);
+    musicVol.mockRestore();
   });
 });

@@ -64,7 +64,7 @@ export const TITLE_FILE = 'images/mainTitle.webp';
  */
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
-type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound';
 
 /** An item clip used as an icon: special items below 1000, score items from 1000. */
 type Icon = { item: number } | { clip: string };
@@ -107,10 +107,19 @@ const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'back'] as 
 type SettingRow = (typeof SETTING_ROWS)[number];
 
 /**
+ * The rows of the sound panel opened from the pause (port addition): details and shaking stay
+ * on the menu's page, as they change the random draws of the game under way.
+ */
+const SOUND_ROWS: readonly SettingRow[] = ['sound', 'music', 'volume', 'back'];
+
+/**
  * The settings button, at the bottom right of the menu's panel: as tall as the action button
  * (36), its right edge on the fridge card's (378).
  */
 const GEAR = { x: 360, y: 478, r: 18 };
+
+/** Center of the pause screen's sound button, under the instructions. */
+const PAUSE_BUTTON_Y = 392;
 
 /**
  * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
@@ -173,6 +182,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     boost: 'Tornade',
     settings: 'Options de jeu',
     settingsNote: 'Les réglages s’appliquent à la prochaine partie.',
+    soundNote: 'Les détails et les vibrations se règlent depuis le menu, entre deux parties.',
+    soundKey: 'Son',
     detail: 'Détails graphiques élevés',
     detailHint: 'Pour améliorer la rapidité du jeu, décochez la case.',
     shake: 'Vibrations fréquentes',
@@ -238,6 +249,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     boost: 'Tornado',
     settings: 'Game options',
     settingsNote: 'The settings apply to the next game.',
+    soundNote: 'Details and vibrations are set from the menu, between games.',
+    soundKey: 'Sound',
     detail: 'High quality graphics',
     detailHint: 'To get a better game performance, disable the box.',
     shake: 'Frequent vibrations',
@@ -302,6 +315,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     boost: 'Tornado',
     settings: 'Opciones de juego',
     settingsNote: 'Los ajustes se aplican a la próxima partida.',
+    soundNote: 'Los detalles y las vibraciones se ajustan desde el menú, entre partidas.',
+    soundKey: 'Sonido',
     detail: 'Detalles gráficos elevados',
     detailHint: 'Para mejorar la rapidez del juego, desactiva la casilla.',
     shake: 'Vibraciones frecuentes',
@@ -395,6 +410,17 @@ export class Shell {
   onStart?: (mode: string) => void;
   /** A setting changed on the settings page. */
   onSettings?: (s: PlayerSettings) => void;
+  /** Set while the sound panel shows over the game. */
+  private onSoundClose: (() => void) | null = null;
+  /**
+   * The button under the pause screen that opens the sound panel (port addition), above the
+   * game: the page adds it to the stage.
+   */
+  readonly pauseLayer = new Container();
+  /** What the pause button was drawn for (device, layout, language), or null when hidden. */
+  private pauseDrawn: string | null = null;
+  /** The pause button was clicked. */
+  onPauseSound?: () => void;
 
   constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts, profile: Profile) {
     this.lib = lib;
@@ -463,6 +489,17 @@ export class Shell {
     this.render();
   }
 
+  /**
+   * The sound panel over the paused game (port addition): sound, music and volume, which the
+   * game applies at once. `onClose` runs when it closes.
+   */
+  showSound(onClose: () => void): void {
+    this.screen = 'sound';
+    this.settingSel = 0;
+    this.onSoundClose = onClose;
+    this.render();
+  }
+
   hide(): void {
     this.screen = null;
     this.fadeFrom = null;
@@ -490,6 +527,79 @@ export class Shell {
   /** Redraws the current screen, e.g. after a language change. */
   refresh(): void {
     if (this.screen) this.render();
+    if (this.pauseDrawn !== null) this.pauseDrawn = '';
+  }
+
+  /**
+   * Shows or hides the pause screen's sound button: a wood pill with a gear, "Son" and the key
+   * that opens it too (O, or the controller's R1). Called every frame; redrawn only on a change.
+   */
+  setPauseButton(on: boolean): void {
+    const key = on ? `${this.input.device}:${this.input.padLayout}:${this.lang}` : null;
+    if (key === this.pauseDrawn) return;
+    this.pauseDrawn = key;
+    for (const c of this.pauseLayer.removeChildren()) c.destroy({ children: true });
+    if (!on) return;
+    const cx = W / 2;
+    const cy = PAUSE_BUTTON_Y;
+    const h = 30;
+    const face = new Container();
+    const lbl = this.text(this.t.soundKey, 'label', 0, 0, {
+      align: 'left',
+      size: 15,
+      color: C.gold,
+      parent: face,
+    });
+    const cap = new Container();
+    let capW = 0;
+    if (this.input.device === 'keyboard') {
+      const k = this.text('O', 'label', 0, 0, {
+        align: 'left',
+        size: 10,
+        color: '#5f452c',
+        parent: cap,
+      });
+      capW = Math.max(17, k.width + 10);
+      cap.addChildAt(
+        new Graphics()
+          .roundRect(0, 1.5, capW, 17, 4)
+          .fill(0xc8a878)
+          .roundRect(0, 0, capW, 17, 4)
+          .fill(0xfffaf0),
+        0,
+      );
+      k.position.set((capW - k.width) / 2, (17 - k.height) / 2);
+    } else if (this.input.device === 'gamepad') {
+      const g = padGlyph('r1', this.input.padLayout, 18, 'onDark');
+      g.position.set(g.width / 2, 9);
+      cap.addChild(g);
+      capW = g.width;
+    }
+    face.addChild(cap);
+    const gearR = 8;
+    const gap = 8;
+    const w = 14 + gearR * 2 + gap + lbl.width + (capW > 0 ? gap + capW : 0) + 14;
+    const x = cx - w / 2;
+    const y = cy - h / 2;
+    const bg = new Graphics()
+      .roundRect(x, y + 3, w, h, h / 2)
+      .fill(C.woodDark)
+      .roundRect(x, y, w, h, h / 2)
+      .fill(C.wood);
+    const glow = new Graphics().roundRect(x, y, w, h, h / 2).fill({ color: 0xffffff, alpha: 0.12 });
+    glow.visible = false;
+    face.addChildAt(gear(x + 14 + gearR, cy, gearR, C.gold), 0);
+    lbl.position.set(x + 14 + gearR * 2 + gap, cy - lbl.height / 2);
+    cap.position.set(lbl.x + lbl.width + gap, cy - 9);
+    const btn = new Container();
+    btn.addChild(bg, glow, face);
+    btn.eventMode = 'static';
+    btn.cursor = 'pointer';
+    btn.hitArea = new Rectangle(x, y, w, h + 3);
+    btn.on('pointerover', () => (glow.visible = true));
+    btn.on('pointerout', () => (glow.visible = false));
+    btn.on('pointertap', () => this.onPauseSound?.());
+    this.pauseLayer.addChild(btn);
   }
 
   /**
@@ -549,9 +659,10 @@ export class Shell {
         if (ok || esc) this.showMenu();
         break;
       case 'settings':
+      case 'sound':
         if (up) this.selectSetting(this.settingSel - 1);
         if (down) this.selectSetting(this.settingSel + 1);
-        if (SETTING_ROWS[this.settingSel] === 'volume') {
+        if (this.settingRows[this.settingSel] === 'volume') {
           if (left) this.setVolume(this.settings.volume - VOLUME_STEP);
           if (right) this.setVolume(this.settings.volume + VOLUME_STEP);
         }
@@ -640,8 +751,13 @@ export class Shell {
     this.render();
   }
 
+  /** The rows of the settings page showing. */
+  private get settingRows(): readonly SettingRow[] {
+    return this.screen === 'sound' ? SOUND_ROWS : SETTING_ROWS;
+  }
+
   private selectSetting(i: number): void {
-    const count = SETTING_ROWS.length;
+    const count = this.settingRows.length;
     const n = (i + count) % count;
     if (n === this.settingSel) return;
     this.settingSel = n;
@@ -650,7 +766,7 @@ export class Shell {
 
   /** Space or a click on a row: ticks or unticks it; on the volume, the next step (wrapping). */
   private confirmSetting(): void {
-    const row = SETTING_ROWS[this.settingSel];
+    const row = this.settingRows[this.settingSel];
     if (row === 'back') {
       this.leaveSettings();
       return;
@@ -663,8 +779,18 @@ export class Shell {
     this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
   }
 
-  /** Back to the menu, with Adventure selected again (the gear is only a way in). */
+  /**
+   * Back to the menu, with Adventure selected again (the gear is only a way in); or, from the
+   * sound panel, back to the paused game.
+   */
   private leaveSettings(): void {
+    if (this.screen === 'sound') {
+      const close = this.onSoundClose;
+      this.onSoundClose = null;
+      this.hide();
+      close?.();
+      return;
+    }
     this.selected = 0;
     this.showMenu();
   }
@@ -708,11 +834,16 @@ export class Shell {
     this.root.eventMode = 'static';
     this.root.visible = true;
     this.root.parent?.addChild(this.root); // above the Loader's clip
-    this.drawBackground(
-      this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings',
-    );
+    if (this.screen === 'sound') {
+      // Over the paused game
+      this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.45 }));
+    } else {
+      this.drawBackground(
+        this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings',
+      );
+    }
     if (this.screen === 'menu') this.drawMenu();
-    else if (this.screen === 'settings') this.drawSettings();
+    else if (this.screen === 'settings' || this.screen === 'sound') this.drawSettings();
     else if (this.screen === 'quests') this.drawQuests();
     else if (this.screen === 'fridge') this.drawFridge();
     else if (this.result) this.drawResult(this.result);
@@ -1160,13 +1291,19 @@ export class Shell {
   private drawSettings(): void {
     const t = this.t;
     const st = this.settings;
-    this.panel(12, 12, 396, H - 20);
-    this.text(t.settings, 'title', W / 2, 22, { size: 26, color: C.heading });
-    this.gearAt(W / 2, 74);
+    const rows = this.settingRows;
+    // The sound panel is smaller, over the game
+    const inGame = this.screen === 'sound';
+    const y0 = inGame ? 50 : 12;
+    const buttonY = inGame ? 414 : BUTTON_Y;
+    this.panel(12, y0, 396, inGame ? 400 : H - 20);
+    this.text(t.settings, 'title', W / 2, y0 + 10, { size: 26, color: C.heading });
+    this.gearAt(W / 2, y0 + 62);
 
-    const top = 110;
+    const top = y0 + 98;
     const rowH = 46;
-    SETTING_ROWS.forEach((row, i) => {
+    const count = rows.length - 1;
+    rows.forEach((row, i) => {
       if (row === 'back') return;
       const y = top + i * rowH;
       const sel = i === this.settingSel;
@@ -1208,8 +1345,8 @@ export class Shell {
       btn.addChild(box);
     });
 
-    const row = SETTING_ROWS[this.settingSel];
-    const hintY = top + 5 * rowH + 10;
+    const row = rows[this.settingSel];
+    const hintY = top + count * rowH + 10;
     if (row !== 'back') {
       this.text(t[row + 'Hint'], 'body', W / 2, hintY, {
         width: 330,
@@ -1218,7 +1355,7 @@ export class Shell {
         color: C.inkSoft,
       });
     }
-    this.text(t.settingsNote, 'body', W / 2, BUTTON_Y - 46, {
+    this.text(inGame ? t.soundNote : t.settingsNote, 'body', W / 2, buttonY - (inGame ? 62 : 46), {
       width: 330,
       size: 10,
       color: C.todo,
@@ -1228,7 +1365,7 @@ export class Shell {
     const back = row === 'back';
     this.actionButton(
       t.back,
-      BUTTON_Y,
+      buttonY,
       () => this.leaveSettings(),
       170,
       true,
@@ -1258,7 +1395,7 @@ export class Shell {
     track.hitArea = new Rectangle(x0 - 10, cy - 14, w + 20, 28);
     track.on('pointertap', (e) => {
       e.stopPropagation();
-      this.settingSel = SETTING_ROWS.indexOf('volume');
+      this.settingSel = this.settingRows.indexOf('volume');
       this.setVolume((100 * (track.toLocal(e.global).x - x0)) / w);
       this.render();
     });

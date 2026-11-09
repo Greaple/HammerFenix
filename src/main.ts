@@ -145,7 +145,7 @@ async function main(): Promise<void> {
   const profile = new Profile(new QuestEngine(dataStore.quests, dataStore.items));
   const shell = new Shell(lib, input, dataStore, profile);
   await shell.load(baseUrl);
-  app.stage.addChild(shell.root);
+  app.stage.addChild(shell.root, shell.pauseLayer);
   session.gameRoot.visible = false;
   shell.showMenu();
   loading.done();
@@ -159,6 +159,7 @@ async function main(): Promise<void> {
   });
   app.ticker.add(() => {
     shell.update();
+    shell.setPauseButton(!shell.visible && session.soundMenuAvailable);
     runQueuedFrameActions();
   });
   // Render only when the picture can have changed (port addition, for phones and 120 Hz screens):
@@ -187,6 +188,21 @@ async function main(): Promise<void> {
   // The settings page (the site's "Options"): the next game reads them
   shell.settings = { ...session.settings };
   shell.onSettings = (settings) => session.setSettings(settings);
+  // Port addition: the sound panel over the paused game (the pause's button, O or R1). The game
+  // stops while it shows, and the key that closes it does not reach the game.
+  const openSound = () => {
+    if (shell.visible || !session.soundMenuAvailable) return;
+    const wasRunning = session.gameLoop.isRunning;
+    session.gameLoop.stop();
+    shell.setPauseButton(false);
+    shell.settings = { ...session.settings };
+    shell.showSound(() => {
+      input.lockHeld();
+      if (wasRunning) session.gameLoop.start();
+    });
+  };
+  session.onSoundMenu = openSound;
+  shell.onPauseSound = openSound;
   shell.onStart = (mode) => {
     // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
     shell.fadeOut(() => session.levelShown);

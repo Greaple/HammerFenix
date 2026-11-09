@@ -84,11 +84,11 @@ export class GameParameters {
   private readonly options = new Map<string, boolean>();
   /** For `toString()` and the replays only. */
   readonly optionList: string[] = [];
-  readonly generalVolume: number;
+  generalVolume!: number;
   /** Sound effects volume, 0 to 0.5 (`GameManager` multiplies it by 100). */
-  readonly soundVolume: number;
+  soundVolume!: number;
   /** Music volume, 0 to 0.325. */
-  readonly musicVolume: number;
+  musicVolume!: number;
   /** High details: dust, bouncing particles, ice shards (`$detail`). */
   fl_detail: boolean;
   /** Shaking from bombs and frozen enemies hitting walls (`$shake`). */
@@ -96,7 +96,7 @@ export class GameParameters {
   /** `Data.MAX_FX`: at most this many particles at once, halved in low details. */
   MAX_FX: number = Data.MAX_FX;
   /** The Loader downloads the musics only when `$music` is not 0. */
-  private readonly fl_musicLoaded: boolean;
+  private fl_musicLoaded!: boolean;
 
   constructor(f: string, opt: string, settings: PlayerSettings = DEFAULT_SETTINGS) {
     // Game options (mirror, nightmare...)
@@ -114,16 +114,24 @@ export class GameParameters {
     }
 
     // Misc data
-    this.generalVolume = (settings.volume * 0.5) / 100;
-    this.soundVolume = settings.sound * this.generalVolume;
-    this.musicVolume = settings.music * this.generalVolume * 0.65;
+    this.setSound(settings);
     this.fl_detail = settings.detail !== 0;
     this.fl_shaky = settings.shake !== 0;
-    this.fl_musicLoaded = settings.music !== 0;
 
     if (!this.fl_detail) {
       this.setLowDetails();
     }
+  }
+
+  /**
+   * The volumes, and whether there is music. The constructor's; also called during a game by
+   * the sound panel of the pause (port addition).
+   */
+  setSound(settings: PlayerSettings): void {
+    this.generalVolume = (settings.volume * 0.5) / 100;
+    this.soundVolume = settings.sound * this.generalVolume;
+    this.musicVolume = settings.music * this.generalVolume * 0.65;
+    this.fl_musicLoaded = settings.music !== 0;
   }
 
   /** `setLowDetails`: low quality mode. The stage's medium `_quality` is not ported. */

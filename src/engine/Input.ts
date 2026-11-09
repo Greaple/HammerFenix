@@ -13,7 +13,7 @@ export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
  * `music` is M, `suicide` Ctrl+Shift+K, `disguise` E and `map` C, the keys
  * `GameMode.getControls` reads besides the controls (the music switch, giving up the game, the
  * next disguise, the world map). The original's disguise key is D, which moves right here (WASD
- * and ZQSD).
+ * and ZQSD). `sound` (O) opens the sound settings from the pause, a port addition.
  */
 export type ControlAction =
   | 'left'
@@ -25,7 +25,8 @@ export type ControlAction =
   | 'music'
   | 'suicide'
   | 'disguise'
-  | 'map';
+  | 'map'
+  | 'sound';
 
 const KEY_MAP: Record<string, ControlAction> = {
   ArrowLeft: 'left',
@@ -48,6 +49,7 @@ const KEY_MAP: Record<string, ControlAction> = {
   KeyM: 'music',
   KeyE: 'disguise',
   KeyC: 'map',
+  KeyO: 'sound',
 };
 
 /** Flash key codes (`Key.*`) of the keys that are not a letter or a digit. */
@@ -390,6 +392,16 @@ export class InputController {
       return true;
     }
     return false;
+  }
+
+  /**
+   * Locks every action held at the last sample until it is let go, so the key that closed a
+   * screen over the game (the sound panel) does not act in the game too.
+   */
+  lockHeld(): void {
+    for (const act of Object.keys(ACTION_BITS) as ControlAction[]) {
+      if (this.isDown(act)) this.locked.add(act);
+    }
   }
 
   lock(action: ControlAction): void {
