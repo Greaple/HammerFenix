@@ -1262,10 +1262,13 @@ dialog.parchment-dialog::backdrop {
   white-space: nowrap;
 }
 
+/* Keys, controller buttons and their icons share one 22px face, so the rows line up */
 .parchment-dialog kbd {
   display: inline-block;
   min-width: 26px;
-  padding: 3px 7px;
+  height: 22px;
+  padding: 0 7px;
+  line-height: 20px;
   font-family: var(--font-family);
   font-size: 0.78rem;
   font-weight: 700;
@@ -1281,10 +1284,27 @@ dialog.parchment-dialog::backdrop {
   min-width: 84px;
 }
 
+/* The keyboard and controller lists share their columns (subgrid), so their texts start at
+   the same place, after the widest row of keys in either */
 .controls-blocks {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 12px 18px;
+}
+
+.controls-blocks > div,
+.controls-blocks .controls-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+}
+
+.controls-blocks > div {
+  row-gap: 0;
+}
+
+.controls-blocks h4 {
+  grid-column: 1 / -1;
 }
 
 html[data-input='gamepad'] .controls-pad {
@@ -1301,11 +1321,9 @@ html[data-input='gamepad'] .controls-pad {
 
 /* Controller buttons: the controller's icons (main.ts), or a label when there is none */
 .parchment-dialog kbd.pad {
-  min-width: 24px;
-  height: 24px;
+  min-width: 22px;
   padding: 0 6px;
-  line-height: 24px;
-  border-radius: 12px;
+  border-radius: 11px;
   color: var(--parchment);
   background: var(--wood-dark);
   border-color: var(--wood-dark);
@@ -1313,13 +1331,21 @@ html[data-input='gamepad'] .controls-pad {
   vertical-align: middle;
 }
 
+/* An icon is drawn with a transparent margin: it overflows the face, centered on it */
 .parchment-dialog kbd.pad.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
-  height: auto;
   padding: 0;
   line-height: 0;
   background: none;
   border: none;
+}
+
+.parchment-dialog kbd.pad.icon svg {
+  display: block;
+  flex: none;
 }
 
 /* A row of controller buttons: centered on one line, a little apart */

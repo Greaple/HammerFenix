@@ -106,8 +106,11 @@ type MenuEntry =
 const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'back'] as const;
 type SettingRow = (typeof SETTING_ROWS)[number];
 
-/** The settings button, at the bottom right of the menu's panel. */
-const GEAR = { x: 368, y: 478, r: 17 };
+/**
+ * The settings button, at the bottom right of the menu's panel: as tall as the action button
+ * (36), its right edge on the fridge card's (378).
+ */
+const GEAR = { x: 360, y: 478, r: 18 };
 
 /**
  * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
@@ -337,6 +340,8 @@ const C = {
   ink: '#4a3520',
   inkSoft: '#7a5f44',
   gold: '#fff3c4',
+  /** Page titles and keycap letters: the wood, as text. */
+  heading: '#5f452c',
   done: '#3f8f1a',
   progress: '#b8730f',
   todo: '#9a8670',
@@ -881,19 +886,19 @@ export class Shell {
       const k = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
         align: 'left',
         size: 9,
-        color: '#5f452c',
+        color: C.heading,
         parent: cap,
       });
       capW = k.width + 12;
       cap.addChildAt(
         new Graphics()
-          .roundRect(0, 1.5, capW, 17, 4)
+          .roundRect(0, 1.5, capW, 18, 4)
           .fill(0xc8a878)
-          .roundRect(0, 0, capW, 17, 4)
+          .roundRect(0, 0, capW, 18, 4)
           .fill(0xfffaf0),
         0,
       );
-      k.position.set(6, (17 - k.height) / 2);
+      k.position.set(6, (18 - k.height) / 2);
       face.addChild(cap);
     } else if (on && device === 'gamepad') {
       const g = padGlyph(back ? 'b' : 'a', this.input.padLayout, 18, 'onDark');
@@ -985,7 +990,7 @@ export class Shell {
     this.drawTitle(2, 290);
     const top = 124;
     this.panel(26, top, 368, H - 8 - top);
-    this.text(t.modes, 'title', W / 2, top + 10, { color: '#5f452c' });
+    this.text(t.modes, 'title', W / 2, top + 10, { color: C.heading });
 
     MODES.forEach((m, i) => {
       const y = top + 46 + i * 38;
@@ -1067,7 +1072,7 @@ export class Shell {
         1,
       );
     }
-    btn.addChild(gear(x, y, r * 0.62, sel ? 0xfff3c4 : C.wood));
+    btn.addChild(gear(x, y, r * 0.62, sel ? C.gold : C.wood));
   }
 
   /** Quests done and items in the fridge, each out of all. */
@@ -1105,13 +1110,13 @@ export class Shell {
         const box = new Graphics()
           .roundRect(x, y + 2, 11, 11, 2)
           .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
-          .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 1.4 });
+          .stroke({ color: sel ? C.gold : C.wood, width: 1.4 });
         if (ticked) {
           box
             .moveTo(x + 2.5, y + 7.5)
             .lineTo(x + 5, y + 10)
             .lineTo(x + 9.5, y + 4)
-            .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 2 });
+            .stroke({ color: sel ? C.gold : C.wood, width: 2 });
         }
         row.addChild(box);
       } else {
@@ -1150,7 +1155,7 @@ export class Shell {
     const t = this.t;
     const st = this.settings;
     this.panel(12, 12, 396, H - 20);
-    this.text(t.settings, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+    this.text(t.settings, 'title', W / 2, 22, { size: 26, color: C.heading });
     this.gearAt(W / 2, 74);
 
     const top = 110;
@@ -1171,27 +1176,28 @@ export class Shell {
       );
       const ink = sel ? C.gold : C.ink;
       const cy = y + (rowH - 6) / 2;
-      this.text(t[row], 'label', row === 'volume' ? 56 : 82, cy - 9, {
+      const label = this.text(t[row], 'label', 82, cy - 9, {
         align: 'left',
         size: 15,
         color: ink,
         parent: btn,
       });
       if (row === 'volume') {
-        this.volumeGauge(btn, cy, sel);
+        btn.addChild(speaker(56, cy, st.volume > 0, sel ? C.gold : C.wood));
+        this.volumeGauge(btn, cy, sel, label.x + label.width);
         return;
       }
       const x = 56;
       const box = new Graphics()
         .roundRect(x, cy - 7, 14, 14, 3)
         .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
-        .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 1.6 });
+        .stroke({ color: sel ? C.gold : C.wood, width: 1.6 });
       if (st[row]) {
         box
           .moveTo(x + 3, cy)
           .lineTo(x + 6.5, cy + 3.5)
           .lineTo(x + 12, cy - 4)
-          .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 2.4 });
+          .stroke({ color: sel ? C.gold : C.wood, width: 2.4 });
       }
       btn.addChild(box);
     });
@@ -1221,17 +1227,18 @@ export class Shell {
    * The volume: a gauge in steps of `VOLUME_STEP`, set by a click at its place, with the
    * value. Left and right change it when its row is selected.
    */
-  private volumeGauge(parent: Container, cy: number, sel: boolean): void {
-    const x0 = 214;
-    const w = 112;
+  private volumeGauge(parent: Container, cy: number, sel: boolean, labelRight: number): void {
+    // After the label (and its knob's room), up to the value
+    const x0 = Math.max(214, labelRight + 16);
+    const w = 326 - x0;
     const v = this.settings.volume;
     const g = new Graphics()
       .roundRect(x0, cy - 4, w, 8, 4)
-      .fill({ color: sel ? 0xfff3c4 : C.wood, alpha: sel ? 0.3 : 0.18 })
+      .fill({ color: sel ? C.gold : C.wood, alpha: sel ? 0.3 : 0.18 })
       .roundRect(x0, cy - 4, Math.max(8, (w * v) / 100), 8, 4)
       .fill(v > 0 ? (sel ? C.gold : C.progress) : 'rgba(0,0,0,0)')
       .circle(x0 + (w * v) / 100, cy, 7)
-      .fill(sel ? 0xfff3c4 : C.wood);
+      .fill(sel ? C.gold : C.wood);
     const track = new Container();
     track.eventMode = 'static';
     track.cursor = 'pointer';
@@ -1277,7 +1284,7 @@ export class Shell {
     const q = this.profile.quests;
     const p = this.profile.data;
     this.panel(12, 12, 396, H - 20);
-    this.text(t.quests, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+    this.text(t.quests, 'title', W / 2, 22, { size: 26, color: C.heading });
 
     // The three states, counted
     const ids = q.quests.map((x) => x.id);
@@ -1337,7 +1344,7 @@ export class Shell {
         row.addChild(
           new Graphics()
             .roundRect(296, y + 9, 50, 4, 2)
-            .fill({ color: sel ? 0xfff3c4 : C.wood, alpha: 0.25 })
+            .fill({ color: sel ? C.gold : C.wood, alpha: 0.25 })
             .roundRect(296, y + 9, Math.max(4, (50 * have) / need), 4, 2)
             .fill(sel ? C.gold : C.progress),
         );
@@ -1430,7 +1437,7 @@ export class Shell {
     const p = this.profile.data;
     const ids = q.itemIds;
     this.panel(12, 12, 396, H - 20);
-    this.text(t.fridge, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+    this.text(t.fridge, 'title', W / 2, 22, { size: 26, color: C.heading });
     const [have, all] = this.counts().fridge;
     this.text(fmt(t.fridgeCount, have, all), 'label', W / 2, 56, { size: 13 });
     this.bar(110, 75, 200, 6, have / all, C.done);
@@ -1476,14 +1483,20 @@ export class Shell {
     const py = y0 + FRIDGE_ROWS * FRIDGE_CELL + 6;
     this.text(`${page + 1} / ${pages}`, 'label', W / 2, py, { size: 13, color: C.inkSoft });
     if (page > 0) {
-      const b = this.button([W / 2 - 92, py - 4, 44, 24], () =>
-        this.selectItem((page - 1) * FRIDGE_PAGE),
+      const b = this.button(
+        [W / 2 - 92, py - 4, 44, 24],
+        () => this.selectItem((page - 1) * FRIDGE_PAGE),
+        false,
+        6,
       );
       this.text('◀', 'label', W / 2 - 70, py, { size: 13, parent: b });
     }
     if (page < pages - 1) {
-      const b = this.button([W / 2 + 48, py - 4, 44, 24], () =>
-        this.selectItem((page + 1) * FRIDGE_PAGE),
+      const b = this.button(
+        [W / 2 + 48, py - 4, 44, 24],
+        () => this.selectItem((page + 1) * FRIDGE_PAGE),
+        false,
+        6,
       );
       this.text('▶', 'label', W / 2 + 70, py, { size: 13, parent: b });
     }
@@ -1564,7 +1577,7 @@ export class Shell {
       const top = 112;
       this.panel(26, top, 368, H - 8 - top);
       this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
-        color: '#5f452c',
+        color: C.heading,
       });
       y = top + 50;
     }
@@ -1575,7 +1588,7 @@ export class Shell {
       if (sector) this.text(sector, 'body', W / 2, y + 22, { color: C.inkSoft });
       this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
         size: 26,
-        color: '#5f452c',
+        color: C.heading,
       });
       y += 82;
     }
@@ -1648,6 +1661,33 @@ function gear(x: number, y: number, r: number, color: number | string): Graphics
     .fill(color)
     .circle(x, y, r * 0.34)
     .cut();
+}
+
+/**
+ * A speaker 14 px wide, its left edge at `x` and centered on `cy`, in the checkboxes' column;
+ * with sound waves unless `on` is false.
+ */
+function speaker(x: number, cy: number, on: boolean, color: number | string): Graphics {
+  const g = new Graphics()
+    .rect(x, cy - 3, 4, 6)
+    .fill(color)
+    .poly([x + 3, cy - 3, x + 8, cy - 7, x + 8, cy + 7, x + 3, cy + 3])
+    .fill(color);
+  if (on) {
+    // Each wave starts where its arc does, or the path joins it to the last point
+    for (const r of [3.5, 6.5]) {
+      g.moveTo(x + 8 + r * Math.cos(-0.9), cy + r * Math.sin(-0.9))
+        .arc(x + 8, cy, r, -0.9, 0.9)
+        .stroke({ color, width: 1.6 });
+    }
+  } else {
+    g.moveTo(x + 10, cy - 3)
+      .lineTo(x + 14, cy + 3)
+      .moveTo(x + 14, cy - 3)
+      .lineTo(x + 10, cy + 3)
+      .stroke({ color, width: 1.6 });
+  }
+  return g;
 }
 
 /** Replaces `{0}`, `{1}`... with the arguments. */
