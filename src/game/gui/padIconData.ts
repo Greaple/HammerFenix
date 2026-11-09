@@ -53,6 +53,12 @@ export const PAD_ICON_DATA: Record<string, Record<string, PadIconData>> = {
       "h": 32,
       "box": 24
     },
+    "x": {
+      "svg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"16\" cy=\"16\" r=\"12\" fill=\"__BODY__\"/><path d=\"M10.8 10.8H13.1807L16.0273 15.9477H16.141L18.9875 10.8H21.3682L17.1353 18.0954V22.4364H15.033V18.0954L10.8 10.8Z\" fill=\"__INK__\"/></svg>",
+      "w": 32,
+      "h": 32,
+      "box": 24
+    },
     "y": {
       "svg": "<svg width=\"32\" height=\"32\" viewBox=\"0 0 32 32\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><circle cx=\"16\" cy=\"16\" r=\"12\" fill=\"__BODY__\"/><path d=\"M13.4602 10L16.0227 14.2614H16.1136L18.6875 10H21.0909L17.5057 15.8182L21.1477 21.6364H18.7045L16.1136 17.4034H16.0227L13.4318 21.6364H11L14.6761 15.8182L11.0455 10H13.4602Z\" fill=\"__INK__\"/></svg>",
       "w": 32,

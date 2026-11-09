@@ -207,9 +207,13 @@ describe('controller icons (assets-src/pad-icons)', () => {
     // An unknown controller: Xbox's buttons, its own Start drawn as a label
     expect(padIconHtml('a', 'generic', 24)).toBe(a);
     expect(padIconHtml('start', 'generic', 24)).toBeNull();
-    // Each maker has its own; a missing face button is drawn, never another maker's
+    // Each maker has its own, for every button the screens show
     expect(padIconHtml('dpad', 'playstation', 24)).not.toBe(padIconHtml('dpad', 'xbox', 24));
-    expect(padIconHtml('x', 'nintendo', 24)).toBeNull(); // no Y button icon yet
+    for (const layout of ['xbox', 'playstation', 'nintendo'] as const) {
+      for (const b of ['a', 'b', 'x', 'y', 'r2', 'start', 'back', 'dpad', 'stick'] as const) {
+        expect(padIconHtml(b, layout, 24), `${layout} ${b}`).not.toBeNull();
+      }
+    }
   });
 });
 

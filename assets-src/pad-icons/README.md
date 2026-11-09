@@ -28,8 +28,8 @@ Figma node of each icon:
   `start` (plain-small-option, the PS5 Options button) and `back` (Share) are pills exported by
   the maintainer in the sheet's style,
   cropped to the pill by the build.
-- Switch (Mono, light): `a` 66:24299 (B), `b` 66:24298 (A), `y` 66:24300 (X), `r2` 66:24307
+- Switch (Mono, light): `a` 66:24299 (B), `b` 66:24298 (A), `x` 66:24301 (Y), `y` 66:24300 (X), `r2` 66:24307
   (ZR), `start` 66:24315 (+), `back` 66:24316 (−), `dpad` 72:37065 (+Control Pad), `stick`
-  66:24371 (Left Stick). Missing: `x` (the Y button, 66:24301).
+  66:24371 (Left Stick).
 
 Missing files: the screens draw that button themselves (`padGlyph` in `PadGlyphs.ts`).
