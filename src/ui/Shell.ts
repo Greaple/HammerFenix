@@ -556,7 +556,7 @@ export class Shell {
           if (right) this.setVolume(this.settings.volume + VOLUME_STEP);
         }
         if (ok) this.confirmSetting();
-        if (esc) this.showMenu();
+        if (esc) this.leaveSettings();
         break;
     }
   }
@@ -652,7 +652,7 @@ export class Shell {
   private confirmSetting(): void {
     const row = SETTING_ROWS[this.settingSel];
     if (row === 'back') {
-      this.showMenu();
+      this.leaveSettings();
       return;
     }
     if (row === 'volume') {
@@ -661,6 +661,12 @@ export class Shell {
       return;
     }
     this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
+  }
+
+  /** Back to the menu, with Adventure selected again (the gear is only a way in). */
+  private leaveSettings(): void {
+    this.selected = 0;
+    this.showMenu();
   }
 
   private setVolume(v: number): void {
@@ -1220,7 +1226,14 @@ export class Shell {
 
     // Back: space only when it is the selected row, as space ticks the others
     const back = row === 'back';
-    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true, back ? 'auto' : 'pad');
+    this.actionButton(
+      t.back,
+      BUTTON_Y,
+      () => this.leaveSettings(),
+      170,
+      true,
+      back ? 'auto' : 'pad',
+    );
   }
 
   /**
