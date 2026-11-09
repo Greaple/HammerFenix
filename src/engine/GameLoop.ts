@@ -27,8 +27,14 @@ export class FixedGameLoop {
   bulletScale = 1.0;
   /** `Timer.fps()`: logic ticks run per real second, measured over half a second. */
   fps: number = FixedGameLoop.LOGIC_HZ;
+  /**
+   * Frames the page drew per real second, measured with `fps`. Flash ran the game once per
+   * drawn frame, so this is what `Timer.fps()` saw when the machine lagged (the lag manager).
+   */
+  frameRate: number = FixedGameLoop.ANIM_HZ;
   private fpsStartMs = 0;
   private fpsSteps = 0;
+  private fpsFrames = 0;
 
   private readonly onLogicStep: () => void;
   private readonly onAnimStep: () => void;
@@ -50,6 +56,7 @@ export class FixedGameLoop {
     this.lastTimeMs = performance.now();
     this.fpsStartMs = this.lastTimeMs;
     this.fpsSteps = 0;
+    this.fpsFrames = 0;
     this.logicAccum = 0;
     this.rafId = requestAnimationFrame(this.tick);
   }
@@ -113,10 +120,13 @@ export class FixedGameLoop {
       steps++;
     }
     this.fpsSteps += steps;
+    this.fpsFrames++;
     if (nowMs - this.fpsStartMs >= 500) {
       this.fps = (this.fpsSteps * 1000) / (nowMs - this.fpsStartMs);
+      this.frameRate = (this.fpsFrames * 1000) / (nowMs - this.fpsStartMs);
       this.fpsStartMs = nowMs;
       this.fpsSteps = 0;
+      this.fpsFrames = 0;
     }
 
     this.onRender?.(this.logicAccum / logicDt);

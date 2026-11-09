@@ -142,7 +142,13 @@ describe('volumes (GameParameters, GameManager, Mode.setMusicVolume)', () => {
     expect(c.soundVolume).toBe(0.5);
     expect(c.musicVolume).toBeCloseTo(0.325);
     expect(c.hasMusic()).toBe(true);
-    const off = new GameParameters(SYSTEM_FAMILIES, '', { volume: 60, sound: 0, music: 0 });
+    const off = new GameParameters(SYSTEM_FAMILIES, '', {
+      volume: 60,
+      sound: 0,
+      music: 0,
+      detail: 1,
+      shake: 1,
+    });
     expect(off.soundVolume).toBe(0);
     expect(off.hasMusic()).toBe(false);
   });

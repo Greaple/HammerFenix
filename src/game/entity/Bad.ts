@@ -366,9 +366,14 @@ export class BadEntity extends MoverEntity {
 
     super.endUpdate();
 
-    // Ice shards (the original's "detail" option, on by default)
+    // Ice shards, in high details only
     const minSpeed = 2;
-    if (this.fl_freeze && this.fl_stable && Math.abs(this.dx) > minSpeed) {
+    if (
+      this.game.config.fl_detail &&
+      this.fl_freeze &&
+      this.fl_stable &&
+      Math.abs(this.dx) > minSpeed
+    ) {
       const nb = this.game.rand.random(5) + 2;
       for (let i = 0; i < nb; i++) {
         const part = this.game.fxMan.attachFx(
@@ -586,9 +591,11 @@ export class WalkerBad extends BadEntity {
         }
       }
     }
-    if (this.fl_freeze && Math.abs(this.dx) >= 4) {
+    if (this.game.config.fl_detail && this.fl_freeze && Math.abs(this.dx) >= 4) {
       if (this.recentParticles <= 0) {
-        this.game.shake(Math.round(Data.SECOND * 0.2), 2);
+        if (this.game.config.fl_shaky) {
+          this.game.shake(Math.round(Data.SECOND * 0.2), 2);
+        }
         this.game.fxMan.inGameParticles(
           Data.PARTICLE_ICE_BAD,
           this.x,

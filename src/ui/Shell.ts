@@ -11,7 +11,10 @@
  * mode list and texts follow the site guide; the results show what the game sends the site;
  * the quest and fridge pages show the profile (3.2b): quests done, in progress and still to
  * discover, and the item collection with its "found N times" rule. The selected mode's options
- * are checkboxes under its text, the locked ones with the quest that unlocks them (3.3).
+ * are checkboxes under its text, the locked ones with the quest that unlocks them (3.3). The
+ * settings page is the site's "Options" link at the bottom of its menu (2C.5): the five
+ * settings with the guide's texts (section 8 of `guide.html`, typos fixed; the volume hint
+ * names the sound, as the volume sets the sounds and the music).
  */
 import {
   BlurFilter,
@@ -30,6 +33,7 @@ import type { InputController } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
 import { padGlyph } from '../game/gui/PadGlyphs';
+import { DEFAULT_SETTINGS, type PlayerSettings, VOLUME_STEP } from '../game/GameParameters';
 import type { GameResult } from '../game/Loader';
 import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
 import type { Lang } from './Language';
@@ -60,7 +64,7 @@ export const TITLE_FILE = 'images/mainTitle.webp';
  */
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
-type Screen = 'menu' | 'result' | 'quests' | 'fridge';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings';
 
 /** An item clip used as an icon: special items below 1000, score items from 1000. */
 type Icon = { item: number } | { clip: string };
@@ -91,11 +95,19 @@ const TABS: TabEntry[] = [
   { screen: 'fridge', icon: { item: 1018 } },
 ];
 
-/** What the menu's arrows move through: the modes, each with its options, the tabs. */
+/** What the menu's arrows move through: the modes, each with its options, the tabs, the settings. */
 type MenuEntry =
   | { kind: 'mode'; mode: ModeEntry }
   | { kind: 'option'; mode: ModeEntry; oid: string }
-  | { kind: 'tab'; tab: TabEntry };
+  | { kind: 'tab'; tab: TabEntry }
+  | { kind: 'settings' };
+
+/** The rows of the settings page, in the guide's order, then the back button. */
+const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'back'] as const;
+type SettingRow = (typeof SETTING_ROWS)[number];
+
+/** The settings button, at the bottom right of the menu's panel. */
+const GEAR = { x: 368, y: 478, r: 17 };
 
 /**
  * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
@@ -156,6 +168,20 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Explosifs instables',
     boost: 'Tornade',
+    settings: 'Options de jeu',
+    settingsNote: 'Les réglages s’appliquent à la prochaine partie.',
+    detail: 'Détails graphiques élevés',
+    detailHint: 'Pour améliorer la rapidité du jeu, décochez la case.',
+    shake: 'Vibrations fréquentes',
+    shakeHint:
+      'Si vous trouvez que les vibrations pendant le jeu sont saccadées, décochez cette case.',
+    sound: 'Son',
+    soundHint:
+      'Les effets de son (les sauts, les explosions) sont activés si vous cochez cette case.',
+    music: 'Musique',
+    musicHint: 'Cochez cette case pour écouter la musique du jeu pendant votre aventure.',
+    volume: 'Volume sonore',
+    volumeHint: 'Réglez l’intensité du volume sonore avec cette option.',
   },
   en: {
     modes: 'Game modes',
@@ -207,6 +233,18 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Unstable explosives',
     boost: 'Tornado',
+    settings: 'Game options',
+    settingsNote: 'The settings apply to the next game.',
+    detail: 'High quality graphics',
+    detailHint: 'To get a better game performance, disable the box.',
+    shake: 'Frequent vibrations',
+    shakeHint: 'If you think the vibrations are slowing down the game, disable this box.',
+    sound: 'Sound',
+    soundHint: 'Sound effects (jumps, explosions, etc.) are activated if you enable this box.',
+    music: 'Music',
+    musicHint: 'Enable this box to listen to the music of the game during your adventure.',
+    volume: 'Volume',
+    volumeHint: 'Turn up or down the volume with this option.',
   },
   es: {
     modes: 'Modos de juego',
@@ -259,6 +297,20 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Explosivos inestables',
     boost: 'Tornado',
+    settings: 'Opciones de juego',
+    settingsNote: 'Los ajustes se aplican a la próxima partida.',
+    detail: 'Detalles gráficos elevados',
+    detailHint: 'Para mejorar la rapidez del juego, desactiva la casilla.',
+    shake: 'Vibraciones frecuentes',
+    shakeHint:
+      'Si te parece que las vibraciones en el juego entorpecen tu juego, desactiva esta casilla.',
+    sound: 'Sonido',
+    soundHint:
+      'Los efectos de sonido (los saltos, las explosiones, etc.) están activados si activas esta casilla.',
+    music: 'Música',
+    musicHint: 'Activa esta casilla para escuchar la música del juego durante tu aventura.',
+    volume: 'Volumen del sonido',
+    volumeHint: 'Puedes cambiar el volumen del sonido con esta opción.',
   },
 };
 
@@ -330,9 +382,14 @@ export class Shell {
   private questSel = 0;
   private questTop = 0;
   private fridgeSel = 0;
+  private settingSel = 0;
+  /** The player's settings, as the settings page shows them. */
+  settings: PlayerSettings = { ...DEFAULT_SETTINGS };
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
+  /** A setting changed on the settings page. */
+  onSettings?: (s: PlayerSettings) => void;
 
   constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts, profile: Profile) {
     this.lib = lib;
@@ -392,6 +449,12 @@ export class Shell {
   showFridge(): void {
     this.screen = 'fridge';
     this.fridgeSel = 0;
+    this.render();
+  }
+
+  showSettings(): void {
+    this.screen = 'settings';
+    this.settingSel = 0;
     this.render();
   }
 
@@ -458,8 +521,8 @@ export class Shell {
         if (up) this.select(this.selected - 1);
         if (down) this.select(this.selected + 1);
         if (entries[this.selected].kind === 'tab' && (left || right)) {
-          // the two tabs side by side, last in the list
-          const first = entries.length - TABS.length;
+          // the two tabs side by side
+          const first = entries.findIndex((e) => e.kind === 'tab');
           this.select(this.selected === first ? first + 1 : first);
         }
         if (ok) this.confirm();
@@ -479,6 +542,16 @@ export class Shell {
         if (up) this.selectItem(this.fridgeSel - FRIDGE_COLS);
         if (down) this.selectItem(this.fridgeSel + FRIDGE_COLS);
         if (ok || esc) this.showMenu();
+        break;
+      case 'settings':
+        if (up) this.selectSetting(this.settingSel - 1);
+        if (down) this.selectSetting(this.settingSel + 1);
+        if (SETTING_ROWS[this.settingSel] === 'volume') {
+          if (left) this.setVolume(this.settings.volume - VOLUME_STEP);
+          if (right) this.setVolume(this.settings.volume + VOLUME_STEP);
+        }
+        if (ok) this.confirmSetting();
+        if (esc) this.showMenu();
         break;
     }
   }
@@ -504,6 +577,7 @@ export class Shell {
       for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
     }
     for (const tab of TABS) out.push({ kind: 'tab', tab });
+    out.push({ kind: 'settings' });
     return out;
   }
 
@@ -523,7 +597,9 @@ export class Shell {
 
   private confirm(): void {
     const e = this.menuEntries()[this.selected];
-    if (e.kind === 'tab') {
+    if (e.kind === 'settings') {
+      this.showSettings();
+    } else if (e.kind === 'tab') {
       if (e.tab.screen === 'quests') this.showQuests();
       else this.showFridge();
     } else if (e.kind === 'option') {
@@ -559,6 +635,40 @@ export class Shell {
     this.render();
   }
 
+  private selectSetting(i: number): void {
+    const count = SETTING_ROWS.length;
+    const n = (i + count) % count;
+    if (n === this.settingSel) return;
+    this.settingSel = n;
+    this.render();
+  }
+
+  /** Space or a click on a row: ticks or unticks it; on the volume, the next step (wrapping). */
+  private confirmSetting(): void {
+    const row = SETTING_ROWS[this.settingSel];
+    if (row === 'back') {
+      this.showMenu();
+      return;
+    }
+    if (row === 'volume') {
+      const v = this.settings.volume;
+      this.setVolume(v >= 100 ? 0 : v + VOLUME_STEP);
+      return;
+    }
+    this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
+  }
+
+  private setVolume(v: number): void {
+    const vol = Math.max(0, Math.min(100, Math.round(v / VOLUME_STEP) * VOLUME_STEP));
+    if (vol !== this.settings.volume) this.changeSettings({ volume: vol });
+  }
+
+  private changeSettings(change: Partial<PlayerSettings>): void {
+    this.settings = { ...this.settings, ...change };
+    this.onSettings?.(this.settings);
+    this.render();
+  }
+
   private selectItem(i: number): void {
     const n = Math.max(0, Math.min(this.profile.quests.itemIds.length - 1, i));
     if (n === this.fridgeSel) return;
@@ -587,8 +697,11 @@ export class Shell {
     this.root.eventMode = 'static';
     this.root.visible = true;
     this.root.parent?.addChild(this.root); // above the Loader's clip
-    this.drawBackground(this.screen === 'quests' || this.screen === 'fridge');
+    this.drawBackground(
+      this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings',
+    );
     if (this.screen === 'menu') this.drawMenu();
+    else if (this.screen === 'settings') this.drawSettings();
     else if (this.screen === 'quests') this.drawQuests();
     else if (this.screen === 'fridge') this.drawFridge();
     else if (this.result) this.drawResult(this.result);
@@ -732,7 +845,8 @@ export class Shell {
   /**
    * The screen's main action: a wood button at the bottom of the panel, centered on `cy`, as
    * the help dialog's (`.parchment-btn`). With a keyboard, a keycap says the space bar does it
-   * too; with a controller, its A button (B for `back`). `action` null draws it disabled.
+   * too (not with `cap` 'pad', where space does something else); with a controller, its A
+   * button (B for `back`). `action` null draws it disabled.
    */
   private actionButton(
     label: string,
@@ -740,6 +854,7 @@ export class Shell {
     action: (() => void) | null,
     w = 220,
     back = false,
+    capMode: 'auto' | 'pad' = 'auto',
   ): void {
     const h = 36;
     const x = W / 2 - w / 2;
@@ -762,7 +877,7 @@ export class Shell {
     let capW = 0;
     const cap = new Container();
     const device = this.input.device;
-    if (on && device === 'keyboard') {
+    if (on && device === 'keyboard' && capMode === 'auto') {
       const k = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
         align: 'left',
         size: 9,
@@ -895,7 +1010,7 @@ export class Shell {
       }
     });
 
-    const mode = cur.kind === 'tab' ? null : cur.mode;
+    const mode = cur.kind === 'mode' || cur.kind === 'option' ? cur.mode : null;
     const shown = mode ?? MODES[0];
     this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 128, { width: 320, color: C.inkSoft });
     if (shown.enabled) this.drawOptions(shown, entries, top + 166);
@@ -932,9 +1047,27 @@ export class Shell {
       });
     });
 
+    this.drawGear(entries);
+
     if (cur.kind === 'tab') this.actionButton(t[cur.tab.screen], BUTTON_Y, () => this.confirm());
+    else if (cur.kind === 'settings') this.actionButton(t.settings, BUTTON_Y, () => this.confirm());
     else if (shown.enabled) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
     else this.actionButton(t.start, BUTTON_Y, null);
+  }
+
+  /** The settings button: a gear on a round wood button, as the tabs when selected. */
+  private drawGear(entries: MenuEntry[]): void {
+    const n = entries.findIndex((e) => e.kind === 'settings');
+    const sel = n === this.selected;
+    const { x, y, r } = GEAR;
+    const btn = this.button([x - r, y - r, 2 * r, 2 * r], () => this.clickEntry(n), sel, r);
+    if (!sel) {
+      btn.addChildAt(
+        new Graphics().circle(x, y, r - 0.5).stroke({ color: C.wood, width: 1, alpha: 0.35 }),
+        1,
+      );
+    }
+    btn.addChild(gear(x, y, r * 0.62, sel ? 0xfff3c4 : C.wood));
   }
 
   /** Quests done and items in the fridge, each out of all. */
@@ -1005,6 +1138,125 @@ export class Shell {
       x.actions.some((a) => a.type === 'give' && a.attrs.option === oid),
     );
     return q ? this.texts.getQuestName(q.id) : '?';
+  }
+
+  // -------------------------------------------------------------- settings
+
+  /**
+   * The settings page: a checkbox each for details, shaking, sound and music, a gauge for the
+   * volume. The selected row shows the guide's text for it.
+   */
+  private drawSettings(): void {
+    const t = this.t;
+    const st = this.settings;
+    this.panel(12, 12, 396, H - 20);
+    this.text(t.settings, 'title', W / 2, 22, { size: 26, color: '#5f452c' });
+    this.gearAt(W / 2, 74);
+
+    const top = 110;
+    const rowH = 46;
+    SETTING_ROWS.forEach((row, i) => {
+      if (row === 'back') return;
+      const y = top + i * rowH;
+      const sel = i === this.settingSel;
+      const btn = this.button(
+        [40, y, 340, rowH - 6],
+        () => {
+          this.settingSel = i;
+          if (row !== 'volume') this.confirmSetting();
+          else this.render();
+        },
+        sel,
+        8,
+      );
+      const ink = sel ? C.gold : C.ink;
+      const cy = y + (rowH - 6) / 2;
+      this.text(t[row], 'label', row === 'volume' ? 56 : 82, cy - 9, {
+        align: 'left',
+        size: 15,
+        color: ink,
+        parent: btn,
+      });
+      if (row === 'volume') {
+        this.volumeGauge(btn, cy, sel);
+        return;
+      }
+      const x = 56;
+      const box = new Graphics()
+        .roundRect(x, cy - 7, 14, 14, 3)
+        .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
+        .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 1.6 });
+      if (st[row]) {
+        box
+          .moveTo(x + 3, cy)
+          .lineTo(x + 6.5, cy + 3.5)
+          .lineTo(x + 12, cy - 4)
+          .stroke({ color: sel ? 0xfff3c4 : C.wood, width: 2.4 });
+      }
+      btn.addChild(box);
+    });
+
+    const row = SETTING_ROWS[this.settingSel];
+    const hintY = top + 5 * rowH + 10;
+    if (row !== 'back') {
+      this.text(t[row + 'Hint'], 'body', W / 2, hintY, {
+        width: 330,
+        size: 11,
+        italic: true,
+        color: C.inkSoft,
+      });
+    }
+    this.text(t.settingsNote, 'body', W / 2, BUTTON_Y - 46, {
+      width: 330,
+      size: 10,
+      color: C.todo,
+    });
+
+    // Back: space only when it is the selected row, as space ticks the others
+    const back = row === 'back';
+    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true, back ? 'auto' : 'pad');
+  }
+
+  /**
+   * The volume: a gauge in steps of `VOLUME_STEP`, set by a click at its place, with the
+   * value. Left and right change it when its row is selected.
+   */
+  private volumeGauge(parent: Container, cy: number, sel: boolean): void {
+    const x0 = 214;
+    const w = 112;
+    const v = this.settings.volume;
+    const g = new Graphics()
+      .roundRect(x0, cy - 4, w, 8, 4)
+      .fill({ color: sel ? 0xfff3c4 : C.wood, alpha: sel ? 0.3 : 0.18 })
+      .roundRect(x0, cy - 4, Math.max(8, (w * v) / 100), 8, 4)
+      .fill(v > 0 ? (sel ? C.gold : C.progress) : 'rgba(0,0,0,0)')
+      .circle(x0 + (w * v) / 100, cy, 7)
+      .fill(sel ? 0xfff3c4 : C.wood);
+    const track = new Container();
+    track.eventMode = 'static';
+    track.cursor = 'pointer';
+    track.hitArea = new Rectangle(x0 - 10, cy - 14, w + 20, 28);
+    track.on('pointertap', (e) => {
+      e.stopPropagation();
+      this.settingSel = SETTING_ROWS.indexOf('volume');
+      this.setVolume((100 * (track.toLocal(e.global).x - x0)) / w);
+      this.render();
+    });
+    track.addChild(g);
+    parent.addChild(track);
+    this.text(`${v} %`, 'label', 372, cy - 8, {
+      align: 'right',
+      size: 13,
+      color: sel ? C.gold : C.inkSoft,
+      parent,
+    });
+  }
+
+  /** A big gear under the settings title. */
+  private gearAt(x: number, y: number): void {
+    const g = gear(x, y, 13, C.wood);
+    g.alpha = 0.55;
+    this.root.addChild(g);
   }
 
   // ---------------------------------------------------------------- quests
@@ -1372,6 +1624,30 @@ export class Shell {
       if (n > 1) this.countBadge(`x${n}`, x + size / 2, y + size / 2 - 1);
     });
   }
+}
+
+/** A gear of radius `r` centered on (x, y): 8 teeth and a hole. */
+function gear(x: number, y: number, r: number, color: number | string): Graphics {
+  const teeth = 8;
+  const inner = r * 0.74;
+  const pts: number[] = [];
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2;
+    const step = Math.PI / teeth;
+    for (const [da, rad] of [
+      [-step * 0.95, inner],
+      [-step * 0.45, r],
+      [step * 0.45, r],
+      [step * 0.95, inner],
+    ] as const) {
+      pts.push(x + Math.cos(a + da) * rad, y + Math.sin(a + da) * rad);
+    }
+  }
+  return new Graphics()
+    .poly(pts)
+    .fill(color)
+    .circle(x, y, r * 0.34)
+    .cut();
 }
 
 /** Replaces `{0}`, `{1}`... with the arguments. */

@@ -246,7 +246,9 @@ export class ClassicBomb extends PlayerBomb {
   override onExplode(): void {
     super.onExplode();
 
-    this.game.shake(Data.SECOND * 0.35, 1.5); // `fl_shaky` option, on by default
+    if (this.game.config.fl_shaky) {
+      this.game.shake(Data.SECOND * 0.35, 1.5);
+    }
 
     const bads = this.bombGetClose(Data.BAD) as BadEntity[];
     for (const e of bads) {

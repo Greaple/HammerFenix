@@ -250,10 +250,14 @@ export class FxManager {
   }
 
   /**
-   * `FxManager.dust`: dust falling from a slab. The original skips it in low detail (2C.5).
-   * The draws happen even when `attachFx` returns null (AS2 evaluates them, then sets nothing).
+   * `FxManager.dust`: dust falling from a slab, skipped in low details. The draws happen even
+   * when `attachFx` returns null (AS2 evaluates them, then sets nothing).
    */
   dust(cx: number, cy: number): void {
+    if (!this.game.config.fl_detail) {
+      return;
+    }
+
     const rand = this.game.rand;
     const x = BaseEntity.x_ctr(cx);
     const y = BaseEntity.y_ctr(cy);
@@ -290,18 +294,22 @@ export class FxManager {
   /**
    * `n` particles of type `id` (`PARTICLE_*`), thrown left and right in turn, or all towards
    * `dir` (its sign) when given. At most `MAX_FX` at once: past it, half as many are thrown and
-   * random old ones removed. The original also skips them in low detail, which the port lacks.
+   * random old ones removed. None in low details (`MAX_FX` is halved there too).
    */
   inGameParticlesDir(id: number, x: number, y: number, n: number, dir: number | null): void {
     if (this.game.fl_lock) {
       return;
     }
+    if (!this.game.config.fl_detail) {
+      return;
+    }
 
     // Cleanup of the fx
+    const maxFx = this.game.config.MAX_FX;
     const l = this.game.getList(Data.FX);
-    if (l.length + n > Data.MAX_FX) {
+    if (l.length + n > maxFx) {
       n = Math.ceil(n * 0.5);
-      this.game.destroySome(Data.FX, n + l.length - Data.MAX_FX);
+      this.game.destroySome(Data.FX, n + l.length - maxFx);
     }
 
     let fl_left = this.game.rand.random(2) === 0;

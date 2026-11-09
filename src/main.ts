@@ -184,6 +184,9 @@ async function main(): Promise<void> {
     shell.hide();
     session.start();
   };
+  // The settings page (the site's "Options"): the next game reads them
+  shell.settings = { ...session.settings };
+  shell.onSettings = (settings) => session.setSettings(settings);
   shell.onStart = (mode) => {
     // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
     shell.fadeOut(() => session.levelShown);

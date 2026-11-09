@@ -24,6 +24,8 @@ export class GameHud {
   private realScore = 0;
   private fakeScore = 0;
   private currentLives = 0;
+  /** `fl_light`: the minimal HUD of `lightMode`, which no longer shows lives. */
+  private fl_light = false;
 
   constructor(game: IGameContext, initialScore = 0, initialLives = 2, initialLevel = 0) {
     this.game = game;
@@ -69,7 +71,22 @@ export class GameHud {
     }
   }
 
+  /**
+   * `lightMode`: the minimal HUD, no score and no lives. Only the Learning mode uses it
+   * (`Tutorial.initGame`, not ported yet).
+   */
+  lightMode(): void {
+    if (this.scoreField) this.scoreField.visible = false;
+    this.setLives(0);
+    this.moreIcon?.removeMovieClip();
+    this.moreIcon = null;
+    this.fl_light = true;
+  }
+
   setLives(v: number): void {
+    if (this.fl_light) {
+      return;
+    }
     const target = Math.max(0, v);
     if (this.currentLives > v) {
       this.game.logAction('$LL');

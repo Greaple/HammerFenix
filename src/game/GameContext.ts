@@ -4,6 +4,7 @@ import type { InputController } from '../engine/Input';
 import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import type { GameDataStore } from './Data';
 import type { FxManager } from './FxManager';
+import type { GameParameters } from './GameParameters';
 import type { BaseEntity } from './entity/Entity';
 import type { GameHud } from './gui/GameHud';
 import type { LevelView } from './levels/LevelView';
@@ -29,6 +30,8 @@ export interface IGameContext {
   readonly rand: Random;
   readonly randMan: RandomManager;
   readonly statsMan: StatsManager;
+  /** `GameManager.CONFIG`: the families, options and the player's settings. */
+  readonly config: GameParameters;
 
   /** `GameMode.mc`: the clip holding the whole game, moved by the screen shake. */
   readonly gameRoot: SwfMovieClip;

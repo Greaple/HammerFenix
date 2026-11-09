@@ -19,7 +19,13 @@ import { FxManager } from './FxManager';
 import { Random } from './Random';
 import { PersistCodec } from '../engine/codec/PersistCodec';
 import packageJson from '../../package.json';
-import { GameParameters, SYSTEM_FAMILIES } from './GameParameters';
+import {
+  GameParameters,
+  loadSettings,
+  type PlayerSettings,
+  saveSettings,
+  SYSTEM_FAMILIES,
+} from './GameParameters';
 import { type GameResult, Loader } from './Loader';
 import { RandomManager } from './RandomManager';
 import { StatsManager } from './StatsManager';
@@ -109,10 +115,15 @@ export class GameSession implements IGameContext {
   /** `GameMode.savedScores`: each player's final score, by pid. */
   savedScores: number[] = [];
   /**
+   * The player's settings (the site's "Options" page, roadmap 2C.5), saved in `localStorage`.
+   * The next game reads them (`setParameters`).
+   */
+  settings: PlayerSettings = loadSettings();
+  /**
    * `GameManager.CONFIG`: the families and options of the next game. The site sets them from
    * the player's profile (`setParameters`); with no site the original uses the system families.
    */
-  config = new GameParameters(SYSTEM_FAMILIES, '');
+  config = new GameParameters(SYSTEM_FAMILIES, '', this.settings);
   /** The page around the game: the fades at the end of a game and the hand-off to the site. */
   readonly loader: Loader;
   /**
@@ -135,6 +146,8 @@ export class GameSession implements IGameContext {
     seed: number;
     families: string;
     options: string;
+    detail: number;
+    shake: number;
   } | null = null;
   /** The last recording, kept after it stops (also when a debug restart ends it). */
   lastRecording: Replay | null = null;
@@ -260,6 +273,8 @@ export class GameSession implements IGameContext {
   mapEvents: MapEvent[] = [];
   /** Bullet time left, in frames of the original's real time. */
   private bulletTimer = 0;
+  /** `GameMode.lagCpt`: frames run under 16 fps in a row (the lag manager). */
+  private lagCpt = 0;
 
   /** Screen flips of the blue and red glasses (items 30, 31). */
   fl_flipX = false;
@@ -554,6 +569,7 @@ export class GameSession implements IGameContext {
     this.shakePower = 0;
     this.bulletTimer = 0;
     this.gameLoop.bulletScale = 1;
+    this.lagCpt = 0;
     this.endLevelStack = [];
     this.perfectItemCpt = NaN;
     this.flipX(false);
@@ -582,9 +598,23 @@ export class GameSession implements IGameContext {
     for (const w of this.dimensions) w.fl_mirror = this.fl_mirror;
   }
 
-  /** The `$families` and `$options` of the next games, as the site sent them. */
-  setParameters(families: string, options = ''): void {
-    this.config = new GameParameters(families, options);
+  /**
+   * The `$families` and `$options` of the next games, as the site sent them, with the player's
+   * settings (or `settings`, for a replay).
+   */
+  setParameters(families: string, options = '', settings: PlayerSettings = this.settings): void {
+    this.config = new GameParameters(families, options, settings);
+  }
+
+  /** Changes the player's settings (the settings screen); the next game uses them. */
+  setSettings(s: PlayerSettings): void {
+    this.settings = { ...s };
+    saveSettings(this.settings);
+    this.config = new GameParameters(
+      this.config.families.join(','),
+      this.config.optionList.join(','),
+      this.settings,
+    );
   }
 
   /** From `GameMode.init`: register the extend letters and the unlocked item families. */
@@ -2393,6 +2423,22 @@ export class GameSession implements IGameContext {
       return;
     }
 
+    // FPS: 30 seconds under 16 fps switch to low details and no shaking (lag manager). Flash
+    // ran the game once per drawn frame, so the page's frame rate stands for `Timer.fps()`.
+    // Port deviation: not while recording or replaying, as it would change the random draws.
+    if (this.config.fl_detail && !this.recorder && !this.input.replaying) {
+      if (this.gameLoop.isRunning && this.gameLoop.frameRate <= 16) {
+        this.lagCpt += 1;
+        if (this.lagCpt >= Data.SECOND * 30) {
+          this.config.setLowDetails();
+          this.config.fl_shaky = false;
+        }
+      } else {
+        this.lagCpt = 0;
+      }
+    }
+
+    // Chrono
     this.gameChrono.update();
     this.input.poll();
 
@@ -2710,6 +2756,8 @@ export class GameSession implements IGameContext {
       seed: this.seed,
       families: this.config.families.join(','),
       options: this.config.optionList.join(','),
+      detail: this.config.fl_detail ? 1 : 0,
+      shake: this.config.fl_shaky ? 1 : 0,
     };
     this.input.startRecording(this.recorder);
   }
@@ -2722,8 +2770,11 @@ export class GameSession implements IGameContext {
   stopRecording(): Replay | null {
     if (!this.recorder || !this.recordStart) return null;
     this.input.stopRecording();
-    const { set, level, seed, families, options } = this.recordStart;
+    const { set, level, seed, families, options, detail, shake } = this.recordStart;
     this.lastRecording = this.recorder.toReplay(set, level, seed, families, options);
+    // Low details and no shaking change the random draws, so the replay keeps them
+    if (detail === 0) this.lastRecording.detail = 0;
+    if (shake === 0) this.lastRecording.shake = 0;
     this.recorder = null;
     this.recordStart = null;
     return this.lastRecording;
@@ -2736,7 +2787,11 @@ export class GameSession implements IGameContext {
       await this.changeSet(replay.set, replay.level);
     }
     this.backToMainWorld();
-    this.setParameters(replay.families ?? SYSTEM_FAMILIES, replay.options ?? '');
+    this.setParameters(replay.families ?? SYSTEM_FAMILIES, replay.options ?? '', {
+      ...this.settings,
+      detail: replay.detail ?? 1,
+      shake: replay.shake ?? 1,
+    });
     this.initGame(replay.level, replay.seed);
     const player = new InputPlayer(replay.input);
     this.input.startReplay(player);

@@ -30,6 +30,12 @@ export interface Replay {
    */
   families?: string;
   options?: string;
+  /**
+   * `$detail` and `$shake` when 0 (they change the random draws); absent means on, as in the
+   * replays recorded before the settings screen.
+   */
+  detail?: number;
+  shake?: number;
   input: [number, number][];
 }
 

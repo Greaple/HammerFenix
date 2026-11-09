@@ -1156,7 +1156,7 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
       Data.PARTICLE_TUBERCULOZ,
       this.x,
       this.y + T.CENTER_OFFSET,
-      Data.MAX_FX,
+      game.config.MAX_FX,
     );
     game.shake(Data.SECOND, 5);
     this.playAnim(Data.ANIM_BOSS_DEATH);
