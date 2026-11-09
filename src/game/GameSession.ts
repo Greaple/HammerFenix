@@ -18,6 +18,7 @@ import { SupaItem } from './entity/Supa';
 import { FxManager } from './FxManager';
 import { Random } from './Random';
 import { PersistCodec } from '../engine/codec/PersistCodec';
+import { Timer } from '../engine/Timer';
 import packageJson from '../../package.json';
 import {
   GameParameters,
@@ -155,10 +156,10 @@ export class GameSession implements IGameContext {
   readonly xOffset = 10;
   readonly yOffset = 0;
   cycle = 0;
-  xFriction = Data.FRICTION_X;
-  yFriction = Data.FRICTION_Y;
-  gFriction = Data.FRICTION_GROUND;
-  sFriction = Data.FRICTION_SLIDE;
+  xFriction: number = Data.FRICTION_X;
+  yFriction: number = Data.FRICTION_Y;
+  gFriction: number = Data.FRICTION_GROUND;
+  sFriction: number = Data.FRICTION_SLIDE;
   speedFactor = 1.0;
   diffFactor = 1.0;
 
@@ -190,6 +191,10 @@ export class GameSession implements IGameContext {
   fl_aqua = false;
   fl_wind = false;
   windSpeed = 0;
+  /** `GameMode.windTimer`: frames of wind left. Nothing in the original starts wind. */
+  private windTimer = 0;
+  /** `GameMode.aquaTimer`: phase of the water wobble of `$AQUA` levels. */
+  private aquaTimer = 0;
   /** Game options (`GameMode` constructor): set from `config` at each new game. */
   fl_mirror = false;
   fl_nightmare = false;
@@ -567,8 +572,10 @@ export class GameSession implements IGameContext {
     this.shakeTimer = 0;
     this.shakeTotal = 0;
     this.shakePower = 0;
+    this.wind(null, null);
+    this.windTimer = 0;
+    this.aquaTimer = 0;
     this.bulletTimer = 0;
-    this.gameLoop.bulletScale = 1;
     this.lagCpt = 0;
     this.endLevelStack = [];
     this.perfectItemCpt = NaN;
@@ -790,7 +797,7 @@ export class GameSession implements IGameContext {
   /** `ViewManager.update`: level scroll, portal side scroll and portal fade. */
   private updateView(): void {
     if (this.fl_scrolling) {
-      this.scrollCpt += Data.SCROLL_SPEED;
+      this.scrollCpt += Data.SCROLL_SPEED * Timer.tmod;
       this.view.moveTo(0, Data.GAME_HEIGHT + Math.sin(this.scrollCpt) * (0 - Data.GAME_HEIGHT));
       if (this.fake) {
         this.fake._x = 0;
@@ -804,7 +811,7 @@ export class GameSession implements IGameContext {
     }
 
     if (this.fl_hscrolling) {
-      this.scrollCpt += this.scrollDir * Data.SCROLL_SPEED;
+      this.scrollCpt += this.scrollDir * Data.SCROLL_SPEED * Timer.tmod;
       if (this.scrollDir > 0) {
         this.view.moveTo(
           20 + Data.GAME_WIDTH + Math.sin(this.scrollCpt) * (0 - Data.GAME_WIDTH - 20),
@@ -828,7 +835,7 @@ export class GameSession implements IGameContext {
     }
 
     if (this.fl_fading && this.fake) {
-      this.fake._alpha -= Data.FADE_SPEED;
+      this.fake._alpha -= Timer.tmod * Data.FADE_SPEED;
 
       const blur = 100 - this.fake._alpha;
       this.fake.setBlur(blur, blur * 0.3);
@@ -858,7 +865,7 @@ export class GameSession implements IGameContext {
     // Floating portal fields
     for (const p of this.world.portalList) {
       p.mc._y = p.y + 3 * Math.sin(p.cpt);
-      p.cpt += 0.1;
+      p.cpt += Timer.tmod * 0.1;
       if (this.rand.random(5) === 0) {
         const a = this.fxMan.attachFx(
           p.x + Data.CASE_WIDTH * 0.5 + this.rand.random(15) * (this.rand.random(2) * 2 - 1),
@@ -1328,6 +1335,23 @@ export class GameSession implements IGameContext {
     } else {
       this.gameRoot._yscale = 100;
       this.gameRoot._y = this.yOffset;
+    }
+  }
+
+  /** `GameMode.updateGroundFrictions`: the frictions on the ground and on ice for this `tmod`. */
+  private updateGroundFrictions(): void {
+    this.gFriction = Math.pow(Data.FRICTION_GROUND, Timer.tmod);
+    this.sFriction = Math.pow(Data.FRICTION_SLIDE, Timer.tmod);
+  }
+
+  /** `GameMode.wind`: wind of `speed` for `duration` frames, or none (`speed` null). */
+  wind(speed: number | null, duration: number | null): void {
+    if (speed === null) {
+      this.fl_wind = false;
+    } else {
+      this.fl_wind = true;
+      this.windSpeed = speed;
+      this.windTimer = duration ?? 0;
     }
   }
 
@@ -2333,20 +2357,18 @@ export class GameSession implements IGameContext {
   /**
    * `Mode.getDebugControls` + `GameMode.getDebugControls`: Backspace clears the log, Shift slows
    * the game to `tmod` 0.3 and Home puts it back to 1 (Shift held with bullet time does nothing
-   * more). Returns this tick's `tmod`. `Adventure`'s Ctrl+Shift+M (the co-op mode) waits for
-   * Phase 4.
+   * more). `Adventure`'s Ctrl+Shift+M (the co-op mode) waits for Phase 4.
    */
-  private getDebugControls(tmod: number): number {
+  private getDebugControls(): void {
     if (this.input.isKeyDown(8)) {
       Log.clear();
     }
     if (this.input.isKeyDown(16)) {
-      tmod = 0.3;
+      Timer.tmod = 0.3;
     }
     if (this.input.isKeyDown(36)) {
-      tmod = 1.0;
+      Timer.tmod = 1.0;
     }
-    return tmod;
   }
 
   /**
@@ -2401,8 +2423,12 @@ export class GameSession implements IGameContext {
 
   // ------------------------------------------------------- Fixed Update Loop
 
-  /** One logic tick: `GameMode.main`, then the dev log's lines of the tick. */
+  /**
+   * One logic tick: `GameManager.main` (`Timer.update` gives this frame's `tmod`, always 1
+   * here), `GameMode.main`, then the dev log's lines of the tick.
+   */
   update(): void {
+    Timer.tmod = 1;
     this.main();
     Log.flush();
   }
@@ -2428,7 +2454,7 @@ export class GameSession implements IGameContext {
     // Port deviation: not while recording or replaying, as it would change the random draws.
     if (this.config.fl_detail && !this.recorder && !this.input.replaying) {
       if (this.gameLoop.isRunning && this.gameLoop.frameRate <= 16) {
-        this.lagCpt += 1;
+        this.lagCpt += Timer.tmod;
         if (this.lagCpt >= Data.SECOND * 30) {
           this.config.setLowDetails();
           this.config.fl_shaky = false;
@@ -2489,24 +2515,34 @@ export class GameSession implements IGameContext {
       this.printDebugInfos();
     }
 
-    // Bullet time: the original counts it in real frames, each moving the game by 0.3.
-    // `Timer.update` recomputes `tmod` each frame (`calc_tmod`), so it lasts that frame only.
-    let tmod = 1;
+    // Bullet time: counted in real frames, each moving the game by 0.3. `Timer.update`
+    // recomputes `tmod` each frame (`calc_tmod`), so it lasts that frame only. The movie clips
+    // keep their 40 fps.
     if (this.fl_bullet && this.bulletTimer > 0) {
-      this.bulletTimer -= 1 / BULLET_TMOD;
-      if (this.bulletTimer > 0) tmod = BULLET_TMOD;
+      this.bulletTimer -= Timer.tmod;
+      if (this.bulletTimer > 0) {
+        Timer.tmod = BULLET_TMOD;
+      }
     }
+    // Variables
+    this.updateGroundFrictions();
+
+    // `Mode.main`
     if (this.fl_debug) {
-      tmod = this.getDebugControls(tmod);
+      this.getDebugControls();
     }
-    this.gameLoop.bulletScale = tmod;
     this.getDevControls();
 
     if (this.fl_pause) {
       return;
     }
 
-    this.cycle += 1;
+    // `Mode.updateConstants`: not while the game is locked
+    if (!this.fl_lock) {
+      this.xFriction = Math.pow(Data.FRICTION_X, Timer.tmod);
+      this.yFriction = Math.pow(Data.FRICTION_Y, Timer.tmod);
+      this.cycle += Timer.tmod;
+    }
     this.fl_ice = this.getDynamicVar('$ICE') !== undefined;
     this.fl_aqua = this.getDynamicVar('$AQUA') !== undefined;
 
@@ -2524,7 +2560,7 @@ export class GameSession implements IGameContext {
     for (const p of this.portalMcList) {
       if (p) {
         p.mc._y = p.y + 2 * Math.sin(p.cpt);
-        p.cpt += 0.1;
+        p.cpt += Timer.tmod * 0.1;
         if (this.rand.random(5) === 0) {
           const a = this.fxMan.attachFx(
             p.x + this.rand.random(25) * (this.rand.random(2) * 2 - 1),
@@ -2539,11 +2575,11 @@ export class GameSession implements IGameContext {
       }
     }
 
-    this.duration += 1;
+    this.duration += Timer.tmod;
 
     // Automatic end of the mode
     if (this.endModeTimer > 0) {
-      this.endModeTimer -= 1;
+      this.endModeTimer -= Timer.tmod;
       if (this.endModeTimer <= 0) {
         for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
           this.registerScore(p.pid, p.score);
@@ -2555,9 +2591,9 @@ export class GameSession implements IGameContext {
     this.fxMan.update();
 
     // Hurry up (H: 21 times faster in dev mode)
-    this.huTimer += 1;
+    this.huTimer += Timer.tmod;
     if (this.input.isKeyDown(72) && this.fl_debug) {
-      this.huTimer += 20;
+      this.huTimer += Timer.tmod * 20;
     }
     if (
       this.huState < Data.HU_STEPS.length &&
@@ -2599,7 +2635,7 @@ export class GameSession implements IGameContext {
 
     // Screen shake
     if (this.shakeTimer > 0) {
-      this.shakeTimer -= 1;
+      this.shakeTimer -= Timer.tmod;
       if (this.shakeTimer <= 0) {
         this.shakeTimer = 0;
         this.shakePower = 0;
@@ -2617,6 +2653,28 @@ export class GameSession implements IGameContext {
         this.gameRoot._y = Data.GAME_HEIGHT + 20 + Math.round(this.yOffset + amp());
       } else {
         this.gameRoot._y = Math.round(this.yOffset + amp());
+      }
+    }
+
+    // Water: the game bobs and stretches
+    if (this.fl_aqua) {
+      this.aquaTimer += 0.03 * Timer.tmod;
+      if (!this.fl_flipY) {
+        this.gameRoot._y = -7 + 7 * Math.cos(this.aquaTimer);
+        this.gameRoot._yscale = 102 - 2 * Math.cos(this.aquaTimer);
+      }
+    } else {
+      if (this.aquaTimer !== 0) {
+        this.aquaTimer = 0;
+        this.flipY(this.fl_flipY);
+      }
+    }
+
+    // Wind
+    if (this.windTimer > 0) {
+      this.windTimer -= Timer.tmod;
+      if (this.windTimer <= 0) {
+        this.wind(null, null);
       }
     }
 

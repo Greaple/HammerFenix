@@ -4,14 +4,15 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-08):
+Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-09):
 
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
 3. 2B.4 to 2B.6 are done (the spot checks in [LEVELS.md](LEVELS.md); its "needs play" rows wait for the user). Phase 2B is done. Next: the rest of Phase 2C.
 4. G.1 is done (solo controller, prompts follow the device in use, tried with a real controller). Next: the rest of Phase 2C.
-5. 2C.3 (disguises, key E and controller Y), 2C.4 (world map, key C) and 2C.8 (`Data.mt` checked constant by constant) are done. Next: 2C.5 to 2C.7.
-6. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
+5. 2C.3 (disguises, key E and controller Y), 2C.4 (world map, key C) and 2C.8 (`Data.mt` checked constant by constant) are done.
+6. 2C.5 (settings page: the gear on the mode menu) and 2C.7 (`Timer.tmod` for bullet time, clip steps before the logic, aqua and wind) are done. Next: 2C.6 (glows and SWF runtime leftovers).
+7. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
 
 Working notes:
 
@@ -24,7 +25,7 @@ Working notes:
 
 Logged during play, not yet investigated in depth. Check each against the Ruffle side-by-side before fixing.
 
-- [x] Fixed. Shield animation seemed to loop (invincibility after losing a life, or from an item): the intro (the bubble forming, frames 1 to 18 of `hammer_player_shield`) replayed every loop. Frame 48 holds `gotoAndPlay("loop")` (frame 19), but the port never ran frame scripts on `nextFrame` and `gotoAndStop` from code, so `Animation.update`'s `gotoAndStop("1")` restarted the intro. Those scripts are now queued and run after the tick (`runQueuedFrameActions` in `SwfMovieClip.ts`), as Flash does; tested in `tests/fx.test.ts`. Not compared in Ruffle (it showed a white screen in the browser pane). Small gap left: the port shows frame 20 after the jump to 19, the original likely 19 (the clip plays one step between logic ticks).
+- [x] Fixed. Shield animation seemed to loop (invincibility after losing a life, or from an item): the intro (the bubble forming, frames 1 to 18 of `hammer_player_shield`) replayed every loop. Frame 48 holds `gotoAndPlay("loop")` (frame 19), but the port never ran frame scripts on `nextFrame` and `gotoAndStop` from code, so `Animation.update`'s `gotoAndStop("1")` restarted the intro. Those scripts are now queued and run after the tick (`runQueuedFrameActions` in `SwfMovieClip.ts`), as Flash does; tested in `tests/fx.test.ts`. Not compared in Ruffle (it showed a white screen in the browser pane). The port then showed frame 20 after the jump to 19; fixed in 2C.7 (clip steps before the logic).
 - [x] Fixed in 3.4 (the screen) and the UI batch U.1 (its music volume). Pause screen (P key) flickers fast between two frames of `hammer_interf_instructions`: the controls page and a "time label 999:00" page (the time attack page). Every text shows its placeholder ("Title Label", "moveLabel", "SPACE LABEL", "click label", "Sector label"), and the tip shows raw `<p><font …>tips...</font></p>` HTML. Compare `GameSession.onPause()` (`src/game/GameSession.ts`) with `mode/GameMode.mt` `onPause()`:
   - The port never calls `pauseMC.gotoAndStop("1")`, so the clip plays through its frames.
   - Texts not set: `click` (to `""`), `pause` (Lang 9), `space` (Lang 10). `sector` is missing the Lang 14 prefix. `title`, `move` and `attack` still show placeholders, so either `getText` doesn't find the fields or `dataStore.getStatic()` returns nothing; the port's English fallbacks (`'PAUSE'`, `'Move: Arrows / WASD'`...) are invented and should go.
@@ -107,14 +108,15 @@ What the audits (1.5 to 1.7) and Phases 2 and 3 left open, from PORT_STATUS.md. 
   - timeline blend modes other than multiply, screen and add (list the symbols that use them first);
   - item 84's 4 px box blur (now a gaussian blur);
   - the darkness light hole: clear out to two thirds of its radius in the port (as its gradient says), about 70% veiled in Ruffle at level 40 (LEVELS.md, 2B.5). Check with a real Flash Player or a video of the original before changing anything.
-- [ ] 2C.7 Timing gaps:
-  - bullet time (Tuberculoz's death) slows the movie clips too; in Flash they kept 40 fps. Needs logic steps with `tmod` below 1;
-  - the shield shows frame 20 after its jump to frame 19, the original likely 19;
-  - `Chrono.formatTime` hour fix-up (computed as in UTC+1);
-  - the aqua screen wobble (`fl_aqua`, `GameMode.main` near line 2398) and the wind timer (`GameMode.wind`; the original never starts wind, so only its reset).
+- [x] 2C.7 Timing gaps:
+  - bullet time (Tuberculoz's death) and the dev key Shift: `Timer.tmod` (`src/engine/Timer.ts`) is 0.3 for the tick and the logic multiplies it in at the original's 104 places (moves, gravity, frictions, timers, entity and FX animations); the loop no longer slows its clock, so the movie clips keep 40 fps. Outside bullet time `tmod` is 1: no replay changed. Fixed on the way: `cycle` stopped counting while the game is locked (`Mode.updateConstants`), as in the original;
+  - the shield showed frame 20 after its jump to frame 19: each tick now runs the clip steps due before it, then the logic, as Flash did, so the page draws the clips as the logic left them (same interleaving, no replay changed);
+  - `Chrono.formatTime`: kept as in UTC+1, now an accepted deviation (the original's hour fix-up was only right in French winter time);
+  - the aqua screen wobble (`fl_aqua`, `GameMode.main`) and the wind timer (`GameMode.wind`), with their resets at a new game.
+    Tested in `tests/timing.test.ts`, `tests/fx.test.ts` and `tests/bosses.test.ts`.
 - [x] 2C.8 `Data.mt` leftovers: `CURSE_*`, `STAT_*` and `HEAD_*` were already in; added `EXT_*` (unused by the original) and the 35 other missing constants (`DP_SOUNDS`, `EVENT_*` for 2C.4, `WEAPON_DURATION`, rarities, walking bomb, editor). `tests/data-constants.test.ts` reads and evaluates `Data.mt` itself and checks all 370 constants against `Data.ts`. Fixed on the way: `ACTION_*` were 1 to 4, the original's are 19 to 22 (only compared to each other: no replay changed); `Player.ts`'s own `WEAPON_DURATION` is now `Data.WEAPON_DURATION`.
 
-Accepted deviations, not to port: the Loader's server parts (sending scores, retries, redirections), `View`'s bitmap cache and editor grid, `ViewLight`, `ScoreItem`'s 500 points for an unknown id (the original stops with a fatal error), `Adventure.saveScore`'s set checksum, the history's `F=` version and the `KEY` generator, Ruffle's double nested trigger on deepnight 184, `Jumper.checkClimb` with no climb height, `Kiwi.clearMines`, `fl_stickRot` and `fl_stickBound` (no caller), `MineFrozen` and `PoireBombFrozen`, `Coward` and `Hunter` (never created by the original).
+Accepted deviations, not to port: `Chrono.formatTime` in the player's time zone (computed as in UTC+1), the lag manager while recording or replaying, the Loader's server parts (sending scores, retries, redirections), `View`'s bitmap cache and editor grid, `ViewLight`, `ScoreItem`'s 500 points for an unknown id (the original stops with a fatal error), `Adventure.saveScore`'s set checksum, the history's `F=` version and the `KEY` generator, Ruffle's double nested trigger on deepnight 184, `Jumper.checkClimb` with no climb height, `Kiwi.clearMines`, `fl_stickRot` and `fl_stickBound` (no caller), `MineFrozen` and `PoireBombFrozen`, `Coward` and `Hunter` (never created by the original).
 
 ## Controllers
 

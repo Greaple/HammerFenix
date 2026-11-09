@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -618,8 +619,8 @@ export class BossFireBallShoot extends ShootEntity {
 
     const ocx = this.cx;
     const ocy = this.cy;
-    this.ang += this.turnSpeed;
-    this.dist += this.distSpeed;
+    this.ang += Timer.tmod * this.turnSpeed;
+    this.dist += Timer.tmod * this.distSpeed;
     this.dist = Math.min(this.dist, this.maxDist);
     this.center();
     if (ocx !== this.cx || ocy !== this.cy) {
@@ -721,7 +722,7 @@ export class FramBallShoot extends ShootEntity {
       if (this.shootSpeed <= 5.8 || this.owner.anger > 0) {
         this.onArrived();
       }
-      this.white += 0.1;
+      this.white += 0.1 * Timer.tmod;
       this.white = Math.min(1, this.white);
     }
     this.turnSpeed = Math.min(1, this.turnSpeed);
@@ -732,14 +733,14 @@ export class FramBallShoot extends ShootEntity {
     // targetting
     const tang = Math.atan2(this.owner.ty - this.y, this.owner.tx - this.x);
     if (this.adjustAngRad(tang - this.ang) > 0) {
-      this.ang += this.turnSpeed;
+      this.ang += this.turnSpeed * Timer.tmod;
     }
     if (this.adjustAngRad(tang - this.ang) < 0) {
-      this.ang -= this.turnSpeed;
+      this.ang -= this.turnSpeed * Timer.tmod;
     }
 
-    this.dx = Math.cos(this.ang) * this.shootSpeed;
-    this.dy = Math.sin(this.ang) * this.shootSpeed;
+    this.dx = Math.cos(this.ang) * this.shootSpeed * Timer.tmod;
+    this.dy = Math.sin(this.ang) * this.shootSpeed * Timer.tmod;
     super.update();
   }
 }

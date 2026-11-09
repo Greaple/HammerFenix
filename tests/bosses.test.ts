@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { Timer } from '../src/engine/Timer';
 import { Data } from '../src/game/Data';
 import { createBad } from '../src/game/entity/Bad';
 import { BossBomb, ClassicBomb } from '../src/game/entity/Bomb';
@@ -245,11 +246,14 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
     session.onExplode(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET, 50);
     expect(tub.fl_death).toBe(true);
     expect(tub.lifeBar).toBeNull();
-    expect(session.gameLoop.bulletScale).toBe(1);
+    expect(Timer.tmod).toBe(1);
     step(1);
-    expect(session.gameLoop.bulletScale).toBeCloseTo(0.3);
-    step(Math.ceil(Data.SECOND * 2 * 0.3));
-    expect(session.gameLoop.bulletScale).toBe(1);
+    expect(Timer.tmod).toBeCloseTo(0.3);
+    // counted in real frames, the clips keep their 40 fps
+    step(Data.SECOND * 2 - 2);
+    expect(Timer.tmod).toBeCloseTo(0.3);
+    step(1);
+    expect(Timer.tmod).toBe(1);
 
     expect(stepUntil(() => tub.fl_defeated)).toBeGreaterThan(0);
     expect(session.fl_clear).toBe(true);
@@ -275,6 +279,8 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
     tub.dy = 0;
     tub.dx = 0;
     tub.y = 100;
-    expect(stepUntil(() => tub.fl_defeated, Data.SECOND * 16)).toBeGreaterThan(0);
+    // 15 s of game time, counted with `tmod`: the 2 s of bullet time only count for 0.3 each
+    const ticks = stepUntil(() => tub.fl_defeated, Data.SECOND * 17);
+    expect(ticks).toBeGreaterThan(Data.SECOND * 16);
   });
 });

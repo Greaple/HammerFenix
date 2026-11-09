@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { LevelData } from '../data/types';
@@ -898,7 +899,7 @@ export class ScriptRunner {
         break;
 
       case 1: // long hurry up
-        game.huTimer -= 0.5;
+        game.huTimer -= Timer.tmod * 0.5;
         break;
 
       case 2: // no exit arrow
@@ -942,7 +943,7 @@ export class ScriptRunner {
         // exit after Tuberculoz
         const boss = game.getOne(Data.BOSS) as { fl_defeated?: boolean } | null;
         if (boss?.fl_defeated) {
-          this.bossDoorTimer -= 1;
+          this.bossDoorTimer -= Timer.tmod;
           if (this.bossDoorTimer <= 0) {
             game.destroyList(Data.BOSS);
             // The original destroys the View; the port keeps one View, which goto() redraws
@@ -1029,7 +1030,7 @@ export class ScriptRunner {
   /** Main loop. */
   update(): void {
     if (this.fl_compile) {
-      this.cycle += 1;
+      this.cycle += Timer.tmod;
       this.runScript();
     }
 

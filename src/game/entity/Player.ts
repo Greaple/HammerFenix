@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
 import type { FxAnim } from '../FxManager';
@@ -310,7 +311,13 @@ export class PlayerEntity extends PhysicsEntity {
     if (this.x <= 0.15 * Data.GAME_WIDTH) sign = 1;
 
     this.playAnim(Data.ANIM_PLAYER_DIE);
-    super.killHit(sign * 20);
+
+    let power = 20;
+    if (Timer.tmod <= 0.6) {
+      power = 40;
+    }
+
+    super.killHit(sign * power);
   }
 
   getScore(origin: BaseEntity | null, value: number): void {
@@ -1039,7 +1046,7 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     if (this.actives[73] && this.fl_stable && this.dx !== 0) {
-      this.walkTimer -= 1;
+      this.walkTimer -= Timer.tmod;
       if (this.walkTimer <= 0) {
         this.walkTimer = Data.SECOND;
         this.getScore(this, 10);
@@ -1284,7 +1291,7 @@ export class PlayerEntity extends PhysicsEntity {
     // Recurring special events of the level
     for (let n = 0; n < this.recurring.length; n++) {
       const e = this.recurring[n];
-      e.timer -= 1;
+      e.timer -= Timer.tmod;
       if (e.timer <= 0) {
         e.func();
         if (e.fl_repeat) {
@@ -2159,7 +2166,7 @@ export class PlayerEntity extends PhysicsEntity {
         this.y - 60 - rand.random(5),
         rand.random(2) + 1,
       );
-      this.scale(Math.min(100, (this.scaleFactor + 0.002) * 100));
+      this.scale(Math.min(100, (this.scaleFactor + 0.002 * Timer.tmod) * 100));
       if (this.scaleFactor <= 0.6) {
         this.killHit(null);
         this.interruptSpecial(100);
@@ -2167,7 +2174,7 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     if (!this.fl_kill && this.game.fl_aqua) {
-      this.oxygen -= 0.1;
+      this.oxygen -= Timer.tmod * 0.1;
       if (this.oxygen <= 0) {
         this.killHit(0);
       }
@@ -2188,11 +2195,14 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     if (this.coolDown > 0) {
-      this.coolDown = Math.max(0, this.coolDown - 1);
+      this.coolDown -= Timer.tmod;
+      if (this.coolDown <= 0) {
+        this.coolDown = 0;
+      }
     }
 
     if (this.fl_knock) {
-      this.knockTimer -= 1;
+      this.knockTimer -= Timer.tmod;
       if (this.knockTimer <= 0) {
         this.onWakeUp();
       } else if (this.fl_stable && this.animId !== Data.ANIM_PLAYER_KNOCK_IN.id) {
@@ -2207,12 +2217,12 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     if (this.lockTimer > 0) {
-      this.lockTimer -= 1;
+      this.lockTimer -= Timer.tmod;
       this.fl_lockControls = this.lockTimer > 0;
     }
 
     if (this.fl_shield) {
-      this.shieldTimer -= 1;
+      this.shieldTimer -= Timer.tmod;
       if (this.shieldTimer <= 0) {
         this.unshield();
       }
@@ -2241,7 +2251,7 @@ export class PlayerEntity extends PhysicsEntity {
 
       if (this.animId === Data.ANIM_PLAYER_STOP.id) {
         if (this.waitTimer <= 0) this.waitTimer = Data.WAIT_TIMER;
-        this.waitTimer -= 1;
+        this.waitTimer -= Timer.tmod;
         if (this.waitTimer <= 0) {
           this.playAnim(
             this.game.rand.random(20) === 0 ? Data.ANIM_PLAYER_WAIT1 : Data.ANIM_PLAYER_WAIT2,
@@ -2259,7 +2269,7 @@ export class PlayerEntity extends PhysicsEntity {
           this.world.getCase(this.cx + this.dir, this.cy) === 0
         ) {
           if (this.edgeTimer <= 0) this.edgeTimer = Data.EDGE_TIMER;
-          this.edgeTimer -= 1;
+          this.edgeTimer -= Timer.tmod;
           if (this.edgeTimer <= 0) {
             this.playAnim(Data.ANIM_PLAYER_EDGE);
           }

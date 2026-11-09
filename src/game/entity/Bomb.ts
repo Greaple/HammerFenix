@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -751,7 +752,7 @@ export class MineBomb extends BadBomb {
     }
 
     if (this.fl_plant && !this.fl_trigger && this.alpha > 0) {
-      this.alpha -= MineBomb.HIDE_SPEED;
+      this.alpha -= Timer.tmod * MineBomb.HIDE_SPEED;
       if (this.alpha <= 0) {
         this.hide();
       }

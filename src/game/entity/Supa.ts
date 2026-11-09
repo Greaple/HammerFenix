@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -232,7 +233,7 @@ export class IceMeteorSupa extends SupaEntity {
 
   protected override postfix(): void {
     super.postfix();
-    this.rotation -= 7;
+    this.rotation -= 7 * Timer.tmod;
     if (!this.world.shapeInBound(this)) {
       this.moveTo(Data.GAME_WIDTH, 0);
     }

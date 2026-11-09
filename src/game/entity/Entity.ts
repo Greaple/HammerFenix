@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -324,13 +325,13 @@ export class BaseEntity {
 
   update(): void {
     if (this.lifeTimer > 0) {
-      this.lifeTimer -= 1;
+      this.lifeTimer -= Timer.tmod;
       if (this.lifeTimer <= 0) {
         this.onLifeTimer();
       }
     }
     if (this.stickTimer > 0) {
-      this.stickTimer -= 1;
+      this.stickTimer -= Timer.tmod;
       if (this.stickTimer <= 0) {
         this.unstick();
       }
@@ -344,7 +345,7 @@ export class BaseEntity {
       const ty = this.y + this._yOffset;
       this.mc._x = this.mc._x + (tx - this.mc._x) * this.softRecalFactor;
       this.mc._y = this.mc._y + (ty - this.mc._y) * this.softRecalFactor;
-      this.softRecalFactor += 0.02;
+      this.softRecalFactor += 0.02 * Timer.tmod;
       if (
         this.softRecalFactor >= 1 ||
         (Math.abs(tx - this.mc._x) <= 1.5 && Math.abs(ty - this.mc._y) <= 1.5)
@@ -488,7 +489,7 @@ export class AnimatorEntity extends BaseEntity {
         this.blinkLife();
       }
       if (this.fl_blinking) {
-        this.blinkTimer -= 1;
+        this.blinkTimer -= Timer.tmod;
         if (this.blinkTimer <= 0) {
           if (this.fl_blinked) {
             if (this.fl_alphaBlink) this.alpha = 100;
@@ -512,7 +513,7 @@ export class AnimatorEntity extends BaseEntity {
 
     if (this.frame >= 0) {
       let stopped = false;
-      this.frame += this.animFactor;
+      this.frame += this.animFactor * Timer.tmod;
       while (!stopped && this.frame >= 1) {
         if (sub._currentframe >= sub._totalframes) {
           if (this.fl_loop) {
@@ -788,16 +789,18 @@ export class PhysicsEntity extends AnimatorEntity {
   }
 
   calcSteps(dxStep: number, dyStep: number): { total: number; dx: number; dy: number } {
+    const dxTotal = dxStep * Timer.tmod;
+    const dyTotal = dyStep * Timer.tmod;
     const total = Math.max(
-      Math.ceil(Math.abs(dxStep) / Data.STEP_MAX),
-      Math.ceil(Math.abs(dyStep) / Data.STEP_MAX),
+      Math.ceil(Math.abs(dxTotal) / Data.STEP_MAX),
+      Math.ceil(Math.abs(dyTotal) / Data.STEP_MAX),
     );
     // With no speed the original gets 0 steps (and NaN per-step speeds, never used).
     if (total === 0) return { total: 0, dx: 0, dy: 0 };
     return {
       total,
-      dx: dxStep / total,
-      dy: dyStep / total,
+      dx: dxTotal / total,
+      dy: dyTotal / total,
     };
   }
 
@@ -858,7 +861,7 @@ export class PhysicsEntity extends AnimatorEntity {
     this.updateCoords();
 
     if (this.fl_wind && this.fl_stable && this.game.fl_wind) {
-      this.dx += this.game.windSpeed;
+      this.dx += this.game.windSpeed * Timer.tmod;
     }
 
     if (this.fl_stable) {
@@ -869,14 +872,20 @@ export class PhysicsEntity extends AnimatorEntity {
 
     if (this.dx !== 0 || this.dy !== 0 || !this.fl_stable) {
       if (!this.fl_skipNextGravity && !this.fl_stable && this.fl_gravity) {
+        // Correction factor for extreme tmods
+        let patchFactor = 1.0;
+        if (Timer.tmod >= 2) {
+          patchFactor = 1.1;
+        }
+
         if (this.dy < 0) {
-          this.dy += this.gravityFactor * Data.GRAVITY;
+          this.dy += this.gravityFactor * Data.GRAVITY * Timer.tmod * patchFactor;
         } else {
           if (this.fallStart === null) this.fallStart = this.y;
           if (this.game.fl_aqua && !this.fl_strictGravity) {
-            this.dy += 0.3 * this.fallFactor * Data.FALL_SPEED;
+            this.dy += 0.3 * this.fallFactor * Data.FALL_SPEED * Timer.tmod * patchFactor;
           } else {
-            this.dy += this.fallFactor * Data.FALL_SPEED;
+            this.dy += this.fallFactor * Data.FALL_SPEED * Timer.tmod * patchFactor;
           }
         }
       }
@@ -1041,7 +1050,7 @@ export class PhysicsEntity extends AnimatorEntity {
         if (this.slideFriction === null) {
           this.dx *= this.game.sFriction;
         } else {
-          this.dx *= this.slideFriction;
+          this.dx *= Math.pow(this.slideFriction, Timer.tmod);
         }
       } else {
         this.dx *= this.game.xFriction;
@@ -1103,7 +1112,7 @@ export class MoverEntity extends PhysicsEntity {
 
   override update(): void {
     if (this.next !== null) {
-      this.next.delay -= 1;
+      this.next.delay -= Timer.tmod;
       if (this.next.delay <= 0) {
         this.onNext();
       }

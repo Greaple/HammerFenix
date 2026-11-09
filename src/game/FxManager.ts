@@ -1,3 +1,4 @@
+import { Timer } from '../engine/Timer';
 import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { Data } from './Data';
 import type { IGameContext } from './GameContext';
@@ -47,7 +48,7 @@ export class FxAnim {
     if (this.fl_kill) return;
 
     if (this.fl_loopDone) {
-      this.lifeTimer -= 1;
+      this.lifeTimer -= Timer.tmod;
       if (this.lifeTimer <= 0) {
         this.destroy();
         return;
@@ -55,14 +56,14 @@ export class FxAnim {
     }
 
     if (this.fl_blink) {
-      this.blinkTimer -= 1;
+      this.blinkTimer -= Timer.tmod;
       if (this.blinkTimer <= 0) {
         this.mc._alpha = this.mc._alpha === 100 ? 30 : 100;
         this.blinkTimer = Data.BLINK_DURATION_FAST;
       }
     }
 
-    this.frame += 1;
+    this.frame += Timer.tmod;
     while (this.frame >= 1) {
       if (this.mc._totalframes <= 1) {
         this.fl_loopDone = true;
@@ -387,7 +388,7 @@ export class FxManager {
         this.fl_bg = true;
         this.game.view.attachSpecialBg(b.id, b.subId);
       }
-      b.timer -= 1;
+      b.timer -= Timer.tmod;
       if (b.timer <= 0) {
         this.bgList.splice(0, 1);
         this.detachBg();
@@ -395,9 +396,9 @@ export class FxManager {
     }
 
     if (this.levelName) {
-      this.nameTimer -= 1;
+      this.nameTimer -= Timer.tmod;
       if (this.nameTimer <= 0) {
-        this.levelName._y += 0.7;
+        this.levelName._y += Timer.tmod * 0.7;
         if (this.levelName._y >= Data.GAME_HEIGHT + 30) {
           this.levelName.removeMovieClip();
           this.levelName = null;
@@ -406,7 +407,7 @@ export class FxManager {
     }
 
     for (let i = 0; i < this.stack.length; i++) {
-      this.stack[i].t -= 1;
+      this.stack[i].t -= Timer.tmod;
       if (this.stack[i].t <= 0) {
         this.attachFx(this.stack[i].x, this.stack[i].y, this.stack[i].link);
         this.stack.splice(i, 1);
@@ -424,9 +425,9 @@ export class FxManager {
     }
 
     if (this.igMsg) {
-      this.igMsgTimer -= 1;
+      this.igMsgTimer -= Timer.tmod;
       if (this.igMsgTimer <= 0) {
-        this.igMsg._alpha -= 2;
+        this.igMsg._alpha -= Timer.tmod * 2;
         if (this.igMsg._alpha <= 2) {
           this.igMsg.removeMovieClip();
           this.igMsg = null;

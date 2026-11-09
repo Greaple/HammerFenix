@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMaskClip, SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -380,14 +381,14 @@ export class BatBoss extends MoverEntity implements BossEntity {
     if (!this.fl_death) {
       game.huTimer = 0;
     } else {
-      game.huTimer += 3;
+      game.huTimer += Timer.tmod * 3;
     }
 
     super.update();
 
     // Immunity timer
     if (this.fl_immune) {
-      this.immuneTimer -= 1;
+      this.immuneTimer -= Timer.tmod;
       if (this.immuneTimer <= 0) {
         this.removeImmunity();
       }
@@ -413,7 +414,7 @@ export class BatBoss extends MoverEntity implements BossEntity {
     }
 
     if (!this.fl_shield && !this.fl_death) {
-      this.glowCpt += 0.3;
+      this.glowCpt += 0.3 * Timer.tmod;
       this.glow.blurX = BatBoss.GLOW_BASE + BatBoss.GLOW_RANGE * Math.sin(this.glowCpt);
       this.glow.blurY = this.glow.blurX;
       this.applyGlow();
@@ -462,8 +463,8 @@ export class BatBoss extends MoverEntity implements BossEntity {
       }
 
       if (!this.fl_deathUp) {
-        this.rotation = Math.min(BatBoss.MAX_FALL_ROTATION, this.rotation + 2.5);
-        this.dy += 0.1;
+        this.rotation = Math.min(BatBoss.MAX_FALL_ROTATION, this.rotation + 2.5 * Timer.tmod);
+        this.dy += 0.1 * Timer.tmod;
         if (rand.random(2) === 0) {
           game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, rand.random(2) + 1);
         }
@@ -962,7 +963,7 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
     const rand = game.rand;
     if (this.action !== T.WALK) return;
 
-    this.seqTimer -= 1;
+    this.seqTimer -= Timer.tmod;
 
     // Turn at the borders
     if (
@@ -1385,14 +1386,14 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
     if (!this.fl_death) {
       game.huTimer = 0;
     } else {
-      game.huTimer += 3;
+      game.huTimer += Timer.tmod * 3;
     }
 
     this.ia();
 
     // Immunity
     if (this.fl_immune) {
-      this.immuneTimer -= 1;
+      this.immuneTimer -= Timer.tmod;
       if (this.immuneTimer <= 0) {
         this.fl_immune = false;
         this.stopBlink();
@@ -1411,7 +1412,7 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
 
     // Last-resort fire balls
     if (!this.fl_death && this.lives <= 50) {
-      this.fbCoolDown -= 1;
+      this.fbCoolDown -= Timer.tmod;
       if (
         this.action === T.WALK &&
         this.fbCoolDown <= 0 &&
@@ -1436,7 +1437,7 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
 
     // Fix for a Tuberculoz that never dies
     if (this.defeatTimeOut > 0 && !this.fl_defeated) {
-      this.defeatTimeOut -= 1;
+      this.defeatTimeOut -= Timer.tmod;
       if (this.defeatTimeOut <= 0) {
         this.final();
       }

@@ -1,4 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { Timer } from '../src/engine/Timer';
 import { flashKeyCode } from '../src/engine/Input';
 import { InputRecorder } from '../src/engine/InputRecording';
 import { Data } from '../src/game/Data';
@@ -126,14 +127,14 @@ describe('dev keys (GameMode, Player.getDebugControls)', () => {
     start();
     session.input.setKeyCode(16, true);
     step();
-    expect(session.gameLoop.bulletScale).toBe(0.3);
+    expect(Timer.tmod).toBe(0.3);
     session.input.setKeyCode(36, true);
     step();
-    expect(session.gameLoop.bulletScale).toBe(1);
+    expect(Timer.tmod).toBe(1);
     session.input.setKeyCode(36, false);
     session.input.setKeyCode(16, false);
     step();
-    expect(session.gameLoop.bulletScale).toBe(1);
+    expect(Timer.tmod).toBe(1);
   });
 });
 

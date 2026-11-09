@@ -33,5 +33,8 @@ describe('FX animations (Animation.update)', () => {
     expect(frames.slice(0, firstLoop)).toContain(2);
     expect(Math.min(...frames.slice(firstLoop))).toBeGreaterThanOrEqual(19);
     expect(frames.slice(firstLoop).filter((f) => f === 47).length).toBeGreaterThanOrEqual(3);
+    // Flash advanced the clips before the game's main and drew after it: the frame after the
+    // jump shows the "loop" label's frame 19, not 20 (2C.7)
+    expect(frames[firstLoop]).toBe(19);
   });
 });

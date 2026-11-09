@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
 import type { IGameContext } from '../GameContext';
@@ -361,7 +362,7 @@ export class BadEntity extends MoverEntity {
     const prevY = this.mc._y;
 
     if (this.fl_softRecal) {
-      this.softRecalFactor += 0.1 * this.speedFactor;
+      this.softRecalFactor += 0.1 * Timer.tmod * this.speedFactor;
     }
 
     super.endUpdate();
@@ -431,14 +432,14 @@ export class BadEntity extends MoverEntity {
     }
 
     if (this.freezeTimer > 0) {
-      this.freezeTimer -= 1;
+      this.freezeTimer -= Timer.tmod;
       if (this.freezeTimer <= 0) {
         this.melt();
       }
     }
 
     if (this.deathTimer > 0) {
-      this.deathTimer -= 1;
+      this.deathTimer -= Timer.tmod;
       if (this.deathTimer <= 0) {
         this.game.fxMan.attachExplosion(this.x, this.y, 80);
         this.y = 1000;
@@ -446,7 +447,7 @@ export class BadEntity extends MoverEntity {
     }
 
     if (this.knockTimer > 0) {
-      this.knockTimer -= 1;
+      this.knockTimer -= Timer.tmod;
       if (this.knockTimer <= 0) {
         this.wakeUp();
       }
@@ -681,7 +682,7 @@ export class WalkerBad extends BadEntity {
 
   override update(): void {
     this.fl_willFallDown = false;
-    if (this.recentParticles > 0) this.recentParticles -= 1;
+    if (this.recentParticles > 0) this.recentParticles -= Timer.tmod;
     super.update();
   }
 }
@@ -979,7 +980,7 @@ export class ShooterBad extends JumperBad {
   onShoot(): void {}
 
   override update(): void {
-    if (this.shootCD > 0) this.shootCD -= 1;
+    if (this.shootCD > 0) this.shootCD -= Timer.tmod;
     if (this.fl_shooter && this.shootCD <= 0) {
       if (this.isReady() && this.game.rand.random(1000) < this.chanceShoot) {
         this.startShoot();
@@ -1549,7 +1550,7 @@ export class FireBallBad extends BadEntity {
 
   override update(): void {
     if (this.fl_summon) {
-      this.summonTimer -= 1;
+      this.summonTimer -= Timer.tmod;
       if (this.summonTimer <= 0) {
         this.fl_summon = false;
         this.stopBlink();
@@ -1564,7 +1565,7 @@ export class FireBallBad extends BadEntity {
       return;
     }
 
-    this.angerTimer += this.game.diffFactor;
+    this.angerTimer += Timer.tmod * this.game.diffFactor;
     if (this.angerTimer >= Data.AUTO_ANGER) {
       this.angerTimer = 0;
       this.angerMore();
@@ -1577,10 +1578,10 @@ export class FireBallBad extends BadEntity {
     if (tang - this.ang > 180) this.ang += 360;
 
     if (this.ang < tang) {
-      this.ang += this.angSpeed * this.speedFactor;
+      this.ang += this.angSpeed * this.speedFactor * Timer.tmod;
       if (this.ang > tang) this.ang = tang;
     } else if (this.ang > tang) {
-      this.ang -= this.angSpeed * this.speedFactor;
+      this.ang -= this.angSpeed * this.speedFactor * Timer.tmod;
       if (this.ang < tang) this.ang = tang;
     }
 
@@ -1998,7 +1999,12 @@ class FraiseBad extends ShooterBad {
 
   override update(): void {
     super.update();
-    if (this.catchCD > 0) this.catchCD = Math.max(0, this.catchCD - 1);
+    if (this.catchCD > 0) {
+      this.catchCD -= Timer.tmod;
+      if (this.catchCD <= 0) {
+        this.catchCD = 0;
+      }
+    }
 
     if (this.game.countList(Data.BALL) === 0) {
       const catchers = this.game.getList(Data.CATCHER) as FraiseBad[];
@@ -2135,7 +2141,7 @@ class CrawlerBad extends WallWalkerBad {
     }
 
     if (inSight) {
-      this.attackCD -= 4;
+      this.attackCD -= Timer.tmod * 4;
       factor = 8;
     }
 
@@ -2190,7 +2196,7 @@ class CrawlerBad extends WallWalkerBad {
     if (this.isHealthy()) {
       xscale += 10 * Math.sin(this.blobCpt);
       yscale += 10 * Math.cos(this.blobCpt);
-      this.blobCpt += 0.1;
+      this.blobCpt += Timer.tmod * 0.1;
     }
 
     if (this.sub) {
@@ -2199,7 +2205,7 @@ class CrawlerBad extends WallWalkerBad {
     }
 
     if (this.colorAlpha > 0) {
-      this.colorAlpha -= 3;
+      this.colorAlpha -= Timer.tmod * 3;
       if (this.colorAlpha <= 0) this.mc.resetColor();
       else this.mc.setColorHex(Math.round(this.colorAlpha), CrawlerBad.COLOR);
     }
@@ -2231,14 +2237,14 @@ class CrawlerBad extends WallWalkerBad {
       this.dy = 0;
     }
     super.update();
-    if (this.attackCD > 0) this.attackCD -= 1;
+    if (this.attackCD > 0) this.attackCD -= Timer.tmod;
 
     if (this.decideAttack() && this.world.getCase(this.cx + this.cp.x, this.cy + this.cp.y) > 0) {
       this.prepareAttack();
     }
 
     if (this.fl_attack && this.attackTimer > 0) {
-      this.attackTimer -= 1;
+      this.attackTimer -= Timer.tmod;
       if (this.attackTimer <= 0) {
         this.attack();
       }
@@ -2367,7 +2373,7 @@ class SawBad extends WallWalkerBad {
         if (delta > 180) delta -= 360;
         s.rotationDeg += delta * SawBad.ROTATION_RECAL;
       } else if (this.fl_kill) {
-        s.rotationDeg += 14.5;
+        s.rotationDeg += Timer.tmod * 14.5;
       } else if (this.isHealthy()) {
         s.rotationDeg += (0 - s.rotationDeg) * (SawBad.ROTATION_RECAL * 0.25);
       }
@@ -2375,7 +2381,7 @@ class SawBad extends WallWalkerBad {
       if (this.fl_stop || this.fl_stun) {
         this.rotSpeed *= 0.9;
       } else {
-        this.rotSpeed = Math.min(SawBad.ROTATION_SPEED, this.rotSpeed + 1);
+        this.rotSpeed = Math.min(SawBad.ROTATION_SPEED, this.rotSpeed + Timer.tmod);
       }
       const blade = s.getClip('sub');
       if (blade) blade.rotationDeg += this.rotSpeed;
@@ -2410,7 +2416,7 @@ class SawBad extends WallWalkerBad {
       if (this.game.rand.random(10) === 0) {
         this.game.fxMan.inGameParticles(Data.PARTICLE_SPARK, this.x, this.y, 1);
       }
-      this.stunTimer -= 1;
+      this.stunTimer -= Timer.tmod;
       if (this.stunTimer <= 0) {
         this.fl_stun = false;
         this.onWakeUp();
@@ -2720,7 +2726,7 @@ class FramboiseBad extends ShooterBad implements FramBallOwner {
     if (this.white > 0) {
       this.mc.setColorHex(Math.round(100 * this.white), 0xffffff);
       this.mc.setGlow(0xffffff, 1, 4, 4, this.white * 2);
-      this.white -= 0.1;
+      this.white -= Timer.tmod * 0.1;
       if (this.white <= 0) {
         this.mc.clearGlow();
       }

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { PersistCodec } from '../src/engine/codec/PersistCodec';
 import { Data } from '../src/game/Data';
 import { ScoreItem, SpecialItem } from '../src/game/entity/Item';
@@ -172,10 +172,13 @@ describe('end of the set', () => {
     expect(session.loader.fl_exit).toBe(true);
     expect(session.loader.loading!._currentframe).toBe(6);
 
-    // The game's main still runs (locked) until its clip is removed
+    // The game's main still runs (locked: `cycle` stops) until its clip is removed
     const cycle = session.cycle;
+    const hud = vi.spyOn(session.hud, 'update');
     step(5);
-    expect(session.cycle).toBeGreaterThan(cycle);
+    expect(hud).toHaveBeenCalledTimes(5);
+    expect(session.cycle).toBe(cycle);
+    hud.mockRestore();
     step(FADE_TICKS);
     expect(session.loader.fl_done).toBe(true);
 

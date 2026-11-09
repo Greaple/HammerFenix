@@ -20,11 +20,6 @@ export class FixedGameLoop {
   private animTicks = 0;
   private steps = 0;
   timeScale = 1.0;
-  /**
-   * This tick's `Timer.tmod` (bullet time, the dev key Shift): slows the game on top of
-   * `timeScale`, since logic always steps by 1.
-   */
-  bulletScale = 1.0;
   /** `Timer.fps()`: logic ticks run per real second, measured over half a second. */
   fps: number = FixedGameLoop.LOGIC_HZ;
   /**
@@ -82,18 +77,22 @@ export class FixedGameLoop {
     return this.steps;
   }
 
-  /** Runs one logic tick, plus the animation steps that fall in it. */
+  /**
+   * Runs one logic tick, after the animation steps due before it. Flash advanced the playing
+   * clips first, then ran the game's main and drew the frame, so the page shows the clips as
+   * the logic left them (a `gotoAndPlay` from a frame script shows its target frame).
+   */
   stepSingleFrame(): void {
-    this.onLogicStep();
-    runQueuedFrameActions();
-    this.steps++;
-    this.logicTicks++;
     const target = Math.floor((this.logicTicks * FixedGameLoop.ANIM_HZ) / FixedGameLoop.LOGIC_HZ);
     while (this.animTicks < target) {
       this.onAnimStep();
       runQueuedFrameActions();
       this.animTicks++;
     }
+    this.onLogicStep();
+    runQueuedFrameActions();
+    this.steps++;
+    this.logicTicks++;
   }
 
   /** Restarts the logic/animation interleaving, so a new game always starts in the same phase. */
@@ -104,10 +103,7 @@ export class FixedGameLoop {
 
   private readonly tick = (nowMs: number) => {
     if (!this.running) return;
-    const dtSec =
-      Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000)) *
-      this.timeScale *
-      this.bulletScale;
+    const dtSec = Math.min(0.1, Math.max(0, (nowMs - this.lastTimeMs) / 1000)) * this.timeScale;
     this.lastTimeMs = nowMs;
 
     const logicDt = 1 / FixedGameLoop.LOGIC_HZ;

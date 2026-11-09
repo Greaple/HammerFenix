@@ -1,3 +1,4 @@
+import { Timer } from '../../engine/Timer';
 import { Data } from '../Data';
 import type { IGameContext } from '../GameContext';
 import { type BaseEntity, MoverEntity } from './Entity';
@@ -178,7 +179,7 @@ export class Particle extends MoverEntity {
 
   override endUpdate(): void {
     if (this.pid === Data.PARTICLE_RAIN) {
-      this.mc._yscale = Math.min(100, this.mc._yscale + 4);
+      this.mc._yscale = Math.min(100, this.mc._yscale + Timer.tmod * 4);
       this.rotation *= 0.93;
     } else {
       this.rotation += this.dx * 2;
@@ -200,7 +201,7 @@ export class Particle extends MoverEntity {
   /** A particle at rest runs out twice as fast (this and `Entity.update`); blobs only once. */
   override update(): void {
     if (Math.abs(this.dx) <= 0.5 && this.pid !== Data.PARTICLE_BLOB) {
-      this.lifeTimer -= 1;
+      this.lifeTimer -= Timer.tmod;
       if (this.lifeTimer <= 0) {
         this.onLifeTimer();
       }
