@@ -44,9 +44,9 @@ describe('localization (3.4)', () => {
       await runReplay(session, replay, (t) => {
         if (t % 10 === 0) for (const s of visibleTexts(session.gameRoot)) seen.add(s);
         if (t === 300) {
-          session.onPause();
+          session.game.onPause();
           for (const s of visibleTexts(session.gameRoot)) seen.add(s);
-          session.onUnpause();
+          session.game.onUnpause();
         }
       });
     }
@@ -59,8 +59,8 @@ describe('localization (3.4)', () => {
     for (let i = 0; i < 80; i++) session.gameLoop.stepSingleFrame();
     const tips: string[] = [];
     for (let i = 0; i < 14; i++) {
-      session.onPause();
-      const mc = (session as unknown as { pauseMC: SwfMovieClip }).pauseMC;
+      session.game.onPause();
+      const mc = (session.game as unknown as { pauseMC: SwfMovieClip }).pauseMC;
       expect(mc._currentframe).toBe(1);
       if (i === 0) {
         expect(mc.getText('title')?.text).toBe('Instructions');
@@ -70,7 +70,7 @@ describe('localization (3.4)', () => {
         expect(mc.getText('sector')?.text).toBe('Land:«The Village of Hammerfest»');
       }
       tips.push(mc.getText('tip')!.text);
-      session.onUnpause();
+      session.game.onUnpause();
     }
     // `Lang` tips 301 to 313, then back to the first
     expect(tips[0]).toBe(`Tip:${session.dataStore.getStatic(301)}`);
@@ -82,7 +82,7 @@ describe('localization (3.4)', () => {
     const session = await createHeadlessSession();
     session.restartLevel();
     for (let i = 0; i < 80; i++) session.gameLoop.stepSingleFrame();
-    const fx = session.fxMan;
+    const fx = session.game.fxMan;
     const texts = (mc: SwfMovieClip) => visibleTexts(mc);
 
     // `FxManager.attachExit`: the field appears on frame 8
@@ -91,7 +91,7 @@ describe('localization (3.4)', () => {
     // `FxManager.attachAlert`: the field is in a child clip, bound to `_parent.label`
     const alert = fx.attachAlert('Hurry up!');
     // `SpecialManager.onPerfect`: `_parent.label` and `_parent.bonus`
-    const perfect = session.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
+    const perfect = session.game.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
     perfect.setVariable('label', session.dataStore.getStatic(11));
     perfect.setVariable('bonus', '50000');
     for (let i = 0; i < 10; i++) session.gameLoop.stepSingleFrame();

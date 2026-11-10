@@ -24,7 +24,7 @@ export interface ScanContext {
   hasSymbol(linkage: string): boolean;
   /** Languages that have no text with this id. */
   missingText(id: number): string[];
-  /** Ids `GameSession.attachBad` creates. */
+  /** Ids `GameMode.attachBad` creates. */
   badIds: Set<number>;
   /** Music tracks `Mode.playMusic` can start. */
   musicIds: Set<number>;

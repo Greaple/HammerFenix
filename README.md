@@ -68,7 +68,8 @@ flowchart TD
     end
 
     subgraph GameCore["Game Simulation"]
-        Session["GameSession (IGameContext)"]
+        Session["GameSession (manager)"]
+        Mode["GameMode / Adventure (IGameContext)"]
         World["LevelWorld & SetManager"]
         View["LevelView (Layered Tiles & Backgrounds)"]
         Player["PlayerEntity & Bomb Inventory"]
@@ -81,7 +82,8 @@ flowchart TD
     SFX --> AudioEng
     JSONData --> Session
     Engine --> Session
-    Session --> GameCore
+    Session --> Mode
+    Mode --> GameCore
 ```
 
 ---

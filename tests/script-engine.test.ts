@@ -14,12 +14,12 @@ describe('ScriptRunner (levels.ScriptEngine)', () => {
   });
 
   function run(script: string): ScriptRunner {
-    for (const v of ['A', 'B', 'C']) session.setDynamicVar(v, '');
-    const runner = new ScriptRunner(session, { ...session.world.current, script });
+    for (const v of ['A', 'B', 'C']) session.game.setDynamicVar(v, '');
+    const runner = new ScriptRunner(session.game, { ...session.game.world.current, script });
     runner.compile();
     return runner;
   }
-  const marked = () => ['A', 'B', 'C'].filter((v) => session.getDynamicVar(v) === '1');
+  const marked = () => ['A', 'B', 'C'].filter((v) => session.game.getDynamicVar(v) === '1');
 
   it('stops scanning the triggers at the first one removed in a cycle', () => {
     const runner = run(`<$do>${mark('A')}</$do><$do>${mark('B')}</$do>`);
@@ -47,7 +47,7 @@ describe('ScriptRunner (levels.ScriptEngine)', () => {
     runner.update();
     runner.update();
     expect(runner.script![0].attrs).toMatchObject({ $t: '4', $base: '2', $repeat: '1' });
-    session.setDynamicVar('A', '');
+    session.game.setDynamicVar('A', '');
     runner.update();
     runner.update();
     expect(marked()).toEqual(['A']);
@@ -58,7 +58,7 @@ describe('ScriptRunner (levels.ScriptEngine)', () => {
     const runner = run(`<$do>${mark('A')}</$do><$t_timer $t="50">${mark('B')}</$t_timer>`);
     const saved = runner.scriptToString()!;
     expect(saved).toBe('<$t_timer $t="50"><$e_setVar $var="B" $value="1" /></$t_timer>');
-    const again = new ScriptRunner(session, { ...session.world.current, script: saved });
+    const again = new ScriptRunner(session.game, { ...session.game.world.current, script: saved });
     again.compile();
     expect(again.scriptToString()).toBe(saved);
   });

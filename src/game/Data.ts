@@ -630,6 +630,11 @@ export class GameDataStore {
     return this.lang;
   }
 
+  /** A level set already loaded (`loadLevelSet`), for the modes' `addWorld`. */
+  getLevelSet(name: string): LevelSet | undefined {
+    return this.levelSets.get(name);
+  }
+
   async loadLevelSet(name: string): Promise<LevelSet> {
     const cached = this.levelSets.get(name);
     if (cached) return cached;

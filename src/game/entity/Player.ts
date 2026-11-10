@@ -90,7 +90,7 @@ export class PlayerController {
  * (`class/hammer/entity/Player.mt`, `PlayerController.mt`, `SpecialManager.mt`).
  */
 export class PlayerEntity extends PhysicsEntity {
-  /** Player 1 is 0: set by `GameSession.insertPlayer`. */
+  /** Player 1 is 0: set by `GameMode.insertPlayer`. */
   pid = 0;
   /** The player's keys (`ctrl`). */
   readonly ctrl: PlayerController = new PlayerController(this);

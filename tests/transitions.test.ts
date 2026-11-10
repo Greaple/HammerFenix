@@ -7,6 +7,7 @@ import type { LevelSet } from '../src/game/data/types';
 import { SpecialItem } from '../src/game/entity/Item';
 import type { GameSession } from '../src/game/GameSession';
 import { LevelWorld } from '../src/game/levels/LevelWorld';
+import type { Adventure } from '../src/game/mode/Adventure';
 import { createHeadlessSession } from './helpers/headless';
 
 /** IA parse of a level: 500 cases, 30 per frame (`GameMechanics.parseCurrentIA`). */
@@ -28,7 +29,7 @@ interface Internals {
   darknessHoles: SwfMovieClip[];
   targetDark: number;
 }
-const internals = () => session as unknown as Internals;
+const internals = () => session.game as unknown as Internals;
 
 beforeAll(async () => {
   session = await createHeadlessSession();
@@ -42,7 +43,7 @@ function step(n: number): void {
 function framesUntilReady(max = 200): number {
   for (let i = 1; i <= max; i++) {
     step(1);
-    if (!session.fl_lock) return i;
+    if (!session.game.fl_lock) return i;
   }
   return -1;
 }
@@ -68,21 +69,21 @@ describe('IA parse over frames (GameMechanics.parseCurrentIA)', () => {
 
 describe('level transitions (ViewManager)', () => {
   it('a new game shows its first level once parsed, without a scroll', () => {
-    session.initGame(5, 1234);
-    expect(session.fl_lock).toBe(true);
-    expect(session.view.fl_attach).toBe(false);
+    session.startGame(5, 1234);
+    expect(session.game.fl_lock).toBe(true);
+    expect(session.game.view.fl_attach).toBe(false);
     expect(framesUntilReady()).toBe(PARSE);
-    expect(session.view.fl_attach).toBe(true);
-    expect(session.view.viewY).toBe(0);
+    expect(session.game.view.fl_attach).toBe(true);
+    expect(session.game.view.viewY).toBe(0);
     expect(internals().fake).toBeNull();
-    expect(session.player!.mc._visible).toBe(true);
+    expect(session.game.player!.mc._visible).toBe(true);
   });
 
   it('the next level scrolls up over the old one after its parse', () => {
-    session.initGame(5, 1234);
+    session.startGame(5, 1234);
     framesUntilReady();
-    session.nextLevel();
-    expect(session.world.currentId).toBe(6);
+    session.game.nextLevel();
+    expect(session.game.world.currentId).toBe(6);
 
     // Parse: the old view stays
     step(PARSE - 1);
@@ -91,27 +92,27 @@ describe('level transitions (ViewManager)', () => {
     step(1);
     expect(internals().fl_scrolling).toBe(true);
     expect(internals().fake).not.toBeNull();
-    expect(session.view.viewY).toBe(Data.GAME_HEIGHT);
+    expect(session.game.view.viewY).toBe(Data.GAME_HEIGHT);
 
     // Halfway
     step(SCROLL / 2);
     const y = Data.GAME_HEIGHT - Math.sin(Data.SCROLL_SPEED * (SCROLL / 2)) * Data.GAME_HEIGHT;
-    expect(session.view.viewY).toBeCloseTo(y, 6);
+    expect(session.game.view.viewY).toBeCloseTo(y, 6);
     expect(internals().fake!._y).toBeCloseTo(y - Data.GAME_HEIGHT, 6);
-    expect(session.fl_lock).toBe(true);
+    expect(session.game.fl_lock).toBe(true);
 
     expect(framesUntilReady()).toBe(SCROLL / 2);
-    expect(session.view.viewY).toBe(0);
+    expect(session.game.view.viewY).toBe(0);
     expect(internals().fake).toBeNull();
   });
 
   it('the warp start (Adventure.nextLevel) shows level 10 without a scroll', () => {
-    session.initGame(0, 1234);
+    session.startGame(0, 1234);
     framesUntilReady();
-    session.fl_warpStart = true;
-    session.fl_clear = true;
-    session.nextLevel();
-    expect(session.world.currentId).toBe(10);
+    (session.game as Adventure).fl_warpStart = true;
+    session.game.fl_clear = true;
+    session.game.nextLevel();
+    expect(session.game.world.currentId).toBe(10);
     expect(framesUntilReady()).toBe(PARSE);
     expect(internals().fake).toBeNull();
   });
@@ -123,36 +124,36 @@ describe('level transitions (ViewManager)', () => {
     const link = session.dataStore.portalLinks.links.find(
       (l) => l.from_did === 0 && l.to_pid >= 0,
     )!;
-    session.initGame(link.from_lid, 1234);
+    session.startGame(link.from_lid, 1234);
     framesUntilReady();
-    session.fl_clear = true;
+    session.game.fl_clear = true;
     internals().fl_rightPortal = right;
-    session.switchDimensionById(link.to_did, link.to_lid, link.to_pid);
-    expect(session.currentDim).toBe(link.to_did);
+    session.game.switchDimensionById(link.to_did, link.to_lid, link.to_pid);
+    expect(session.game.currentDim).toBe(link.to_did);
     expect(internals().fake).not.toBeNull();
 
     step(PARSE);
     expect(internals().fl_hscrolling).toBe(true);
     expect(internals().scrollDir).toBe(dir);
-    expect(session.view.viewX).toBe(Data.GAME_WIDTH);
+    expect(session.game.view.viewX).toBe(Data.GAME_WIDTH);
     step(1);
     const x0 = dir > 0 ? Data.GAME_WIDTH + 20 : -Data.GAME_WIDTH - 20;
-    expect(Math.sign(session.view.viewX!)).toBe(Math.sign(x0));
+    expect(Math.sign(session.game.view.viewX!)).toBe(Math.sign(x0));
 
     expect(framesUntilReady()).toBe(SCROLL - 1);
-    expect(session.view.viewX).toBe(0);
+    expect(session.game.view.viewX).toBe(0);
     expect(internals().fake).toBeNull();
-    expect(session.player!.mc._visible).toBe(true);
+    expect(session.game.player!.mc._visible).toBe(true);
   });
 
   it('arriving at no portal (pid < 0) fades the old world out', () => {
-    session.initGame(5, 1234);
+    session.startGame(5, 1234);
     framesUntilReady();
-    session.fl_clear = true;
-    session.switchDimensionById(1, 0, -1);
+    session.game.fl_clear = true;
+    session.game.switchDimensionById(1, 0, -1);
     step(PARSE);
     expect(internals().fl_fading).toBe(true);
-    expect(session.view.viewX).toBe(0);
+    expect(session.game.view.viewX).toBe(0);
     const alpha = internals().fake!._alpha;
     step(1);
     expect(internals().fake!._alpha).toBe(alpha - Data.FADE_SPEED);
@@ -163,19 +164,19 @@ describe('level transitions (ViewManager)', () => {
 
 describe('darkness (GameMode.updateDarkness, holeUpdate)', () => {
   function useItem(id: number): void {
-    const item = SpecialItem.attach(session, 100, 100, id, null)!;
-    session.player!.executeSpecialItem(item);
+    const item = SpecialItem.attach(session.game, 100, 100, id, null)!;
+    session.game.player!.executeSpecialItem(item);
     item.destroy();
   }
 
   it('no darkness before level 16', () => {
-    session.initGame(15, 1234);
+    session.startGame(15, 1234);
     framesUntilReady();
     expect(internals().darknessMC).toBeNull();
   });
 
   it('the darkness eases to the level number and the light follows the player', () => {
-    session.initGame(40, 1234);
+    session.startGame(40, 1234);
     framesUntilReady();
     const d = internals().darknessMC!;
     // startLevel's updateDarkness, then the frame's holeUpdate: 2 steps of 2
@@ -184,36 +185,36 @@ describe('darkness (GameMode.updateDarkness, holeUpdate)', () => {
     expect(d._alpha).toBe(24);
     step(30);
     expect(d._alpha).toBe(40);
-    expect(session.world.darknessFactor).toBe(40);
+    expect(session.game.world.darknessFactor).toBe(40);
 
     const hole = internals().darknessHoles[0];
     expect(hole.blendMode).toBe('erase');
-    const p = session.player!;
+    const p = session.game.player!;
     step(20);
     expect(hole._x).toBeCloseTo(p.x + Data.CASE_WIDTH * 0.5, 0);
     expect(hole._y).toBeCloseTo(p.y - Data.CASE_HEIGHT, 0);
   });
 
   it('68: the candle widens the light; 26: the light bulb halves the darkness', () => {
-    session.initGame(40, 1234);
+    session.startGame(40, 1234);
     framesUntilReady();
     useItem(68);
-    session.updateDarkness();
+    session.game.updateDarkness();
     expect(internals().darknessHoles[0]._xscale).toBe(150);
     useItem(26);
     expect(internals().targetDark).toBe(20);
   });
 
   it('torches add light spots; code trigger 14 removes them', () => {
-    session.initGame(40, 1234);
+    session.startGame(40, 1234);
     framesUntilReady();
-    session.addHole(100, 100, 180);
-    session.updateDarkness();
+    session.game.addHole(100, 100, 180);
+    session.game.updateDarkness();
     expect(internals().darknessHoles.length).toBe(3);
     const hole = internals().darknessHoles[2];
     expect(hole._width).toBeCloseTo(180, 0);
     expect(hole.blendMode).toBe('erase');
-    session.clearExtraHoles();
+    session.game.clearExtraHoles();
     expect(internals().darknessHoles.length).toBe(2);
     expect(hole.parent).toBeNull();
   });
@@ -222,14 +223,14 @@ describe('darkness (GameMode.updateDarkness, holeUpdate)', () => {
     const link = session.dataStore.portalLinks.links.find(
       (l) => l.from_did === 0 && l.from_lid >= 30 && l.to_pid >= 0,
     )!;
-    session.initGame(link.from_lid, 1234);
+    session.startGame(link.from_lid, 1234);
     framesUntilReady();
     step(60);
-    const dark = session.world.darknessFactor;
+    const dark = session.game.world.darknessFactor;
     expect(dark).toBeGreaterThan(0);
-    session.fl_clear = true;
-    session.switchDimensionById(link.to_did, link.to_lid, link.to_pid);
-    expect(session.world.darknessFactor).toBe(dark);
+    session.game.fl_clear = true;
+    session.game.switchDimensionById(link.to_did, link.to_lid, link.to_pid);
+    expect(session.game.world.darknessFactor).toBe(dark);
     // The snapshot is drawn as dark as the darkness under it
     expect(internals().fake!._alpha).toBe(100 - dark);
   });

@@ -21,13 +21,13 @@ describe('new game while paused', () => {
   it('drops the old pause screen (a new GameMode has none)', () => {
     session.restartLevel();
     step(80);
-    session.onPause();
-    const paused = (session as unknown as { pauseMC: SwfMovieClip | null }).pauseMC;
+    session.game.onPause();
+    const paused = (session.game as unknown as { pauseMC: SwfMovieClip | null }).pauseMC;
     expect(paused?.parent).toBeTruthy();
     session.restartLevel();
     step(80);
-    expect(session.fl_pause).toBe(false);
-    expect((session as unknown as { pauseMC: SwfMovieClip | null }).pauseMC).toBeNull();
+    expect(session.game.fl_pause).toBe(false);
+    expect((session.game as unknown as { pauseMC: SwfMovieClip | null }).pauseMC).toBeNull();
     expect(paused?.parent).toBeFalsy();
   });
 });

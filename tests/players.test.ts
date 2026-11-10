@@ -208,28 +208,28 @@ describe('two players in a game (G.2)', () => {
 
   /** `MultiCoop.initGame`, after a level 1 game started: player 2 next to player 1. */
   function addPlayer2(): [PlayerEntity, PlayerEntity] {
-    const p1 = session.player!;
+    const p1 = session.game.player!;
     p1.ctrl.setKeys(Key.UP, Key.DOWN, Key.LEFT, Key.RIGHT, Key.ENTER);
-    const w = session.world.current;
-    const p2 = session.insertPlayer(w.playerX, w.playerY);
+    const w = session.game.world.current;
+    const p2 = session.game.insertPlayer(w.playerX, w.playerY);
     p2.ctrl.setKeys(82, 70, 68, 71, 65);
     p2.show();
     return [p1, p2];
   }
 
   it('gives pids in order, and a new game is back to one player', () => {
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     step(30);
     const [p1, p2] = addPlayer2();
     expect([p1.pid, p2.pid]).toEqual([0, 1]);
     expect(session.input.playerCount).toBe(2);
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     expect(session.input.playerCount).toBe(1);
     expect(session.input.playerKeys(0)).toBe(DEFAULT_KEYS);
   });
 
   it('each player moves and drops bombs with their own keys', () => {
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     step(30);
     const [p1, p2] = addPlayer2();
     const x1 = p1.x;
@@ -243,14 +243,14 @@ describe('two players in a game (G.2)', () => {
     session.input.setKeyCode(65, true); // A: player 2's bomb
     step();
     session.input.setKeyCode(65, false);
-    const bombs = () => session.getBombs().map((b) => (b.parent as PlayerEntity | null)?.pid);
+    const bombs = () => session.game.getBombs().map((b) => (b.parent as PlayerEntity | null)?.pid);
     expect(bombs()).toEqual([1]);
     session.input.setKeyCode(Key.ENTER, true); // player 1's bomb
     step();
     session.input.setKeyCode(Key.ENTER, false);
     expect(bombs().sort()).toEqual([0, 1]);
     // Ctrl is no longer player 1's bomb, until a mode gives it back (`setAlt`)
-    session.destroyList(Data.BOMB);
+    session.game.destroyList(Data.BOMB);
     step(20);
     session.input.setKeyCode(Key.CONTROL, true);
     step();
@@ -298,10 +298,10 @@ describe('two players in a game (G.2)', () => {
     for (let t = 0; t < 120; t++) {
       if (t === 30) {
         // The replay's game makes the same second player; its keys do not matter
-        const w = session.world.current;
-        const p2 = session.insertPlayer(w.playerX, w.playerY);
+        const w = session.game.world.current;
+        const p2 = session.game.insertPlayer(w.playerX, w.playerY);
         p2.show();
-        players = [session.player!, p2];
+        players = [session.game.player!, p2];
       }
       step();
       if (players) again.push(players.flatMap((p) => [p.x, p.y]));

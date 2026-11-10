@@ -162,7 +162,7 @@ describe('volumes (GameParameters, GameManager, Mode.setMusicVolume)', () => {
     it('sets each channel at a new game, enemies and interface 10 lower', () => {
       const setVolume = vi.spyOn(s.audio, 'setVolume');
       s.setParameters(SYSTEM_FAMILIES, '');
-      s.initGame(1, 1234);
+      s.startGame(1, 1234);
       const vol = new Map(setVolume.mock.calls);
       expect(vol.get(Data.CHAN_PLAYER)).toBe(50);
       expect(vol.get(Data.CHAN_BOMB)).toBe(50);
@@ -175,11 +175,11 @@ describe('volumes (GameParameters, GameManager, Mode.setMusicVolume)', () => {
 
     it('plays the music at 33, 16 while paused, 0 when muted with M', () => {
       const setMusicVolume = vi.spyOn(s.audio, 'setMusicVolume');
-      s.playMusicTrack(0);
+      s.game.playMusicTrack(0);
       expect(setMusicVolume).toHaveBeenLastCalledWith(33);
-      s.setMusicVolume(0.5);
+      s.game.setMusicVolume(0.5);
       expect(setMusicVolume).toHaveBeenLastCalledWith(16);
-      s.setMusicVolume(0);
+      s.game.setMusicVolume(0);
       expect(setMusicVolume).toHaveBeenLastCalledWith(0);
       setMusicVolume.mockRestore();
     });

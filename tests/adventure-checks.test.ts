@@ -23,16 +23,16 @@ function step(n: number): void {
 
 describe('level name banner (Adventure.onLevelReady)', () => {
   it('shows only on levels with a name of their own (Lang.getLevelName)', () => {
-    session.initGame(0, 1234);
+    session.startGame(0, 1234);
     step(20);
-    session.forcedGoto(1);
+    session.game.forcedGoto(1);
     step(60);
-    expect(session.world.currentId).toBe(1);
-    expect(session.fxMan.levelName).toBeNull();
-    session.forcedGoto(2);
+    expect(session.game.world.currentId).toBe(1);
+    expect(session.game.fxMan.levelName).toBeNull();
+    session.game.forcedGoto(2);
     step(60);
-    expect(session.world.currentId).toBe(2);
-    expect(session.fxMan.levelName?.getText('field')?.text).toBe(
+    expect(session.game.world.currentId).toBe(2);
+    expect(session.game.fxMan.levelName?.getText('field')?.text).toBe(
       session.dataStore.getLevelName(0, 2),
     );
   });

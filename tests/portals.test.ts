@@ -193,42 +193,43 @@ describe.each([
   function ready(max = 300): boolean {
     for (let i = 0; i < max; i++) {
       step();
-      if (!s.fl_lock) return true;
+      if (!s.game.fl_lock) return true;
     }
     return false;
   }
 
   /** Starts a game in the link's level, with its enemies gone so the level is clear. */
   function enter(l: PortalLink): void {
-    s.initGame(l.from_did === 0 ? l.from_lid : 0, 1234);
-    expect(s.fl_mirror).toBe(mirror);
+    s.startGame(l.from_did === 0 ? l.from_lid : 0, 1234);
+    expect(s.game.fl_mirror).toBe(mirror);
     expect(ready()).toBe(true);
     if (l.from_did !== 0) {
-      s.fl_clear = true;
-      s.switchDimensionById(l.from_did, l.from_lid, -1);
+      s.game.fl_clear = true;
+      s.game.switchDimensionById(l.from_did, l.from_lid, -1);
       expect(ready()).toBe(true);
     }
-    expect(name(s.currentDim, s.world.currentId)).toBe(name(l.from_did, l.from_lid));
+    expect(name(s.game.currentDim, s.game.world.currentId)).toBe(name(l.from_did, l.from_lid));
     // Enemies come a frame after the unlock; the game then clears the level itself
     // (GameMode.checkLevelClear), which runs the script's $end blocks
-    for (let i = 0; i < 60 && !(i > 2 && s.fl_clear); i++) {
-      for (const b of s.getBads()) b.destroy();
+    for (let i = 0; i < 60 && !(i > 2 && s.game.fl_clear); i++) {
+      for (const b of s.game.getBads()) b.destroy();
       step();
     }
-    expect(s.fl_clear).toBe(true);
+    expect(s.game.fl_clear).toBe(true);
     // The arrival knock of the setup (pid -1) would carry over to the portal's arrival
-    for (let i = 0; i < 100 && s.player!.fl_knock; i++) step();
+    for (let i = 0; i < 100 && s.game.player!.fl_knock; i++) step();
   }
 
-  const left = (l: PortalLink) => s.currentDim !== l.from_did || s.world.currentId !== l.from_lid;
+  const left = (l: PortalLink) =>
+    s.game.currentDim !== l.from_did || s.game.world.currentId !== l.from_lid;
 
   it.each(firstLinks.map((l) => [`${fromName(l)} > ${toName(l)}`, l] as const))('%s', (_, l) => {
     enter(l);
-    const p = s.player!;
-    const field = s.world.portalList[l.from_pid];
-    const floating = scriptPortals(s.world.current.script).get(l.from_pid);
+    const p = s.game.player!;
+    const field = s.game.world.portalList[l.from_pid];
+    const floating = scriptPortals(s.game.world.current.script).get(l.from_pid);
     // Script coordinates are flipped where they are used (GameMode.flipCoordCase)
-    const fx = (cx: number) => s.flipCoordCase(cx);
+    const fx = (cx: number) => s.game.flipCoordCase(cx);
     if (field) {
       // Entering the portal field: Physics.infix, run when the player changes case
       p.moveToCase(field.cx, field.cy);
@@ -236,18 +237,19 @@ describe.each([
     } else if (floating) {
       // The level script opens it (e_openPortal) when its trigger fires, with a position trigger
       // that takes the player in (ScriptEngine.insertPortal)
-      const opened = () => (s as unknown as { portalMcList: unknown[] }).portalMcList[l.from_pid];
+      const opened = () =>
+        (s.game as unknown as { portalMcList: unknown[] }).portalMcList[l.from_pid];
       const t = floating.trigger;
       // A locked portal ($key) needs its key, found elsewhere in the game
-      if (t?.attrs.key !== undefined) s.giveKey(t.attrs.key);
+      if (t?.attrs.key !== undefined) s.game.giveKey(t.attrs.key);
       for (let i = 0; i < 1500 && !opened(); i++) {
         if (t?.name === 'exp') {
-          const x = s.flipCoordReal(BaseEntity.x_ctr(t.attrs.x));
-          s.onExplode(x, BaseEntity.y_ctr(t.attrs.y), Data.CASE_WIDTH);
+          const x = s.game.flipCoordReal(BaseEntity.x_ctr(t.attrs.x));
+          s.game.onExplode(x, BaseEntity.y_ctr(t.attrs.y), Data.CASE_WIDTH);
         } else if (t?.name === 't_pos') {
           p.moveToCase(fx(t.attrs.x), t.attrs.y);
         } else if (t?.name === 'enter') {
-          s.onEnterCase(fx(t.attrs.x), t.attrs.y);
+          s.game.onEnterCase(fx(t.attrs.x), t.attrs.y);
         }
         step();
       }
@@ -255,16 +257,16 @@ describe.each([
       p.moveToCase(fx(floating.cx), floating.cy);
     } else {
       // An e_portal event of the level script (the village's well, behind a key and a case)
-      expect(s.usePortal(l.from_pid, null)).toBe(true);
+      expect(s.game.usePortal(l.from_pid, null)).toBe(true);
     }
     for (let i = 0; i < 300 && !left(l); i++) {
       // Held at a floating portal until its trigger pulls the player in (GameMode.usePortal)
-      if (floating && !field && !(s as unknown as { nextLink: unknown }).nextLink) {
+      if (floating && !field && !(s.game as unknown as { nextLink: unknown }).nextLink) {
         p.moveToCase(fx(floating.cx), floating.cy);
       }
       step();
     }
-    expect(name(s.currentDim, s.world.currentId)).toBe(name(l.to_did, l.to_lid));
+    expect(name(s.game.currentDim, s.game.world.currentId)).toBe(name(l.to_did, l.to_lid));
     expect(ready()).toBe(true);
 
     const want = expectedEntrance(l, mirror);

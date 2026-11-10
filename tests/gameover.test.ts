@@ -21,15 +21,15 @@ function step(n: number): void {
 
 /** A fresh game on `level`, run until it is ready. */
 function start(level = 6): void {
-  session.initGame(level, 1234);
+  session.startGame(level, 1234);
   results = [];
   step(20);
 }
 
 /** Loses the player's last life. */
 function die(): void {
-  session.player!.lives = 0;
-  session.player!.killPlayer();
+  session.game.player!.lives = 0;
+  session.game.player!.killPlayer();
 }
 
 /** Logic ticks until the Loader is done (44 Flash frames at 40 Hz, 5 per 4 ticks). */
@@ -39,10 +39,10 @@ describe('game over', () => {
   it('stops the game and fades in the save screen, then hands over the result', () => {
     start();
     const score = 1234;
-    session.player!.getScore(null, score);
+    session.game.player!.getScore(null, score);
     die();
 
-    expect(session.fl_gameOver).toBe(true);
+    expect(session.game.fl_gameOver).toBe(true);
     expect(session.loader.fl_gameOver).toBe(true);
     const loading = session.loader.loading!;
     expect(loading).not.toBeNull();
@@ -52,9 +52,9 @@ describe('game over', () => {
     expect(loading._alpha).toBe(0);
 
     // The game's main stops at once
-    const cycle = session.cycle;
+    const cycle = session.game.cycle;
     step(5);
-    expect(session.cycle).toBe(cycle);
+    expect(session.game.cycle).toBe(cycle);
     expect(session.gameRoot.visible).toBe(true);
 
     // The game is removed when the screen is covered...
@@ -79,12 +79,12 @@ describe('game over', () => {
 
   it('sends the item picks, the score items at id + 1000', () => {
     start();
-    const p = session.player!;
-    const sp = SpecialItem.attach(session, p.x, p.y, 13, null)!;
+    const p = session.game.player!;
+    const sp = SpecialItem.attach(session.game, p.x, p.y, 13, null)!;
     p.hit(sp);
-    const sc = ScoreItem.attach(session, p.x, p.y, 7, null);
+    const sc = ScoreItem.attach(session.game, p.x, p.y, 7, null);
     p.hit(sc);
-    p.hit(ScoreItem.attach(session, p.x, p.y, 7, null));
+    p.hit(ScoreItem.attach(session.game, p.x, p.y, 7, null));
     die();
     step(FADE_TICKS);
     const r = results[0];
@@ -96,7 +96,7 @@ describe('game over', () => {
 
   it('marks the game illegal when the score was changed from outside', () => {
     start();
-    const p = session.player!;
+    const p = session.game.player!;
     p.getScore(null, 500);
     p.score = 99999; // a memory editor
     p.getScore(null, 500);
@@ -118,29 +118,29 @@ describe('game over', () => {
 
   it('keeps the first non-zero final score', () => {
     start();
-    session.registerScore(1, 0);
-    session.registerScore(1, 500);
-    session.registerScore(1, 800);
-    expect(session.savedScores[1]).toBe(500);
+    session.game.registerScore(1, 0);
+    session.game.registerScore(1, 500);
+    session.game.registerScore(1, 800);
+    expect(session.game.savedScores[1]).toBe(500);
   });
 
   it('counts the frames played, not those of the level change', () => {
     start();
-    const d = session.duration;
+    const d = session.game.duration;
     step(10);
-    expect(session.duration).toBe(d + 10);
-    session.nextLevel();
+    expect(session.game.duration).toBe(d + 10);
+    session.game.nextLevel();
     step(10);
-    expect(session.duration).toBe(d + 10);
+    expect(session.game.duration).toBe(d + 10);
   });
 
   it('ends the game with the elevator timer, with the score registered', () => {
     start();
-    session.player!.getScore(null, 777);
-    session.endModeTimer = 1;
+    session.game.player!.getScore(null, 777);
+    session.game.endModeTimer = 1;
     step(1);
-    expect(session.fl_gameOver).toBe(true);
-    expect(session.savedScores[0]).toBe(777);
+    expect(session.game.fl_gameOver).toBe(true);
+    expect(session.game.savedScores[0]).toBe(777);
   });
 
   it('says the save worked, hands over once, and leaves the next game to the site', () => {
@@ -154,7 +154,7 @@ describe('game over', () => {
     session.input.setTouch('attack', true);
     step(5);
     session.input.setTouch('attack', false);
-    expect(session.fl_gameOver).toBe(true);
+    expect(session.game.fl_gameOver).toBe(true);
     expect(results).toHaveLength(1);
   });
 });
@@ -162,22 +162,22 @@ describe('game over', () => {
 describe('end of the set', () => {
   it('leaves for endGame.html with the picks, the game running until it is covered', () => {
     start();
-    const p = session.player!;
-    p.hit(SpecialItem.attach(session, p.x, p.y, 13, null)!);
-    p.hit(ScoreItem.attach(session, p.x, p.y, 7, null));
-    session.onEndOfSet();
+    const p = session.game.player!;
+    p.hit(SpecialItem.attach(session.game, p.x, p.y, 13, null)!);
+    p.hit(ScoreItem.attach(session.game, p.x, p.y, 7, null));
+    session.game.onEndOfSet();
 
-    expect(session.fl_gameOver).toBe(false);
-    expect(session.fl_lock).toBe(true);
+    expect(session.game.fl_gameOver).toBe(false);
+    expect(session.game.fl_lock).toBe(true);
     expect(session.loader.fl_exit).toBe(true);
     expect(session.loader.loading!._currentframe).toBe(6);
 
     // The game's main still runs (locked: `cycle` stops) until its clip is removed
-    const cycle = session.cycle;
-    const hud = vi.spyOn(session.hud, 'update');
+    const cycle = session.game.cycle;
+    const hud = vi.spyOn(session.game.hud, 'update');
     step(5);
     expect(hud).toHaveBeenCalledTimes(5);
-    expect(session.cycle).toBe(cycle);
+    expect(session.game.cycle).toBe(cycle);
     hud.mockRestore();
     step(FADE_TICKS);
     expect(session.loader.fl_done).toBe(true);
@@ -193,7 +193,7 @@ describe('end of the set', () => {
 
   it('happens when going past the last level', () => {
     start();
-    session.goto(session.world.levelCount);
+    session.game.goto(session.game.world.levelCount);
     expect(session.loader.fl_exit).toBe(true);
   });
 });

@@ -54,12 +54,12 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Compact, comparable state of the game: what a regression snapshot records. */
 export function snapshotState(session: GameSession) {
-  const p = session.player;
+  const p = session.game.player;
   return {
-    level: session.world.currentId,
-    dim: session.currentDim,
-    gameOver: session.fl_gameOver,
-    clear: session.fl_clear,
+    level: session.game.world.currentId,
+    dim: session.game.currentDim,
+    gameOver: session.game.fl_gameOver,
+    clear: session.game.fl_clear,
     player: p
       ? {
           x: r2(p.x),
@@ -70,8 +70,8 @@ export function snapshotState(session: GameSession) {
           anim: p.animId,
         }
       : null,
-    bads: session.getBads().map((b) => `${b.constructor.name} ${r2(b.x)},${r2(b.y)}`),
-    items: session.getItems().map((i) => `${i.id}:${i.subId ?? ''} ${r2(i.x)},${r2(i.y)}`),
-    bombs: session.getBombs().length,
+    bads: session.game.getBads().map((b) => `${b.constructor.name} ${r2(b.x)},${r2(b.y)}`),
+    items: session.game.getItems().map((i) => `${i.id}:${i.subId ?? ''} ${r2(i.x)},${r2(i.y)}`),
+    bombs: session.game.getBombs().length,
   };
 }

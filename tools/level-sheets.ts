@@ -72,15 +72,15 @@ const step = (n = 1) => {
 /** Plays a level until it shows, then a few frames for its `attach` scripts, and captures it. */
 async function capture(set: string, id: number): Promise<HTMLCanvasElement> {
   if (session.currentSetName !== set) await session.changeSet(set, id);
-  else session.initGame(id, 1234);
-  for (let i = 0; i < 300 && session.fl_lock; i++) step();
+  else session.startGame(id, 1234);
+  for (let i = 0; i < 300 && session.game.fl_lock; i++) step();
   step(3);
   if (!full) {
-    for (const e of session.getList(Data.ENTITY)) e.mc._visible = false;
+    for (const e of session.game.getList(Data.ENTITY)) e.mc._visible = false;
     const dark = (session as unknown as { darknessMC: SwfMovieClip | null }).darknessMC;
     if (dark) dark._visible = false;
     // Effects (item spawn flashes) and the zone name banner
-    session.fxMan.clear();
+    session.game.fxMan.clear();
   }
   return app.renderer.extract.canvas({
     target: app.stage,

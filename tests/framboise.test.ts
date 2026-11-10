@@ -26,9 +26,9 @@ function step(n: number): void {
 
 /** deepnight 214: a single Framboise. Waits until it stands on a platform. */
 function startLevel214(): Framboise {
-  session.initGame(214, 1234);
+  session.startGame(214, 1234);
   step(20);
-  const b = session.getBads()[0] as Framboise;
+  const b = session.game.getBads()[0] as Framboise;
   expect(b.constructor.name).toBe('FramboiseBad');
   for (let i = 0; i < 200 && !b.isReady(); i++) step(1);
   expect(b.isReady()).toBe(true);
@@ -36,7 +36,7 @@ function startLevel214(): Framboise {
 }
 
 function frags(b: Framboise): FramBallShoot[] {
-  return session
+  return session.game
     .getList(Data.SHOOT)
     .filter(
       (s) => s instanceof FramBallShoot && (s.owner as unknown) === b && !s.fl_destroy,
@@ -45,7 +45,7 @@ function frags(b: Framboise): FramBallShoot[] {
 
 /** Drops a player bomb next to the Framboise and steps until it bursts. */
 function burst(b: Framboise): void {
-  ClassicBomb.attach(session, b.x, b.y);
+  ClassicBomb.attach(session.game, b.x, b.y);
   for (let i = 0; i < 40 && !b.fl_phased; i++) step(1);
   expect(b.fl_phased).toBe(true);
 }
@@ -104,9 +104,9 @@ describe('Framboise (task 2.12)', () => {
 describe('Baleine (task 2.12)', () => {
   it('is a plain Flyer of its own class', async () => {
     const adv = await createHeadlessSession();
-    adv.initGame(99, 1234);
+    adv.startGame(99, 1234);
     for (let i = 0; i < 20; i++) adv.gameLoop.stepSingleFrame();
-    const names = adv.getBads().map((b) => b.constructor.name);
+    const names = adv.game.getBads().map((b) => b.constructor.name);
     expect(names.length).toBeGreaterThan(0);
     expect(new Set(names)).toEqual(new Set(['BaleineBad']));
   });

@@ -294,14 +294,14 @@ async function main(): Promise<void> {
       await session.changeSet(setName, 0);
       if (levelInput) {
         levelInput.value = '0';
-        levelInput.max = String(Math.max(0, session.world.set.levels.length - 1));
+        levelInput.max = String(Math.max(0, session.game.world.set.levels.length - 1));
       }
     });
   }
 
   // Level number input
   if (levelInput) {
-    levelInput.max = String(Math.max(0, session.world.set.levels.length - 1));
+    levelInput.max = String(Math.max(0, session.game.world.set.levels.length - 1));
     levelInput.addEventListener('change', () => {
       const lvl = parseInt(levelInput.value, 10);
       if (!Number.isNaN(lvl)) {
@@ -318,7 +318,7 @@ async function main(): Promise<void> {
   });
 
   btnPause?.addEventListener('click', () => {
-    session.togglePause();
+    session.game.togglePause();
   });
 
   /** The page's texts and the sound button, in the current language. */
@@ -412,7 +412,7 @@ async function main(): Promise<void> {
   };
   // Unplugged during a game: the game pauses
   input.onPadDisconnect = () => {
-    const playing = session.loader.gameRunning && !session.fl_pause;
+    const playing = session.loader.gameRunning && !session.game.fl_pause;
     if (playing) session.requestPause();
     notice.show(pageText(lang(), playing ? 'padLostPaused' : 'padLost'));
   };

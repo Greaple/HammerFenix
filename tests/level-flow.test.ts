@@ -8,17 +8,17 @@ import { createHeadlessSession } from './helpers/headless';
 // the script added the enemies, so the level counted as cleared and its item timers were removed.
 it('a level reached from the previous one gets its items', async () => {
   const s = await createHeadlessSession();
-  s.initGame(1, 1234);
+  s.startGame(1, 1234);
   let arrived = -1;
   for (let t = 0; t < 600 && arrived < 0; t++) {
     s.gameLoop.stepSingleFrame();
-    if (s.world.currentId === 2) arrived = t;
+    if (s.game.world.currentId === 2) arrived = t;
   }
   expect(arrived).toBeGreaterThan(0);
-  expect(s.fl_clear).toBe(false);
+  expect(s.game.fl_clear).toBe(false);
 
   for (let t = 0; t < Data.SCORE_ITEM_TIMER + 5; t++) s.gameLoop.stepSingleFrame();
-  expect(s.fl_clear).toBe(false);
-  const ids = s.getItems().map((i) => i.id);
+  expect(s.game.fl_clear).toBe(false);
+  const ids = s.game.getItems().map((i) => i.id);
   expect(ids.length).toBeGreaterThan(0);
 });

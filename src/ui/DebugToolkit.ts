@@ -35,7 +35,6 @@ export class DebugToolkit {
     // Overlay graphics for visual debug (hitboxes, grid, collision boxes)
     this.overlayGfx = new Graphics();
     this.overlayGfx.zIndex = 99999;
-    this.session.gameRoot.addChild(this.overlayGfx);
 
     this.createDom();
     this.bindKeyboardShortcuts();
@@ -163,8 +162,8 @@ export class DebugToolkit {
     const godBtn = this.panelEl.querySelector('#dbg-btn-god') as HTMLButtonElement;
     godBtn?.addEventListener('click', () => {
       this.isGodMode = !this.isGodMode;
-      if (this.session.player) {
-        this.session.player.fl_godMode = this.isGodMode;
+      if (this.session.game.player) {
+        this.session.game.player.fl_godMode = this.isGodMode;
       }
       godBtn.textContent = `God Mode: ${this.isGodMode ? 'ON' : 'OFF'}`;
       godBtn.classList.toggle('active', this.isGodMode);
@@ -199,7 +198,7 @@ export class DebugToolkit {
 
     // Step button
     this.panelEl.querySelector('#dbg-btn-step')?.addEventListener('click', () => {
-      if (!this.session.fl_pause) this.session.onPause();
+      if (!this.session.game.fl_pause) this.session.game.onPause();
       this.session.gameLoop.stepSingleFrame();
     });
 
@@ -209,21 +208,27 @@ export class DebugToolkit {
     });
 
     this.panelEl.querySelector('#dbg-btn-hurry')?.addEventListener('click', () => {
-      this.session.onHurryUp();
+      this.session.game.onHurryUp();
     });
 
     this.panelEl.querySelector('#dbg-btn-clear')?.addEventListener('click', () => {
-      this.session.fxMan.attachExit();
-      this.session.fl_clear = true;
+      this.session.game.fxMan.attachExit();
+      this.session.game.fl_clear = true;
     });
 
     this.panelEl.querySelector('#dbg-btn-extend')?.addEventListener('click', () => {
       // The level's letters, or any letter on a level that has none (no special slots)
       const s = this.session;
-      if (s.statsMan.extendList.length > 0) {
-        s.statsMan.attachExtend();
-      } else if (s.player) {
-        SpecialItem.attach(s, s.player.x, s.player.y - 40, 0, s.rand.random(Data.EXTENDS.length));
+      if (s.game.statsMan.extendList.length > 0) {
+        s.game.statsMan.attachExtend();
+      } else if (s.game.player) {
+        SpecialItem.attach(
+          s.game,
+          s.game.player.x,
+          s.game.player.y - 40,
+          0,
+          s.rand.random(Data.EXTENDS.length),
+        );
       }
     });
 
@@ -237,40 +242,40 @@ export class DebugToolkit {
     const spawnBadSelect = this.panelEl.querySelector('#dbg-spawn-bad-select') as HTMLSelectElement;
     this.panelEl.querySelector('#dbg-btn-spawn-bad')?.addEventListener('click', () => {
       const id = parseInt(spawnBadSelect.value, 10);
-      const p = this.session.player;
+      const p = this.session.game.player;
       const x = p ? p.x + 40 : 200;
       const y = p ? p.y - 40 : 100;
-      this.session.attachBad(id, x, y);
+      this.session.game.attachBad(id, x, y);
     });
 
     const spawnBombSelect = this.panelEl.querySelector(
       '#dbg-spawn-bomb-select',
     ) as HTMLSelectElement;
     this.panelEl.querySelector('#dbg-btn-spawn-bomb')?.addEventListener('click', () => {
-      const p = this.session.player;
+      const p = this.session.game.player;
       if (!p) return;
       const bType = spawnBombSelect.value;
       switch (bType) {
         case 'classic':
-          ClassicBomb.attach(this.session, p.x, p.y);
+          ClassicBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'black':
-          BlackBomb.attach(this.session, p.x, p.y);
+          BlackBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'blue':
-          BlueBomb.attach(this.session, p.x, p.y);
+          BlueBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'green':
-          GreenBomb.attach(this.session, p.x, p.y);
+          GreenBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'red':
-          RedBomb.attach(this.session, p.x, p.y);
+          RedBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'repel':
-          RepelBomb.attach(this.session, p.x, p.y);
+          RepelBomb.attach(this.session.game, p.x, p.y);
           break;
         case 'mine':
-          MineBomb.attach(this.session, p.x, p.y);
+          MineBomb.attach(this.session.game, p.x, p.y);
           break;
       }
     });
@@ -287,7 +292,7 @@ export class DebugToolkit {
       this.session.startRecording();
       recordBtn.disabled = true;
       stopBtn.disabled = false;
-      status.textContent = `Recording level ${this.session.world.currentId} (seed ${this.session.seed})…`;
+      status.textContent = `Recording level ${this.session.game.world.currentId} (seed ${this.session.seed})…`;
     });
 
     stopBtn.addEventListener('click', () => {
@@ -349,19 +354,19 @@ export class DebugToolkit {
         const stepBtn = this.panelEl?.querySelector('#dbg-btn-step') as HTMLButtonElement;
         stepBtn?.click();
       } else if (e.code === 'BracketLeft') {
-        if (this.session.world.currentId > 0) {
-          this.session.changeLevel(this.session.world.currentId - 1);
+        if (this.session.game.world.currentId > 0) {
+          this.session.changeLevel(this.session.game.world.currentId - 1);
         }
       } else if (e.code === 'BracketRight') {
-        if (this.session.world.currentId < this.session.world.levelCount - 1) {
-          this.session.changeLevel(this.session.world.currentId + 1);
+        if (this.session.game.world.currentId < this.session.game.world.levelCount - 1) {
+          this.session.changeLevel(this.session.game.world.currentId + 1);
         }
       }
     });
   }
 
   private killAllBads(): void {
-    const bads = this.session.getBads();
+    const bads = this.session.game.getBads();
     for (const b of bads) {
       b.forceKill(0);
     }
@@ -379,10 +384,10 @@ export class DebugToolkit {
       }
 
       if (this.isVisible && statsEl) {
-        const p = this.session.player;
+        const p = this.session.game.player;
         const pStr = p ? `(${Math.round(p.x)}, ${Math.round(p.y)}) [${p.cx}, ${p.cy}]` : 'None';
-        const badCount = this.session.getBads().length;
-        statsEl.textContent = `FPS: ${this.fps} | Cyc: ${this.session.cycle} | Igor: ${pStr} | Bads: ${badCount}`;
+        const badCount = this.session.game.getBads().length;
+        statsEl.textContent = `FPS: ${this.fps} | Cyc: ${this.session.game.cycle} | Igor: ${pStr} | Bads: ${badCount}`;
       }
 
       this.renderVisualOverlay();
@@ -397,6 +402,9 @@ export class DebugToolkit {
       this.overlayGfx.clear();
       return;
     }
+    // Each game is a new mode with its own clip: the overlay follows the current one
+    const mc = this.session.game.mc;
+    if (this.overlayGfx.parent !== mc) mc.addChild(this.overlayGfx);
 
     this.overlayGfx.clear();
 
@@ -418,7 +426,7 @@ export class DebugToolkit {
       // Solid walls
       for (let y = 0; y < Data.LEVEL_HEIGHT; y++) {
         for (let x = 0; x < Data.LEVEL_WIDTH; x++) {
-          if (this.session.world.getCase(x, y) > 0) {
+          if (this.session.game.world.getCase(x, y) > 0) {
             this.overlayGfx
               .rect(x * Data.CASE_WIDTH, y * Data.CASE_HEIGHT, Data.CASE_WIDTH, Data.CASE_HEIGHT)
               .fill({ color: 0x0284c7, alpha: 0.25 });
@@ -430,7 +438,7 @@ export class DebugToolkit {
     // 2. Hitbox visualizer
     if (this.showHitboxes) {
       // Player
-      const p = this.session.player;
+      const p = this.session.game.player;
       if (p) {
         const hw = p.hitWidth;
         const hh = p.hitHeight;
@@ -444,7 +452,7 @@ export class DebugToolkit {
       }
 
       // Bads
-      for (const b of this.session.getBads()) {
+      for (const b of this.session.game.getBads()) {
         const hw = b.hitWidth;
         const hh = b.hitHeight;
         this.overlayGfx
@@ -455,7 +463,7 @@ export class DebugToolkit {
       }
 
       // Bombs
-      for (const bomb of this.session.getBombs()) {
+      for (const bomb of this.session.game.getBombs()) {
         const hw = bomb.hitWidth;
         const hh = bomb.hitHeight;
         this.overlayGfx
@@ -465,7 +473,7 @@ export class DebugToolkit {
       }
 
       // Items
-      for (const item of this.session.getItems()) {
+      for (const item of this.session.game.getItems()) {
         const hw = item.hitWidth;
         const hh = item.hitHeight;
         this.overlayGfx

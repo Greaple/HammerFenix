@@ -12,9 +12,11 @@ import {
   TonsSupa,
 } from '../src/game/entity/Supa';
 import type { GameSession } from '../src/game/GameSession';
+import type { Adventure } from '../src/game/mode/Adventure';
 import { createHeadlessSession } from './helpers/headless';
 
 let session: GameSession;
+const adventure = () => session.game as Adventure;
 
 beforeAll(async () => {
   session = await createHeadlessSession();
@@ -22,9 +24,9 @@ beforeAll(async () => {
 
 /** A fresh game on level 6 (two enemies), run until they are in. */
 function startLevel6(): void {
-  session.initGame(6, 1234);
+  session.startGame(6, 1234);
   for (let i = 0; i < 20; i++) session.gameLoop.stepSingleFrame();
-  expect(session.getBads().length).toBeGreaterThan(1);
+  expect(session.game.getBads().length).toBeGreaterThan(1);
 }
 
 function step(n: number): void {
@@ -32,13 +34,13 @@ function step(n: number): void {
 }
 
 function supas() {
-  return session.getList(Data.SUPA);
+  return session.game.getList(Data.SUPA);
 }
 
 /** Runs a special item effect as if the player picked item `id`. */
 function useItem(id: number): void {
-  const item = SpecialItem.attach(session, 100, 100, id, null)!;
-  session.player!.executeSpecialItem(item);
+  const item = SpecialItem.attach(session.game, 100, 100, id, null)!;
+  session.game.player!.executeSpecialItem(item);
   item.destroy();
 }
 
@@ -68,8 +70,8 @@ describe('super items (entity/supa)', () => {
 
   it('the ice meteor freezes the enemies it touches', () => {
     startLevel6();
-    const b = session.getBads()[0];
-    const s = IceMeteorSupa.attach(session);
+    const b = session.game.getBads()[0];
+    const s = IceMeteorSupa.attach(session.game);
     s.moveTo(b.x, b.y);
     step(1);
     expect(b.fl_freeze).toBe(true);
@@ -77,8 +79,8 @@ describe('super items (entity/supa)', () => {
 
   it('the beach ball knocks the enemies it touches and leaves on the right', () => {
     startLevel6();
-    const b = session.getBads()[0];
-    const s = BallSupa.attach(session);
+    const b = session.game.getBads()[0];
+    const s = BallSupa.attach(session.game);
     s.moveTo(b.x, b.y);
     s.dy = 0;
     step(1);
@@ -89,9 +91,9 @@ describe('super items (entity/supa)', () => {
 
   it('the weight kills enemies and the player, and falls again', () => {
     startLevel6();
-    const b = session.getBads()[0];
-    const p = session.player!;
-    const s = TonsSupa.attach(session);
+    const b = session.game.getBads()[0];
+    const p = session.game.player!;
+    const s = TonsSupa.attach(session.game);
     s.moveTo(b.x, b.y);
     step(1);
     expect(b.fl_kill).toBe(true);
@@ -125,7 +127,7 @@ describe('super items (entity/supa)', () => {
   it('super items are removed when the player comes back to life', () => {
     startLevel6();
     useItem(9);
-    session.onResurrect();
+    session.game.onResurrect();
     step(1);
     expect(supas().length).toBe(0);
   });
@@ -137,28 +139,30 @@ describe('super item of a perfect clear (Adventure.onLevelClear)', () => {
       b.killHit(0);
       step(1);
     }
-    for (let i = 0; i < 200 && !session.fl_clear; i++) step(1);
-    expect(session.fl_clear).toBe(true);
+    for (let i = 0; i < 200 && !session.game.fl_clear; i++) step(1);
+    expect(session.game.fl_clear).toBe(true);
   }
 
   it('falls when the enemies are killed in their order of appearance', () => {
     startLevel6();
-    const bads = [...session.getBads()].sort(
-      (a, b) => session.perfectOrder.indexOf(a.uniqId) - session.perfectOrder.indexOf(b.uniqId),
+    const bads = [...session.game.getBads()].sort(
+      (a, b) =>
+        adventure().perfectOrder.indexOf(a.uniqId) - adventure().perfectOrder.indexOf(b.uniqId),
     );
     killAll(bads);
     const l = supas();
     expect(l.length).toBe(1);
     const item = l[0] as SupaItem;
     expect(item).toBeInstanceOf(SupaItem);
-    expect(item.supaId).toBe(session.perfectCount - 1);
-    expect(session.player!.baseStopAnim).toBe(Data.ANIM_PLAYER_STOP_V);
+    expect(item.supaId).toBe(adventure().perfectCount - 1);
+    expect(session.game.player!.baseStopAnim).toBe(Data.ANIM_PLAYER_STOP_V);
   });
 
   it('does not fall when they are killed out of order', () => {
     startLevel6();
-    const bads = [...session.getBads()].sort(
-      (a, b) => session.perfectOrder.indexOf(b.uniqId) - session.perfectOrder.indexOf(a.uniqId),
+    const bads = [...session.game.getBads()].sort(
+      (a, b) =>
+        adventure().perfectOrder.indexOf(b.uniqId) - adventure().perfectOrder.indexOf(a.uniqId),
     );
     killAll(bads);
     expect(supas().length).toBe(0);
@@ -166,15 +170,15 @@ describe('super item of a perfect clear (Adventure.onLevelClear)', () => {
 
   it('gives crystal value x5 when caught, and the player cries when it is missed', () => {
     startLevel6();
-    const p = session.player!;
-    const caught = SupaItem.attach(session, 2);
+    const p = session.game.player!;
+    const caught = SupaItem.attach(session.game, 2);
     const before = p.score;
     caught.moveTo(p.x, p.y - Data.CASE_HEIGHT * 1.5);
     step(1);
     expect(p.score - before).toBe(Data.getCrystalValue(2) * 5);
     expect(caught.fl_destroy).toBe(true);
 
-    const missed = SupaItem.attach(session, 0);
+    const missed = SupaItem.attach(session.game, 0);
     missed.moveTo(10, Data.GAME_HEIGHT + 49);
     step(2);
     expect(missed.fl_destroy).toBe(true);

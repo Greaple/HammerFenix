@@ -87,35 +87,35 @@ describe('what the settings turn off in a game', () => {
 
   function start(settings: PlayerSettings): void {
     s.setParameters(SYSTEM_FAMILIES, '', settings);
-    s.initGame(1, 1234);
+    s.startGame(1, 1234);
     for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
-    s.destroyList(Data.FX);
+    s.game.destroyList(Data.FX);
   }
 
   it('low details: no dust and no bouncing particles (FxManager.dust, inGameParticles)', () => {
     start(DEFAULT_SETTINGS);
-    s.fxMan.dust(10, 10);
-    s.fxMan.inGameParticles(Data.PARTICLE_ICE, 100, 100, 3);
-    expect(s.getList(Data.FX).length).toBeGreaterThan(0);
+    s.game.fxMan.dust(10, 10);
+    s.game.fxMan.inGameParticles(Data.PARTICLE_ICE, 100, 100, 3);
+    expect(s.game.getList(Data.FX).length).toBeGreaterThan(0);
 
     start(LOW);
     const draws = s.rand.next();
     start(LOW);
-    s.fxMan.dust(10, 10);
-    s.fxMan.inGameParticles(Data.PARTICLE_ICE, 100, 100, 3);
-    expect(s.getList(Data.FX)).toHaveLength(0);
+    s.game.fxMan.dust(10, 10);
+    s.game.fxMan.inGameParticles(Data.PARTICLE_ICE, 100, 100, 3);
+    expect(s.game.getList(Data.FX)).toHaveLength(0);
     // and no random draws either
     expect(s.rand.next()).toBe(draws);
   });
 
   it('no shaking: the classic bomb does not shake the screen', () => {
-    const shakeOf = () => (s as unknown as { shakeTimer: number }).shakeTimer;
+    const shakeOf = () => (s.game as unknown as { shakeTimer: number }).shakeTimer;
     start(DEFAULT_SETTINGS);
-    ClassicBomb.attach(s, 200, 200).onExplode();
+    ClassicBomb.attach(s.game, 200, 200).onExplode();
     expect(shakeOf()).toBeGreaterThan(0);
 
     start({ ...DEFAULT_SETTINGS, shake: 0 });
-    ClassicBomb.attach(s, 200, 200).onExplode();
+    ClassicBomb.attach(s.game, 200, 200).onExplode();
     expect(shakeOf()).toBe(0);
   });
 
@@ -152,7 +152,7 @@ describe('sound panel from the pause (port addition)', () => {
   function start(settings: PlayerSettings = DEFAULT_SETTINGS): void {
     s.setSettings(settings);
     s.setParameters(SYSTEM_FAMILIES, '');
-    s.initGame(1, 1234);
+    s.startGame(1, 1234);
     for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
   }
 
@@ -170,15 +170,15 @@ describe('sound panel from the pause (port addition)', () => {
     expect(s.soundMenuAvailable).toBe(false);
     tap('sound');
     expect(opened).toBe(0);
-    s.onPause();
+    s.game.onPause();
     expect(s.soundMenuAvailable).toBe(true);
     tap('sound');
     expect(opened).toBe(1);
-    s.onUnpause();
+    s.game.onUnpause();
 
     s.startRecording(1);
     for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
-    s.onPause();
+    s.game.onPause();
     expect(s.soundMenuAvailable).toBe(false);
     tap('sound');
     expect(opened).toBe(1);
@@ -188,7 +188,7 @@ describe('sound panel from the pause (port addition)', () => {
 
   it('applies the volume and the sound at once, details and shaking at the next game', () => {
     start();
-    s.onPause();
+    s.game.onPause();
     const vol = vi.spyOn(s.audio, 'setVolume');
     s.setSettings({ ...DEFAULT_SETTINGS, volume: 80, detail: 0, shake: 0 });
     let v = new Map(vol.mock.calls);
@@ -203,16 +203,16 @@ describe('sound panel from the pause (port addition)', () => {
 
   it('stops the music when switched off, and starts the asked track again when on', () => {
     start();
-    s.onPause();
-    expect(s.fl_music).toBe(true);
+    s.game.onPause();
+    expect(s.game.fl_music).toBe(true);
     const stop = vi.spyOn(s.audio, 'stopMusic');
     s.setSettings({ ...DEFAULT_SETTINGS, music: 0 });
     expect(stop).toHaveBeenCalled();
-    expect(s.fl_music).toBe(false);
+    expect(s.game.fl_music).toBe(false);
     const play = vi.spyOn(s.audio, 'playMusic');
     const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
     s.setSettings(DEFAULT_SETTINGS);
-    expect(s.fl_music).toBe(true);
+    expect(s.game.fl_music).toBe(true);
     expect(play).toHaveBeenCalledWith('music_ingame');
     // still paused: half the music volume
     expect(musicVol).toHaveBeenLastCalledWith(16);
@@ -225,10 +225,10 @@ describe('sound panel from the pause (port addition)', () => {
     start();
     const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
     tap('music');
-    expect(s.fl_mute).toBe(true);
+    expect(s.game.fl_mute).toBe(true);
     expect(musicVol).toHaveBeenLastCalledWith(0);
     tap('music');
-    expect(s.fl_mute).toBe(false);
+    expect(s.game.fl_mute).toBe(false);
     expect(musicVol).toHaveBeenLastCalledWith(33);
     musicVol.mockRestore();
   });

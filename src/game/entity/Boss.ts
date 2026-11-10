@@ -9,7 +9,7 @@ import { ScoreItem, SpecialItem } from './Item';
 import type { PlayerEntity } from './Player';
 import { BossFireBallShoot, EnemyFireBallShoot } from './Shoot';
 
-/** What `GameSession` calls on the entity registered as `Data.BOSS`. */
+/** What the game mode calls on the entity registered as `Data.BOSS`. */
 export interface BossEntity extends BaseEntity {
   onPlayerDeath(): void;
   onKillBad?(): void;
@@ -1373,8 +1373,8 @@ export class TuberculozBoss extends MoverEntity implements BossEntity {
 
     // The life bar follows the screen shake
     if (this.lifeBar) {
-      this.lifeBar.mc._x = this.game.gameRoot._x - this.game.xOffset;
-      this.lifeBar.mc._y = this.game.gameRoot._y + Data.GAME_HEIGHT * 0.5;
+      this.lifeBar.mc._x = this.game.mc._x - this.game.xOffset;
+      this.lifeBar.mc._y = this.game.mc._y + Data.GAME_HEIGHT * 0.5;
     }
   }
 

@@ -89,8 +89,8 @@ function cloneLevel(src: LevelData): LevelData {
 /**
  * Port of `levels.SetManager` (`class/hammer/levels/SetManager.mt`) and
  * `levels.GameMechanics` (`class/hammer/levels/GameMechanics.mt`), plus the `ViewManager` flags
- * the views are built from. The level script engine and the view are kept on `GameSession`
- * (`scriptRunner`, `view`); `GameSession.updateWorld()` is `GameMechanics.update`.
+ * the views are built from. The level script engine and the view are kept on `GameMode`
+ * (`scriptRunner`, `view`); `GameMode.updateWorld()` is `GameMechanics.update`.
  *
  * Not ported: the editor functions (`overwrite`, `rollback`, `insert`, `delete`, cookies).
  */
@@ -98,7 +98,7 @@ export class LevelWorld {
   set: LevelSet;
   currentId = 0;
   current!: LevelData;
-  /** Mirror option: levels are read flipped (`flip`). Set by `GameSession` before a game. */
+  /** Mirror option: levels are read flipped (`flip`). Set by `GameMode.addWorld`. */
   fl_mirror = false;
   fl_mainWorld = true;
   darknessFactor = 0;
@@ -192,8 +192,8 @@ export class LevelWorld {
   }
 
   /**
-   * `GameMechanics.goto` + `SetManager.goto`. Visits are marked by `GameSession`. The IA map is
-   * then parsed over the next frames (`GameSession.updateWorld`), and the level is shown when it
+   * `GameMechanics.goto` + `SetManager.goto`. Visits are marked by `GameMode`. The IA map is
+   * then parsed over the next frames (`GameMode.updateWorld`), and the level is shown when it
    * is done (`onDataReady`).
    */
   goto(id: number): boolean {
@@ -206,7 +206,7 @@ export class LevelWorld {
     return true;
   }
 
-  /** `GameMechanics.onReadComplete`: the IA parse starts (the script engine is `GameSession`'s). */
+  /** `GameMechanics.onReadComplete`: the IA parse starts (the script engine is `GameMode`'s). */
   private onReadComplete(): void {
     this.fl_parsing = true;
   }
@@ -230,7 +230,7 @@ export class LevelWorld {
   /**
    * `SetManager.flip`: the level mirrored for good. Only the map and the player's start move;
    * enemies, item slots and scripts keep their data and are flipped when placed
-   * (`GameSession.flipCoordCase`), as the original's own flip of them is commented out.
+   * (`GameMode.flipCoordCase`), as the original's own flip of them is commented out.
    */
   private static flip(l: LevelData): LevelData {
     return {

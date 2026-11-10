@@ -24,9 +24,9 @@ function step(n = 1): void {
 
 /** A fresh game on `level`, run until the player can move, with the dev keys on. */
 function start(level = 1): void {
-  session.initGame(level, 1234);
+  session.startGame(level, 1234);
   step(30);
-  session.player!.fl_godMode = true;
+  session.game.player!.fl_godMode = true;
   session.fl_debug = true;
 }
 
@@ -55,7 +55,7 @@ describe('dev keys (GameMode, Player.getDebugControls)', () => {
     start();
     session.fl_debug = false;
     tap(75);
-    expect(session.hasKey(3)).toBe(false);
+    expect(session.game.hasKey(3)).toBe(false);
   });
 
   it('are off while recording, since the recording would not replay', () => {
@@ -63,7 +63,7 @@ describe('dev keys (GameMode, Player.getDebugControls)', () => {
     session.input.startRecording(new InputRecorder());
     tap(75);
     session.input.stopRecording();
-    expect(session.hasKey(3)).toBe(false);
+    expect(session.game.hasKey(3)).toBe(false);
   });
 
   it('Ctrl and three digits go to that level', () => {
@@ -71,57 +71,57 @@ describe('dev keys (GameMode, Player.getDebugControls)', () => {
     session.input.setKeyCode(17, true);
     tap(96 + 0);
     tap(96 + 1);
-    expect(session.player!.debugInput).toBe('01');
+    expect(session.game.player!.debugInput).toBe('01');
     tap(96 + 2);
     session.input.setKeyCode(17, false);
-    expect(session.player!.debugInput).toBe('');
+    expect(session.game.player!.debugInput).toBe('');
     step(80);
-    expect(session.world.currentId).toBe(12);
+    expect(session.game.world.currentId).toBe(12);
   });
 
   it('Backspace clears the digits; three digits alone spawn that special item', () => {
     start();
     tap(96 + 5);
     tap(8);
-    expect(session.player!.debugInput).toBe('');
-    const before = session.countList(Data.SPECIAL_ITEM);
+    expect(session.game.player!.debugInput).toBe('');
+    const before = session.game.countList(Data.SPECIAL_ITEM);
     tap(96);
     tap(96);
     tap(96 + 4);
-    expect(session.countList(Data.SPECIAL_ITEM)).toBe(before + 1);
+    expect(session.game.countList(Data.SPECIAL_ITEM)).toBe(before + 1);
   });
 
   it('K gives every key, N goes to the next level', () => {
     start(1);
     tap(75);
-    for (let i = 0; i < 50; i++) expect(session.hasKey(i)).toBe(true);
+    for (let i = 0; i < 50; i++) expect(session.game.hasKey(i)).toBe(true);
     tap(78);
     step(80);
-    expect(session.world.currentId).toBe(2);
+    expect(session.game.world.currentId).toBe(2);
   });
 
   it('numpad * removes every enemy', () => {
     start(10);
-    for (let i = 0; i < 100 && session.countList(Data.BAD) === 0; i++) step();
-    expect(session.countList(Data.BAD)).toBeGreaterThan(0);
+    for (let i = 0; i < 100 && session.game.countList(Data.BAD) === 0; i++) step();
+    expect(session.game.countList(Data.BAD)).toBeGreaterThan(0);
     tap(106);
     step();
-    expect(session.countList(Data.BAD)).toBe(0);
+    expect(session.game.countList(Data.BAD)).toBe(0);
   });
 
   it('W cycles the weapons 1 to 9', () => {
     start();
-    session.player!.changeWeapon(9);
+    session.game.player!.changeWeapon(9);
     tap(87);
-    expect(session.player!.currentWeapon).toBe(1);
+    expect(session.game.player!.currentWeapon).toBe(1);
   });
 
   it('H makes the hurry up timer run 21 times faster', () => {
     start();
-    const t = session.huTimer;
+    const t = session.game.huTimer;
     session.input.setKeyCode(72, true);
     step();
-    expect(session.huTimer - t).toBe(21);
+    expect(session.game.huTimer - t).toBe(21);
   });
 
   it('Shift slows the game (tmod 0.3) while held, Home puts it back', () => {
@@ -142,7 +142,7 @@ describe('dev keys (GameMode, Player.getDebugControls)', () => {
 describe('boss dev keys', () => {
   it('K kills the Bat', () => {
     start(Data.BAT_LEVEL);
-    const bat = session.getList(Data.BOSS)[0] as BatBoss;
+    const bat = session.game.getList(Data.BOSS)[0] as BatBoss;
     expect(bat).toBeInstanceOf(BatBoss);
     session.input.setKeyCode(75, true);
     step();
@@ -151,7 +151,7 @@ describe('boss dev keys', () => {
 
   it('Enter kills Tuberculoz, Shift takes his lives', () => {
     start(Data.TUBERCULOZ_LEVEL);
-    const tub = session.getList(Data.BOSS)[0] as TuberculozBoss;
+    const tub = session.game.getList(Data.BOSS)[0] as TuberculozBoss;
     expect(tub).toBeInstanceOf(TuberculozBoss);
     const lives = tub.lives;
     session.input.setKeyCode(16, true);

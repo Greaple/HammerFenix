@@ -21,13 +21,13 @@ function step(n: number): void {
 
 /** A fresh game on level 6, run until it is ready. */
 function start(): void {
-  session.initGame(6, 1234);
+  session.startGame(6, 1234);
   step(20);
 }
 
 /** Leaves for the next level and runs its transition (IA parse and scroll). */
 function nextLevel(): void {
-  session.nextLevel();
+  session.game.nextLevel();
   step(60);
 }
 
@@ -48,7 +48,7 @@ describe('Stat', () => {
 describe('StatsManager', () => {
   it('gives one letter, plus one per combo step above 1, at most 7', () => {
     start();
-    const sm = session.statsMan;
+    const sm = session.game.statsMan;
     const count = (combo: number) => {
       sm.write(Data.STAT_MAX_COMBO, combo);
       return sm.countExtend();
@@ -63,42 +63,42 @@ describe('StatsManager', () => {
 
   it('records the best combo of the level when an enemy drops its crystal', () => {
     start();
-    const bad = session.getBads()[0] as BadEntity;
+    const bad = session.game.getBads()[0] as BadEntity;
     bad.comboId = 999;
     bad.dropReward();
     bad.dropReward();
     bad.dropReward();
-    expect(session.statsMan.read(Data.STAT_MAX_COMBO)).toBe(3);
+    expect(session.game.statsMan.read(Data.STAT_MAX_COMBO)).toBe(3);
     // A smaller combo does not lower it
     bad.comboId = 998;
     bad.dropReward();
-    expect(session.statsMan.read(Data.STAT_MAX_COMBO)).toBe(3);
+    expect(session.game.statsMan.read(Data.STAT_MAX_COMBO)).toBe(3);
   });
 
   it("sets the next level's letters from the combo of the level left, then resets", () => {
     start();
-    session.statsMan.write(Data.STAT_MAX_COMBO, 4);
+    session.game.statsMan.write(Data.STAT_MAX_COMBO, 4);
     nextLevel();
-    expect(session.world.currentId).toBe(7);
-    expect(session.world.current.specialSlots.length).toBeGreaterThan(0);
+    expect(session.game.world.currentId).toBe(7);
+    expect(session.game.world.current.specialSlots.length).toBeGreaterThan(0);
 
-    const list = session.statsMan.extendList;
+    const list = session.game.statsMan.extendList;
     expect(list.length).toBe(4);
     expect(new Set(list).size).toBe(4);
     for (const id of list) expect(id).toBeGreaterThanOrEqual(0);
     for (const id of list) expect(id).toBeLessThan(Data.EXTENDS.length);
 
-    expect(session.statsMan.read(Data.STAT_MAX_COMBO)).toBe(0);
-    expect(session.statsMan.getTotal(Data.STAT_MAX_COMBO)).toBe(4);
+    expect(session.game.statsMan.read(Data.STAT_MAX_COMBO)).toBe(0);
+    expect(session.game.statsMan.getTotal(Data.STAT_MAX_COMBO)).toBe(4);
   });
 
   it('drops only letters from the list, every EXTEND_TIMER, on the ground', () => {
     start();
     nextLevel();
-    const list = session.statsMan.extendList;
+    const list = session.game.statsMan.extendList;
     expect(list.length).toBe(1);
     const letters = () =>
-      session.getList(Data.SPECIAL_ITEM).filter((e) => (e as SpecialItem).id === 0);
+      session.game.getList(Data.SPECIAL_ITEM).filter((e) => (e as SpecialItem).id === 0);
     expect(letters().length).toBe(0);
     step(Data.EXTEND_TIMER + 2);
     expect(letters().length).toBe(1);
@@ -107,15 +107,15 @@ describe('StatsManager', () => {
 
   it('drops no letter once the level is clear', () => {
     start();
-    session.statsMan.extendList = [2];
-    session.fl_clear = true;
-    expect(session.statsMan.attachExtend()).toBeNull();
+    session.game.statsMan.extendList = [2];
+    session.game.fl_clear = true;
+    expect(session.game.statsMan.attachExtend()).toBeNull();
   });
 
   it('counts jumps, bombs and deaths of the level', () => {
     start();
-    const sm = session.statsMan;
-    const p = session.player!;
+    const sm = session.game.statsMan;
+    const p = session.game.player!;
     for (let i = 0; i < 100 && !p.fl_stable; i++) step(1);
     expect(p.fl_stable).toBe(true);
     session.input.setTouch('jump', true);
@@ -190,32 +190,32 @@ describe('game chrono', () => {
   it('runs while the level is played and stops during the pause', () => {
     clock = 0;
     start();
-    const t0 = session.gameChrono.get();
-    expect(session.gameChrono.fl_stop).toBe(false);
+    const t0 = session.game.gameChrono.get();
+    expect(session.game.gameChrono.fl_stop).toBe(false);
     clock += 2000;
     step(1);
-    expect(session.gameChrono.get()).toBe(t0 + 2000);
+    expect(session.game.gameChrono.get()).toBe(t0 + 2000);
 
-    session.onPause();
-    expect(session.fl_lock).toBe(true);
+    session.game.onPause();
+    expect(session.game.fl_lock).toBe(true);
     clock += 10_000;
     step(1);
-    expect(session.gameChrono.get()).toBe(t0 + 2000);
+    expect(session.game.gameChrono.get()).toBe(t0 + 2000);
 
-    session.onUnpause();
+    session.game.onUnpause();
     clock += 1000;
     step(1);
-    expect(session.gameChrono.get()).toBe(t0 + 3000);
+    expect(session.game.gameChrono.get()).toBe(t0 + 3000);
   });
 
   it('stops during a level change', () => {
     clock = 0;
     start();
-    session.nextLevel();
-    const t = session.gameChrono.get();
-    expect(session.gameChrono.fl_stop).toBe(true);
+    session.game.nextLevel();
+    const t = session.game.gameChrono.get();
+    expect(session.game.gameChrono.fl_stop).toBe(true);
     clock += 5000;
     step(10);
-    expect(session.gameChrono.get()).toBe(t);
+    expect(session.game.gameChrono.get()).toBe(t);
   });
 });

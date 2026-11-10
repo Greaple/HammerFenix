@@ -17,7 +17,7 @@ function step(n = 1): void {
 /** A new game with the system families and `extra`, stepped until its first level is ready. */
 function start(extra: number[]): void {
   s.setParameters([SYSTEM_FAMILIES, ...extra].join(','), '');
-  s.initGame(1, 1234);
+  s.startGame(1, 1234);
   step(60);
 }
 
@@ -27,13 +27,13 @@ function press(): number {
   step();
   s.input.setTouch('disguise', false);
   step();
-  return s.player!.head;
+  return s.game.player!.head;
 }
 
 describe('disguises (GameMode.getControls, key D)', () => {
   it('cycles through the heads of the quest families the profile has', () => {
     start([109, 110, 111, 112, 113]);
-    expect(s.player!.head).toBe(Data.HEAD_NORMAL);
+    expect(s.game.player!.head).toBe(Data.HEAD_NORMAL);
     const heads = [press(), press(), press(), press(), press(), press()];
     expect(heads).toEqual([
       Data.HEAD_AFRO,
@@ -61,19 +61,19 @@ describe('disguises (GameMode.getControls, key D)', () => {
     start([109]);
     s.input.setTouch('disguise', true);
     step(10);
-    expect(s.player!.head).toBe(Data.HEAD_AFRO);
+    expect(s.game.player!.head).toBe(Data.HEAD_AFRO);
     s.input.setTouch('disguise', false);
     step();
   });
 
   it('works during the pause, and not when fl_disguise is off', () => {
     start([109]);
-    s.onPause();
+    s.game.onPause();
     expect(press()).toBe(Data.HEAD_AFRO);
-    s.onUnpause();
+    s.game.onUnpause();
     step();
-    s.fl_disguise = false;
+    s.game.fl_disguise = false;
     expect(press()).toBe(Data.HEAD_AFRO);
-    s.fl_disguise = true;
+    s.game.fl_disguise = true;
   });
 });

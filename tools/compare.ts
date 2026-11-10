@@ -117,9 +117,9 @@ export function portToDeepnight(): void {
 
 /** `GameMode.forcedGoto`, then the level change (57 ticks) and `extra` ticks. */
 export function gotoPort(n: number, extra = 0): number {
-  session().forcedGoto(n);
+  session().game.forcedGoto(n);
   step(57 + extra);
-  return session().world.currentId;
+  return session().game.world.currentId;
 }
 
 // ---------------------------------------------------------------- the original

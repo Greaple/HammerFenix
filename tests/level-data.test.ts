@@ -242,7 +242,7 @@ describe('level data (2B.0)', () => {
       });
       const ids = unique(all.flatMap((l) => l.$badList.map((b) => b.$id)));
       it.each(ids)('id %i', (id) => {
-        const bad = session.attachBad(id, 100, 100) as { constructor: { name: string } } & {
+        const bad = session.game.attachBad(id, 100, 100) as { constructor: { name: string } } & {
           fl_spawner?: boolean;
         };
         expect(bad.constructor.name).toBe(BAD_CLASSES[id]);

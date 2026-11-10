@@ -16,43 +16,46 @@ function step(n = 1): void {
 
 /** A fresh game on `level`, past its level change, with the player out of harm's way. */
 function start(level = 1): void {
-  session.initGame(level, 1234);
+  session.startGame(level, 1234);
   step(60);
-  session.player!.fl_godMode = true;
+  session.game.player!.fl_godMode = true;
 }
 
-const dvars = () => (session as unknown as { dvars: Map<string, string> }).dvars;
+const dvars = () => (session.game as unknown as { dvars: Map<string, string> }).dvars;
 
 describe('Timer.tmod (2C.7)', () => {
   it('is 1 on every tick outside bullet time', () => {
     start();
     step(5);
     expect(Timer.tmod).toBe(1);
-    expect([session.gFriction, session.xFriction]).toEqual([Data.FRICTION_GROUND, Data.FRICTION_X]);
+    expect([session.game.gFriction, session.game.xFriction]).toEqual([
+      Data.FRICTION_GROUND,
+      Data.FRICTION_X,
+    ]);
   });
 
   it('bullet time: 0.3 of the game per tick, for 2 s of real ticks', () => {
     start();
-    session.bulletTime(Data.SECOND * 2);
-    const hu = session.huTimer;
-    const cycle = session.cycle;
+    session.game.bulletTime(Data.SECOND * 2);
+    const hu = session.game.huTimer;
+    const cycle = session.game.cycle;
     step(10);
     expect(Timer.tmod).toBeCloseTo(0.3);
-    expect(session.huTimer - hu).toBeCloseTo(3);
-    expect(session.cycle - cycle).toBeCloseTo(3);
-    expect(session.gFriction).toBeCloseTo(Math.pow(Data.FRICTION_GROUND, 0.3));
+    expect(session.game.huTimer - hu).toBeCloseTo(3);
+    expect(session.game.cycle - cycle).toBeCloseTo(3);
+    expect(session.game.gFriction).toBeCloseTo(Math.pow(Data.FRICTION_GROUND, 0.3));
     step(Data.SECOND * 2 - 10);
     expect(Timer.tmod).toBe(1);
   });
 
   it('slows the moves: a falling player gains 0.3 of the fall speed per tick', () => {
     start();
-    const p = session.player!;
+    const p = session.game.player!;
     p.dx = 0;
     p.dy = 5;
     p.fl_stable = false;
     p.moveTo(200, 100);
-    session.bulletTime(Data.SECOND * 2);
+    session.game.bulletTime(Data.SECOND * 2);
     step(1);
     const dy = p.dy;
     const y = p.y;
@@ -65,7 +68,7 @@ describe('Timer.tmod (2C.7)', () => {
 
   it('keeps the movie clips at 40 fps: 5 clip steps for 4 ticks, as outside bullet time', () => {
     start();
-    session.bulletTime(Data.SECOND * 2);
+    session.game.bulletTime(Data.SECOND * 2);
     session.gameLoop.resetPhase();
     let anims = 0;
     const loop = session.gameLoop as unknown as { onAnimStep: () => void };
@@ -83,37 +86,37 @@ describe('Timer.tmod (2C.7)', () => {
 
   it('counts cycles only while the game is not locked (Mode.updateConstants)', () => {
     start();
-    const cycle = session.cycle;
-    session.lock();
+    const cycle = session.game.cycle;
+    session.game.lock();
     step(5);
-    expect(session.cycle).toBe(cycle);
-    session.unlock();
+    expect(session.game.cycle).toBe(cycle);
+    session.game.unlock();
     step(5);
-    expect(session.cycle).toBe(cycle + 5);
+    expect(session.game.cycle).toBe(cycle + 5);
   });
 });
 
 describe('aqua wobble and wind (GameMode.main)', () => {
   it('$AQUA bobs and stretches the game, and its end puts it back', () => {
     start();
-    session.setDynamicVar('$AQUA', '1');
+    session.game.setDynamicVar('$AQUA', '1');
     step(10);
     const t = 0.03 * 10;
-    expect(session.gameRoot._y).toBeCloseTo(-7 + 7 * Math.cos(t), 5);
-    expect(session.gameRoot._yscale).toBeCloseTo(102 - 2 * Math.cos(t), 5);
+    expect(session.game.mc._y).toBeCloseTo(-7 + 7 * Math.cos(t), 5);
+    expect(session.game.mc._yscale).toBeCloseTo(102 - 2 * Math.cos(t), 5);
     dvars().delete('aqua');
     step(1);
-    expect(session.gameRoot._y).toBe(session.yOffset);
-    expect(session.gameRoot._yscale).toBe(100);
+    expect(session.game.mc._y).toBe(session.game.yOffset);
+    expect(session.game.mc._yscale).toBe(100);
   });
 
   it('wind stops when its timer runs out', () => {
     start();
-    session.wind(1.5, 10);
-    expect([session.fl_wind, session.windSpeed]).toEqual([true, 1.5]);
+    session.game.wind(1.5, 10);
+    expect([session.game.fl_wind, session.game.windSpeed]).toEqual([true, 1.5]);
     step(9);
-    expect(session.fl_wind).toBe(true);
+    expect(session.game.fl_wind).toBe(true);
     step(1);
-    expect(session.fl_wind).toBe(false);
+    expect(session.game.fl_wind).toBe(false);
   });
 });

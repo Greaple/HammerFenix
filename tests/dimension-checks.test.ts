@@ -21,18 +21,18 @@ async function deepnight(lid: number, options = ''): Promise<GameSession> {
   const s = await createHeadlessSession();
   const step = stepper(s);
   s.setParameters(SYSTEM_FAMILIES, options);
-  s.initGame(0, 1234);
+  s.startGame(0, 1234);
   step(40);
-  s.usePortal(0, null);
+  s.game.usePortal(0, null);
   step(150);
-  expect(s.world.set.name).toBe('deepnight');
-  s.forcedGoto(lid);
+  expect(s.game.world.set.name).toBe('deepnight');
+  s.game.forcedGoto(lid);
   step(60);
-  expect(s.world.currentId).toBe(lid);
+  expect(s.game.world.currentId).toBe(lid);
   return s;
 }
 
-const map = (s: GameSession) => s.world.current.map.map((col) => col.join('')).join('|');
+const map = (s: GameSession) => s.game.world.current.map.map((col) => col.join('')).join('|');
 
 describe('option blocks', () => {
   it('night block of deepnight 185 (inside an explosion trigger) breaks the statue only in nightmare', async () => {
@@ -40,19 +40,19 @@ describe('option blocks', () => {
     const on = await deepnight(185, 'nightmare');
     for (const s of [off, on]) {
       // A bomb on the statue at (11, 22)
-      s.scriptRunner!.onExplode(Data.CASE_WIDTH * 11.5, Data.CASE_HEIGHT * 22, 50);
+      s.game.scriptRunner!.onExplode(Data.CASE_WIDTH * 11.5, Data.CASE_HEIGHT * 22, 50);
       stepper(s)(5);
     }
     for (const x of [11, 12]) {
-      expect(off.world.current.map[x][22]).toBeGreaterThan(0);
-      expect(on.world.current.map[x][22]).toBe(0);
+      expect(off.game.world.current.map[x][22]).toBeGreaterThan(0);
+      expect(on.game.world.current.map[x][22]).toBe(0);
     }
   });
 
   it('ninja block of deepnight 141 fills row 21 only in ninja', async () => {
     const off = await deepnight(141);
     const on = await deepnight(141, 'ninja');
-    const row = (s: GameSession) => s.world.current.map.map((col) => col[21]);
+    const row = (s: GameSession) => s.game.world.current.map.map((col) => col[21]);
     expect(row(off).every((v) => v > 0)).toBe(false);
     expect(row(on).every((v) => v > 0)).toBe(true);
   });
@@ -70,7 +70,7 @@ describe('option blocks', () => {
   it('multi block of deepnight 125 (item 225 in place of 219) stays off in solo', async () => {
     const s = await deepnight(125);
     stepper(s)(40);
-    const ids = s
+    const ids = s.game
       .getList(Data.ITEM)
       .filter((i) => i.scriptId === 666)
       .map((i) => (i as unknown as { id: number }).id);
@@ -82,32 +82,32 @@ describe('ayame', () => {
   it('19: clearing the level lays the item line, a bomb at (19, 2) opens the way and the portal', async () => {
     const s = await createHeadlessSession();
     const step = stepper(s);
-    s.initGame(0, 1234);
+    s.startGame(0, 1234);
     step(40);
-    s.switchDimensionById(3, 19, -1);
+    s.game.switchDimensionById(3, 19, -1);
     step(120);
-    expect([s.world.set.name, s.world.currentId]).toEqual(['ayame', 19]);
-    const m = s.world.current.map;
+    expect([s.game.world.set.name, s.game.world.currentId]).toEqual(['ayame', 19]);
+    const m = s.game.world.current.map;
     expect(m[19][3]).toBeGreaterThan(0);
     expect(m[14][14]).toBe(0);
 
     // Every bad killed: the `end` trigger drops an item every 10 cycles, from x 17 to 2 on row 1
-    s.destroyList(Data.BAD);
+    s.game.destroyList(Data.BAD);
     step(2);
-    s.checkLevelClear();
+    s.game.checkLevelClear();
     const seen = new Map<object, number>();
     for (let i = 0; i < 32 * 7; i++) {
       step(1);
-      for (const it of s.getList(Data.ITEM).filter((i) => i.constructor.name === 'ScoreItem'))
+      for (const it of s.game.getList(Data.ITEM).filter((i) => i.constructor.name === 'ScoreItem'))
         if (!seen.has(it)) seen.set(it, it.cx);
     }
     expect([...seen.values()]).toEqual(Array.from({ length: 16 }, (_, k) => 17 - k));
 
-    s.scriptRunner!.onExplode(Data.CASE_WIDTH * 19.5, Data.CASE_HEIGHT * 2, 50);
+    s.game.scriptRunner!.onExplode(Data.CASE_WIDTH * 19.5, Data.CASE_HEIGHT * 2, 50);
     step(5);
     expect(m[19][3]).toBe(0);
     expect(m[14][14]).toBeGreaterThan(0);
-    expect((s as unknown as { portalMcList: unknown[] }).portalMcList[0]).toBeTruthy();
+    expect((s.game as unknown as { portalMcList: unknown[] }).portalMcList[0]).toBeTruthy();
   });
 });
 
@@ -115,16 +115,16 @@ describe('hiko', () => {
   it('0: the trigger at (17, 21) spawns 10 Citrons, the one at (2, 23) kills them (code trigger 11)', async () => {
     const s = await createHeadlessSession();
     const step = stepper(s);
-    s.initGame(0, 1234);
+    s.startGame(0, 1234);
     step(40);
-    s.switchDimensionById(2, 0, -1);
+    s.game.switchDimensionById(2, 0, -1);
     step(120);
-    expect(s.world.set.name).toBe('hiko');
+    expect(s.game.world.set.name).toBe('hiko');
     const citrons = () =>
-      s
+      s.game
         .getList(Data.BAD)
         .filter((b) => (b as unknown as { badId: number }).badId === Data.BAD_CITRON).length;
-    const p = s.player!;
+    const p = s.game.player!;
     p.moveToCase(12, 22);
     step(10);
     p.moveToCase(17, 21);
@@ -133,23 +133,23 @@ describe('hiko', () => {
     p.moveToCase(2, 23);
     step(10);
     expect(citrons()).toBe(0);
-    expect(s.getList(Data.BAD).length).toBe(5); // the Spears stay
+    expect(s.game.getList(Data.BAD).length).toBe(5); // the Spears stay
   });
 
   it('4: the darkness flickers by script (e_darkness 0 and 100)', async () => {
     const s = await createHeadlessSession();
     const step = stepper(s);
-    s.initGame(0, 1234);
+    s.startGame(0, 1234);
     step(40);
-    s.switchDimensionById(2, 0, -1);
+    s.game.switchDimensionById(2, 0, -1);
     step(120);
-    s.forcedGoto(4);
+    s.game.forcedGoto(4);
     const seen = new Set<number | null>();
     for (let i = 0; i < 300; i++) {
       step(1);
-      seen.add(s.forcedDarkness);
+      seen.add(s.game.forcedDarkness);
     }
-    expect(s.world.currentId).toBe(4);
+    expect(s.game.world.currentId).toBe(4);
     expect(seen).toContain(0);
     expect(seen).toContain(100);
   });

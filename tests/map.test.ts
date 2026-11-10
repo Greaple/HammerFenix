@@ -19,33 +19,33 @@ const step = (n = 1) => {
 
 /** Steps until the game unlocks (level parsed and shown). */
 function ready(max = 300): void {
-  for (let i = 0; i < max && s.fl_lock; i++) step();
-  expect(s.fl_lock).toBe(false);
+  for (let i = 0; i < max && s.game.fl_lock; i++) step();
+  expect(s.game.fl_lock).toBe(false);
 }
 
 /** Clears the level of its enemies, as `portals.test.ts` does, and waits out the knock. */
 function clear(): void {
-  for (let i = 0; i < 60 && !(i > 2 && s.fl_clear); i++) {
-    for (const b of s.getBads()) b.destroy();
+  for (let i = 0; i < 60 && !(i > 2 && s.game.fl_clear); i++) {
+    for (const b of s.game.getBads()) b.destroy();
     step();
   }
-  for (let i = 0; i < 100 && s.player!.fl_knock; i++) step();
+  for (let i = 0; i < 100 && s.game.player!.fl_knock; i++) step();
 }
 
 /** A new game at main-world level `lid`, cleared of its enemies. */
 function start(lid: number): void {
-  s.initGame(lid, 1234);
+  s.startGame(lid, 1234);
   ready();
   clear();
 }
 
 /** Enters portal field `pid` of the current level and steps until the level changes. */
 function takePortal(pid: number): void {
-  const from = `${s.currentDim}:${s.world.currentId}`;
-  const field = s.world.portalList[pid];
-  s.player!.moveToCase(field.cx, field.cy);
-  (s.player as unknown as { infix(): void }).infix();
-  for (let i = 0; i < 300 && `${s.currentDim}:${s.world.currentId}` === from; i++) step();
+  const from = `${s.game.currentDim}:${s.game.world.currentId}`;
+  const field = s.game.world.portalList[pid];
+  s.game.player!.moveToCase(field.cx, field.cy);
+  (s.game.player as unknown as { infix(): void }).infix();
+  for (let i = 0; i < 300 && `${s.game.currentDim}:${s.game.world.currentId}` === from; i++) step();
   ready();
 }
 
@@ -56,18 +56,18 @@ function press(action: 'map' | 'pause'): void {
   step();
 }
 
-const travels = () => s.mapTravels.map((e) => [e.lid, e.eid, e.misc]);
-const events = () => s.mapEvents.map((e) => [e.lid, e.eid, e.misc]);
+const travels = () => s.game.mapTravels.map((e) => [e.lid, e.eid, e.misc]);
+const events = () => s.game.mapEvents.map((e) => [e.lid, e.eid, e.misc]);
 
 describe('map events (GameMode.registerMapEvent)', () => {
   it('a portal records its exit with the target level name, and only in the main world', () => {
     start(33);
     expect(travels()).toEqual([]);
     takePortal(0);
-    expect(s.currentDim).toBe(1);
+    expect(s.game.currentDim).toBe(1);
     const name = s.dataStore.getLevelName(1, 60);
     expect(name).toBeTruthy();
-    const side = (s as unknown as { fl_rightPortal: boolean }).fl_rightPortal
+    const side = (s.game as unknown as { fl_rightPortal: boolean }).fl_rightPortal
       ? Data.EVENT_EXIT_RIGHT
       : Data.EVENT_EXIT_LEFT;
     expect(travels()).toEqual([[33, side, `34. ${name}`]]);
@@ -76,9 +76,9 @@ describe('map events (GameMode.registerMapEvent)', () => {
     // original's filter for return trips reads mapEvents, where travels never go.
     clear();
     takePortal(0);
-    expect(s.currentDim).toBe(0);
-    expect(s.world.currentId).toBe(33);
-    const pt = s.world.portalList[0];
+    expect(s.game.currentDim).toBe(0);
+    expect(s.game.world.currentId).toBe(33);
+    const pt = s.game.world.portalList[0];
     const back = pt.cx >= Data.LEVEL_WIDTH / 2 ? Data.EVENT_BACK_RIGHT : Data.EVENT_BACK_LEFT;
     expect(travels()).toEqual([
       [33, side, `34. ${name}`],
@@ -88,10 +88,10 @@ describe('map events (GameMode.registerMapEvent)', () => {
 
   it('leaves out returns and repeated exits on the same side, keeps the others', () => {
     start(5);
-    s.registerMapEvent(Data.EVENT_EXIT_RIGHT, 'a');
-    s.registerMapEvent(Data.EVENT_EXIT_RIGHT, 'b');
-    s.registerMapEvent(Data.EVENT_BACK_RIGHT, null);
-    s.registerMapEvent(Data.EVENT_BACK_LEFT, null);
+    s.game.registerMapEvent(Data.EVENT_EXIT_RIGHT, 'a');
+    s.game.registerMapEvent(Data.EVENT_EXIT_RIGHT, 'b');
+    s.game.registerMapEvent(Data.EVENT_BACK_RIGHT, null);
+    s.game.registerMapEvent(Data.EVENT_BACK_LEFT, null);
     expect(travels()).toEqual([
       [5, Data.EVENT_EXIT_RIGHT, 'a'],
       [5, Data.EVENT_EXIT_RIGHT, 'b'],
@@ -104,11 +104,11 @@ describe('map events (GameMode.registerMapEvent)', () => {
 
   it('records deaths and extends apart from the travels, and a new game forgets them', () => {
     start(4);
-    s.player!.lives = 3;
-    s.player!.killHit(0);
-    for (let i = 0; i < 400 && s.mapEvents.length === 0; i++) step();
+    s.game.player!.lives = 3;
+    s.game.player!.killHit(0);
+    for (let i = 0; i < 400 && s.game.mapEvents.length === 0; i++) step();
     expect(events()).toEqual([[4, Data.EVENT_DEATH, null]]);
-    s.registerMapEvent(Data.EVENT_EXTEND, null);
+    s.game.registerMapEvent(Data.EVENT_EXTEND, null);
     expect(events()).toEqual([
       [4, Data.EVENT_DEATH, null],
       [4, Data.EVENT_EXTEND, null],
@@ -121,24 +121,24 @@ describe('map events (GameMode.registerMapEvent)', () => {
 
 describe('the world map (GameMode.onMap)', () => {
   const mapClip = () =>
-    (s as unknown as { mapMC: { getClip(n: string): { _y: number } } | null }).mapMC;
-  const icons = () => (s as unknown as { mapIcons: { _x: number; _y: number }[] }).mapIcons;
+    (s.game as unknown as { mapMC: { getClip(n: string): { _y: number } } | null }).mapMC;
+  const icons = () => (s.game as unknown as { mapIcons: { _x: number; _y: number }[] }).mapIcons;
 
   it('C pauses the game under the map, C or P closes it', () => {
     start(12);
-    s.registerMapEvent(Data.EVENT_DEATH, null);
-    s.registerMapEvent(Data.EVENT_EXTEND, null);
-    s.registerMapEvent(Data.EVENT_EXIT_LEFT, '13. X');
+    s.game.registerMapEvent(Data.EVENT_DEATH, null);
+    s.game.registerMapEvent(Data.EVENT_EXTEND, null);
+    s.game.registerMapEvent(Data.EVENT_EXIT_LEFT, '13. X');
     press('map');
-    expect(s.fl_pause).toBe(true);
-    expect(s.fl_lock).toBe(true);
+    expect(s.game.fl_pause).toBe(true);
+    expect(s.game.fl_lock).toBe(true);
     expect(mapClip()).not.toBeNull();
-    expect(mapClip()!.getClip('ptr')._y).toBe(s.getMapY(12));
+    expect(mapClip()!.getClip('ptr')._y).toBe(s.game.getMapY(12));
     // One travel icon, then each of the 2 events of level 12 twice (the original's double loop)
     expect(icons().length).toBe(1 + 2 * 2);
     expect(icons()[0]).toMatchObject({
       _x: Data.GAME_WIDTH / 2 - 5,
-      _y: Math.floor(s.getMapY(12)),
+      _y: Math.floor(s.game.getMapY(12)),
     });
     expect(
       icons()
@@ -147,32 +147,32 @@ describe('the world map (GameMode.onMap)', () => {
     ).toEqual([196, 204]);
 
     press('map');
-    expect(s.fl_pause).toBe(false);
+    expect(s.game.fl_pause).toBe(false);
     expect(mapClip()).toBeNull();
     expect(icons()).toEqual([]);
 
     press('map');
     expect(mapClip()).not.toBeNull();
     press('pause');
-    expect(s.fl_pause).toBe(false);
+    expect(s.game.fl_pause).toBe(false);
     expect(mapClip()).toBeNull();
   });
 
   it('closes the pause screen instead of opening over it, and waits for fl_map', () => {
     start(12);
     press('pause');
-    expect(s.fl_pause).toBe(true);
+    expect(s.game.fl_pause).toBe(true);
     press('map');
-    expect(s.fl_pause).toBe(false);
+    expect(s.game.fl_pause).toBe(false);
     expect(mapClip()).toBeNull();
 
-    s.fl_map = false;
+    s.game.fl_map = false;
     press('map');
-    expect(s.fl_pause).toBe(false);
-    s.fl_map = true;
+    expect(s.game.fl_pause).toBe(false);
+    s.game.fl_map = true;
   });
 
   it('getMapY: 3.5 px a level from 84, down to 434', () => {
-    expect([0, 1, 50, 100, 101].map((l) => s.getMapY(l))).toEqual([84, 87.5, 259, 434, 434]);
+    expect([0, 1, 50, 100, 101].map((l) => s.game.getMapY(l))).toEqual([84, 87.5, 259, 434, 434]);
   });
 });

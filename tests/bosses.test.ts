@@ -22,16 +22,16 @@ function step(n: number): void {
 
 /** A fresh game on a boss level, run until the boss is in; the player cannot die. */
 function start(level: number) {
-  session.initGame(level, 1234);
+  session.startGame(level, 1234);
   step(20);
-  session.player!.fl_godMode = true;
-  const boss = session.getList(Data.BOSS)[0];
+  session.game.player!.fl_godMode = true;
+  const boss = session.game.getList(Data.BOSS)[0];
   expect(boss).toBeDefined();
   return boss;
 }
 
 function live<T>(type: number, cls: abstract new (...a: never[]) => T): T[] {
-  return session.getList(type).filter((e) => !e.fl_kill && e instanceof cls) as T[];
+  return session.game.getList(type).filter((e) => !e.fl_kill && e instanceof cls) as T[];
 }
 
 /** Steps until `cond` holds; returns the number of frames, or -1. */
@@ -49,10 +49,10 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
     expect(bat).toBeInstanceOf(BatBoss);
     expect(bat.isType(Data.BAD)).toBe(true);
     expect(bat.isType(Data.BAD_CLEAR)).toBe(false);
-    expect(session.fl_clear).toBe(false);
-    expect(session.isBossLevel(Data.BAT_LEVEL)).toBe(true);
+    expect(session.game.fl_clear).toBe(false);
+    expect(session.game.isBossLevel(Data.BAT_LEVEL)).toBe(true);
     // The level script plays the boss music
-    expect(session.currentTrack).toBe(1);
+    expect(session.game.currentTrack).toBe(1);
     expect(bat.animId).toBe(Data.ANIM_BAT_INTRO.id);
     // After the intro it is shielded and flies somewhere
     expect(stepUntil(() => bat.animId !== Data.ANIM_BAT_INTRO.id)).toBeGreaterThan(0);
@@ -63,7 +63,7 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
   it('turns off the hurry up while alive', () => {
     start(Data.BAT_LEVEL);
     step(Data.HU_STEPS[0] + 10);
-    expect(session.huState).toBe(0);
+    expect(session.game.huState).toBe(0);
   });
 
   it('a first bomb takes the shield off and angers it, a second one costs a life', () => {
@@ -93,7 +93,7 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
   it('player bombs reach it like any enemy', () => {
     const bat = start(Data.BAT_LEVEL) as BatBoss;
     stepUntil(() => bat.fl_shield);
-    const b = ClassicBomb.attach(session, bat.x, bat.y);
+    const b = ClassicBomb.attach(session.game, bat.x, bat.y);
     b.onExplode();
     expect(bat.fl_shield).toBe(false);
     expect(bat.fl_anger).toBe(true);
@@ -103,7 +103,7 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
     const bat = start(Data.BAT_LEVEL) as BatBoss;
     stepUntil(() => bat.fl_shield);
     bat.freeze(Data.FREEZE_DURATION);
-    session.resetHurry();
+    session.game.resetHurry();
     expect(bat.fl_anger).toBe(false);
     expect(bat.fl_shield).toBe(true);
   });
@@ -111,7 +111,7 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
   it('kills a player that touches it', () => {
     const bat = start(Data.BAT_LEVEL) as BatBoss;
     stepUntil(() => bat.fl_shield);
-    const p = session.player!;
+    const p = session.game.player!;
     p.fl_godMode = false;
     p.moveTo(bat.x, bat.y);
     step(1);
@@ -128,11 +128,11 @@ describe('Bat (entity.boss.Bat, level 100)', () => {
     }
     expect(bat.fl_death).toBe(true);
     expect(bat.fl_deathUp).toBe(true);
-    expect(session.fl_clear).toBe(false);
+    expect(session.game.fl_clear).toBe(false);
     expect(stepUntil(() => !bat.fl_deathUp)).toBeGreaterThan(0);
     expect(bat.animId).toBe(Data.ANIM_BAT_FINAL_DIVE.id);
     expect(stepUntil(() => bat.fl_destroy)).toBeGreaterThan(0);
-    expect(session.fl_clear).toBe(true);
+    expect(session.game.fl_clear).toBe(true);
   });
 });
 
@@ -141,7 +141,7 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     expect(tub).toBeInstanceOf(TuberculozBoss);
     expect(tub.isType(Data.BAD)).toBe(false);
-    expect(session.fl_clear).toBe(false);
+    expect(session.game.fl_clear).toBe(false);
     expect(tub.lifeBar).not.toBeNull();
     expect(tub.lifeBar!.bar).not.toBeNull();
     expect(tub.y).toBe(TuberculozBoss.GROUND_Y);
@@ -151,10 +151,10 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
   it('loses a life per bomb in reach, then is immune for 3 seconds', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     stepUntil(() => tub.action === TuberculozBoss.WALK);
-    session.onExplode(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET, 50);
+    session.game.onExplode(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET, 50);
     expect(tub.lives).toBe(99);
     expect(tub.lifeBar!.bar!._xscale).toBe(99);
-    session.onExplode(tub.x, tub.y, 50);
+    session.game.onExplode(tub.x, tub.y, 50);
     expect(tub.lives).toBe(99);
     step(Data.SECOND * 3);
     expect(tub.fl_immune).toBe(false);
@@ -163,7 +163,7 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
   it('a frozen enemy thrown at him costs 10 lives and knocks him up', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     stepUntil(() => tub.action === TuberculozBoss.WALK);
-    const b = createBad(session, Data.BAD_ORANGE, 0, 0);
+    const b = createBad(session.game, Data.BAD_ORANGE, 0, 0);
     b.freeze(Data.FREEZE_DURATION);
     b.moveTo(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET);
     b.dx = 10;
@@ -178,7 +178,7 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
   it('kicks player bombs away once each', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     stepUntil(() => tub.action === TuberculozBoss.WALK);
-    const b = ClassicBomb.attach(session, tub.x + 10 * tub.dir, tub.y);
+    const b = ClassicBomb.attach(session.game, tub.x + 10 * tub.dir, tub.y);
     tub.checkHits();
     expect(b.dy).toBe(-7);
     expect(Math.sign(b.dx)).toBe(tub.dir);
@@ -227,7 +227,7 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
   it('kills give the multi-bomb items and an extra life', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     const specials = () =>
-      (session.getList(Data.SPECIAL_ITEM) as ItemEntity[]).filter((i) => !i.fl_kill);
+      (session.game.getList(Data.SPECIAL_ITEM) as ItemEntity[]).filter((i) => !i.fl_kill);
     for (let i = 0; i < 5; i++) tub.onKillBad();
     expect(specials().map((i) => i.id)).toEqual([4]);
     for (let i = 0; i < 5; i++) tub.onKillBad();
@@ -241,9 +241,9 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
   it('dies: bullet time, then the cloak, the key, the door and the exit to level 102', () => {
     const tub = start(Data.TUBERCULOZ_LEVEL) as TuberculozBoss;
     stepUntil(() => tub.action === TuberculozBoss.WALK);
-    const scoreBefore = session.player!.score;
+    const scoreBefore = session.game.player!.score;
     tub.lives = 1;
-    session.onExplode(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET, 50);
+    session.game.onExplode(tub.x, tub.y + TuberculozBoss.CENTER_OFFSET, 50);
     expect(tub.fl_death).toBe(true);
     expect(tub.lifeBar).toBeNull();
     expect(Timer.tmod).toBe(1);
@@ -256,19 +256,19 @@ describe('Tuberculoz (entity.boss.Tuberculoz, level 101)', () => {
     expect(Timer.tmod).toBe(1);
 
     expect(stepUntil(() => tub.fl_defeated)).toBeGreaterThan(0);
-    expect(session.fl_clear).toBe(true);
+    expect(session.game.fl_clear).toBe(true);
     expect(tub.animId).toBe(Data.ANIM_BOSS_DEATH.id);
-    const items = session.getItems().filter((i) => !i.fl_kill);
+    const items = session.game.getItems().filter((i) => !i.fl_kill);
     expect(items.some((i) => i instanceof SpecialItem && i.id === 113)).toBe(true);
     expect(items.some((i) => i instanceof ScoreItem && i.id === 199)).toBe(true);
     // Life bonus: 20000 per spare life
-    expect(session.player!.score - scoreBefore).toBe(session.player!.lives * 20000);
-    expect(session.currentTrack).toBe(0);
+    expect(session.game.player!.score - scoreBefore).toBe(session.game.player!.lives * 20000);
+    expect(session.game.currentTrack).toBe(0);
 
     // Code trigger 5: the door at (5, 6) leads to level 102
-    session.player!.moveTo(BaseEntity.x_ctr(5), BaseEntity.y_ctr(6));
-    expect(stepUntil(() => session.world.currentId === 102, 400)).toBeGreaterThan(0);
-    expect(session.getList(Data.BOSS)).toHaveLength(0);
+    session.game.player!.moveTo(BaseEntity.x_ctr(5), BaseEntity.y_ctr(6));
+    expect(stepUntil(() => session.game.world.currentId === 102, 400)).toBeGreaterThan(0);
+    expect(session.game.getList(Data.BOSS)).toHaveLength(0);
   });
 
   it('a defeat time-out ends the fight if he never lands', () => {

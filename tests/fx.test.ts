@@ -15,9 +15,9 @@ function step(n: number): void {
 
 describe('FX animations (Animation.update)', () => {
   it('the shield plays its intro once, then loops from its "loop" label', () => {
-    session.initGame(6, 1234);
+    session.startGame(6, 1234);
     step(20);
-    const player = session.player!;
+    const player = session.game.player!;
     player.shield(Data.SECOND * 60);
     const mc = (player as any).shieldMC.mc;
 

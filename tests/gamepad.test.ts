@@ -235,11 +235,11 @@ describe('controller in a game (G.1)', () => {
   it('drops a bomb with B, through the recorded action mask', () => {
     const pad = new FakePad(0);
     pads = [pad];
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     for (let i = 0; i < 30; i++) session.gameLoop.stepSingleFrame();
     pad.press(PAD.B);
     session.gameLoop.stepSingleFrame();
-    expect(session.countList(Data.BOMB)).toBe(1);
+    expect(session.game.countList(Data.BOMB)).toBe(1);
     pad.press(PAD.B, false);
     session.gameLoop.stepSingleFrame();
   });
@@ -247,13 +247,13 @@ describe('controller in a game (G.1)', () => {
   it('Start pauses and unpauses', () => {
     const pad = new FakePad(0);
     pads = [pad];
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     for (let i = 0; i < 30; i++) session.gameLoop.stepSingleFrame();
     pad.press(PAD.START);
     session.gameLoop.stepSingleFrame();
-    expect(session.fl_pause).toBe(true);
+    expect(session.game.fl_pause).toBe(true);
     // The pause screen hides its keyboard keys for the controller's buttons
-    const mc = (session as unknown as { pauseMC: SwfMovieClip }).pauseMC;
+    const mc = (session.game as unknown as { pauseMC: SwfMovieClip }).pauseMC;
     expect(mc.childAtDepth(26)?.visible).toBe(false); // the space bar
     pad.press(PAD.START, false);
     session.gameLoop.stepSingleFrame();
@@ -262,22 +262,22 @@ describe('controller in a game (G.1)', () => {
     expect(mc.childAtDepth(26)?.visible).toBe(true);
     pad.press(PAD.START);
     session.gameLoop.stepSingleFrame();
-    expect(session.fl_pause).toBe(false);
+    expect(session.game.fl_pause).toBe(false);
     pad.press(PAD.START, false);
     session.gameLoop.stepSingleFrame();
   });
 
   it('a pause asked during a level change waits for the controls to unlock', () => {
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     for (let i = 0; i < 30; i++) session.gameLoop.stepSingleFrame();
-    session.lock();
+    session.game.lock();
     session.requestPause();
-    expect(session.fl_pause).toBe(false);
+    expect(session.game.fl_pause).toBe(false);
     session.gameLoop.stepSingleFrame();
-    expect(session.fl_pause).toBe(false);
-    session.unlock();
+    expect(session.game.fl_pause).toBe(false);
+    session.game.unlock();
     session.gameLoop.stepSingleFrame();
-    expect(session.fl_pause).toBe(true);
-    session.onUnpause();
+    expect(session.game.fl_pause).toBe(true);
+    session.game.onUnpause();
   });
 });

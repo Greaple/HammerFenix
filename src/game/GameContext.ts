@@ -15,8 +15,8 @@ import type { RandomManager } from './RandomManager';
 import type { StatsManager } from './StatsManager';
 
 /**
- * Shared runtime contract exposed by `GameSession` to entities, FX, HUD, and level scripts.
- * Mirrors the interface of `mode.GameMode` in the original MotionTypes codebase.
+ * Shared runtime contract exposed by `GameMode` (`mode/GameMode.ts`) to entities, FX, HUD, and
+ * level scripts. Mirrors the interface of `mode.GameMode` in the original MotionTypes codebase.
  */
 export interface IGameContext {
   readonly depthMan: DepthManager;
@@ -34,7 +34,7 @@ export interface IGameContext {
   readonly config: GameParameters;
 
   /** `GameMode.mc`: the clip holding the whole game, moved by the screen shake. */
-  readonly gameRoot: SwfMovieClip;
+  readonly mc: SwfMovieClip;
   readonly xOffset: number;
   cycle: number;
   xFriction: number;

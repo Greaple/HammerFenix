@@ -18,7 +18,7 @@ const quests: QuestDef[] = JSON.parse(readFileSync(join(DATA, 'quests.json'), 'u
 /** A new game with `options`, stepped until its first level is ready. */
 function start(s: GameSession, options: string, level = 1): void {
   s.setParameters(SYSTEM_FAMILIES, options);
-  s.initGame(level, 1234);
+  s.startGame(level, 1234);
   for (let i = 0; i < 40; i++) s.gameLoop.stepSingleFrame();
 }
 
@@ -30,48 +30,48 @@ describe('game options (GameMode constructor)', () => {
 
   it('sets the flags from $options at each new game', () => {
     start(s, 'mirror,nightmare,ninja,bombexpert');
-    expect([s.fl_mirror, s.fl_nightmare, s.fl_ninja, s.fl_bombExpert]).toEqual([
+    expect([s.game.fl_mirror, s.game.fl_nightmare, s.game.fl_ninja, s.game.fl_bombExpert]).toEqual([
       true,
       true,
       true,
       true,
     ]);
-    expect(s.dimensions.every((w) => w.fl_mirror)).toBe(true);
+    expect(s.game.dimensions.every((w) => w.fl_mirror)).toBe(true);
     start(s, '');
-    expect([s.fl_mirror, s.fl_nightmare, s.fl_ninja, s.fl_bombExpert]).toEqual([
+    expect([s.game.fl_mirror, s.game.fl_nightmare, s.game.fl_ninja, s.game.fl_bombExpert]).toEqual([
       false,
       false,
       false,
       false,
     ]);
-    expect(s.dimensions.some((w) => w.fl_mirror)).toBe(false);
+    expect(s.game.dimensions.some((w) => w.fl_mirror)).toBe(false);
   });
 
   it('mirror reads the levels flipped (SetManager.flip)', () => {
     start(s, '');
-    const map = s.world.current.map.map((c) => c.slice());
-    const px = s.world.current.playerX;
+    const map = s.game.world.current.map.map((c) => c.slice());
+    const px = s.game.world.current.playerX;
     start(s, 'mirror');
     const w = Data.LEVEL_WIDTH;
-    for (let x = 0; x < w; x++) expect(s.world.current.map[x]).toEqual(map[w - x - 1]);
-    expect(s.world.current.playerX).toBe(w - px - 1);
+    for (let x = 0; x < w; x++) expect(s.game.world.current.map[x]).toEqual(map[w - x - 1]);
+    expect(s.game.world.current.playerX).toBe(w - px - 1);
     // The player starts on the flipped case, not flipped twice
-    expect(s.player!.cx).toBe(w - px - 1);
+    expect(s.game.player!.cx).toBe(w - px - 1);
   });
 
   it('Tornade speeds the player up, more in nightmare', () => {
     start(s, '');
-    expect(s.player!.speedFactor).toBe(1);
+    expect(s.game.player!.speedFactor).toBe(1);
     start(s, 'boost');
-    expect(s.player!.speedFactor).toBe(1.3);
+    expect(s.game.player!.speedFactor).toBe(1.3);
     start(s, 'nightmare');
-    expect(s.player!.speedFactor).toBe(1.3);
+    expect(s.game.player!.speedFactor).toBe(1.3);
     start(s, 'nightmare,boost');
-    expect(s.player!.speedFactor).toBe(1.6);
+    expect(s.game.player!.speedFactor).toBe(1.6);
   });
 
   it('ninja picks one foe and its friends (GameMode.onBadsReady)', () => {
-    const bads = () => s.getList(Data.BAD_CLEAR) as BadEntity[];
+    const bads = () => s.game.getList(Data.BAD_CLEAR) as BadEntity[];
     const friends = () => bads().filter((b) => b.fl_ninFriend).length;
     start(s, '', 16);
     expect(bads().length).toBe(6);

@@ -50,37 +50,37 @@ describe('key locks (PlayerController.keyLocks)', () => {
   });
 
   it('a bomb key pressed again while the controls are locked drops no bomb on unlock', () => {
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     step(30);
-    const p = session.player!;
+    const p = session.game.player!;
     const input = session.input;
     input.setTouch('attack', true);
     step();
-    expect(session.countList(Data.BOMB)).toBe(1);
+    expect(session.game.countList(Data.BOMB)).toBe(1);
     p.fl_lockControls = true;
     input.setTouch('attack', false);
     step();
     input.setTouch('attack', true);
     step();
-    session.destroyList(Data.BOMB); // so the bomb limit does not hide a drop
+    session.game.destroyList(Data.BOMB); // so the bomb limit does not hide a drop
     step();
-    expect(session.countList(Data.BOMB)).toBe(0);
+    expect(session.game.countList(Data.BOMB)).toBe(0);
     p.fl_lockControls = false;
     p.coolDown = 0;
     step(); // the controller runs with the key still locked: no bomb
-    expect(session.countList(Data.BOMB)).toBe(0);
+    expect(session.game.countList(Data.BOMB)).toBe(0);
     input.setTouch('attack', false);
   });
 });
 
 describe('FxManager.dust', () => {
   it('attaches 7 dust clips, on frames 5 to 9', () => {
-    session.initGame(1, 1234);
+    session.startGame(1, 1234);
     step(30);
-    const fx = session.fxMan as unknown as { animList: { mc: { _currentframe: number } }[] };
+    const fx = session.game.fxMan as unknown as { animList: { mc: { _currentframe: number } }[] };
     const before = fx.animList.length;
-    const p = session.player!;
-    session.fxMan.dust(p.cx, p.cy + 1);
+    const p = session.game.player!;
+    session.game.fxMan.dust(p.cx, p.cy + 1);
     const added = fx.animList.slice(before);
     expect(added).toHaveLength(7);
     for (const a of added) {

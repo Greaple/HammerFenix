@@ -38,12 +38,12 @@ describe('game start from the site (Loader.gameReady / startGame)', () => {
     session.clickStart();
     expect(session.loader.gameRunning).toBe(true);
     expect(session.gameRoot.visible).toBe(true);
-    expect(session.world.currentId).toBe(0);
+    expect(session.game.world.currentId).toBe(0);
     expect(session.loader.loading).not.toBeNull();
     // 2% per Flash frame: 50 frames at 40 Hz, 40 logic ticks
     step(45);
     expect(session.loader.loading).toBeNull();
-    expect(session.player).not.toBeNull();
+    expect(session.game.player).not.toBeNull();
   });
 
   it('the menu starts at once: no "click to start", no cover (port addition)', () => {
@@ -57,7 +57,7 @@ describe('game start from the site (Loader.gameReady / startGame)', () => {
     expect(session.levelShown).toBe(false);
     step(20);
     expect(session.levelShown).toBe(true);
-    expect(session.player).not.toBeNull();
+    expect(session.game.player).not.toBeNull();
   });
 
   it('ignores clicks during a game', () => {
