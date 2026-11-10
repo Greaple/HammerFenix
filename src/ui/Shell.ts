@@ -967,7 +967,10 @@ export class Shell {
     const s = Math.max((W + 2 * m) / b.width, (H + 2 * m) / b.height);
     bg.scale.set(s);
     bg.position.set((W - b.width * s) / 2 - b.x * s, (H - b.height * s) / 2 - b.y * s);
-    bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4 })];
+    // Not clipped to the screen: Pixi clips a filter to the screen's size in pixels divided by
+    // the target's resolution, which inside the 1.5x cache below cuts the picture short when
+    // the canvas is drawn at resolution 1 (a small frame on a phone), leaving it partly black
+    bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4, clipToViewport: false })];
     // Drawn once into a texture: a blurred picture needs no more than the frame's resolution
     const layer = new Container();
     layer.addChild(bg);
