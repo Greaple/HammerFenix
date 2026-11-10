@@ -157,7 +157,7 @@ Port addition: the Flash game had the keyboard only. Controllers go through the 
 
 Time Attack and two-player co-op are unlocked by quests (`give mode=` in `quests.xml`), through the profile from 3.2.
 
-Order (cost and dependencies, 2026-11-10): 4.0, then 4.6 Tutorial (single player, done as 4.6a with Shareware), 4.5, 4.1, 4.2 with G.3, 4.3 (needs 4.1 and 4.2), then 4.4 last. Fjv (4.6b) can come any time. The heaviest tasks are 4.4 (Soccer), 4.0 (the split) and 4.2 with G.3 (a second player touches the interface, deaths, lives and the results screen).
+Order (cost and dependencies, 2026-11-10): 4.0, then 4.6 Tutorial (single player, done as 4.6a with Shareware), 4.5, 4.1, 4.2 with G.3, 4.3 (needs 4.1 and 4.2), then 4.4 last. Fjv (4.6b) is not ported, by decision. The heaviest tasks are 4.4 (Soccer), 4.0 (the split) and 4.2 with G.3 (a second player touches the interface, deaths, lives and the results screen).
 
 Risk for every mode: the Ruffle side-by-side starts the Adventure. Checked in 4.6a: it cannot start another mode. The original's `loader.swf` sets `$mode` to `solo` itself (the first lines of `Loader`'s constructor, with `$options`, `$lang` and the sound settings), so `mode=tutorial` in the flashvars still starts the Adventure; the only mode switch in the game is `Adventure`'s Ctrl+Shift+M (co-op). So compare each mode by reading its code and against videos of the original, and note it.
 
@@ -171,7 +171,7 @@ Each mode: port it from the original, add it to the mode menu (locked until its 
 - [ ] 4.4 Soccer (`Soccer.mt`, `SoccerSelector.mt`, `gui/SoccerInterface.mt`)
 - [ ] 4.5 Boss Rush (`BossRush.mt`)
 - [x] 4.6a Tutorial and Shareware (`Tutorial.mt`, `Shareware.mt`). Done: the menu's Learning mode ("Apprentissage", no longer "coming soon") starts `mode/Tutorial.ts`: the 24 lessons of the set `tutorial` with 99,999 lives, the light interface (no score, no lives), no hurry up, no exit arrow, no music, the system families and no option (as the site's `try.html` page sent). Its end (level 18's door, level 0's shortcut door, or falling out of the hidden levels 19 to 23) starts `mode/Shareware.ts`, as in the original: the 7 demo levels with the Adventure's rules, two lives and the music. The demo's end or game over, and giving up the tutorial (Ctrl+Shift+K), leave for the site's `$out` (`/subscribe.html` on the try page): here, back to the menu, with no results page and nothing recorded in the profile. The session keeps the site's `$mode` (`session.mode`, `isTutorial`), replays keep it (`mode` field), and the debug toolbar shows the set being played. Not compared in Ruffle (see "Risk" above): ported from the code. See PORT_STATUS.md "Learning mode (4.6a)" and LEVELS.md. Tested in `tests/tutorial.test.ts`, a replay (`tests/replays/tutorial.json`), a headless walk through the 31 levels, and in the browser.
-- [ ] 4.6b Fjv / FjvEnd (the kiosk mode, which the original itself switches off: `GameManager.isFjv` returns false)
+- 4.6b Fjv / FjvEnd: not ported, by decision (2026-11-10). It is a kiosk mode for a public demo (12 levels of the `fjv` set, 2 lives, a timed end screen), which the original itself switches off: `GameManager.isFjv` returns false, so no player ever saw it. Its level data is still checked by 2B.0.
 
 ## UI and UX polish (audit of 2026-11-06)
 
