@@ -92,6 +92,8 @@ export class PlayerController {
 export class PlayerEntity extends PhysicsEntity {
   /** Player 1 is 0: set by `GameMode.insertPlayer`. */
   pid = 0;
+  /** `Player.name`: Igor, or Sandy for player 2 of the co-op mode. */
+  name = 'Igor';
   /** The player's keys (`ctrl`). */
   readonly ctrl: PlayerController = new PlayerController(this);
 
@@ -399,7 +401,7 @@ export class PlayerEntity extends PhysicsEntity {
     const step = Data.EXTRA_LIFE_STEPS[this.extraLifeCurrent];
     if (step !== undefined && this.score < step && this.score + value >= step) {
       this.lives++;
-      this.game.hud.setLives(this.lives);
+      this.game.hud.setLives(this.pid, this.lives);
       this.game.logAction('$EL' + this.extraLifeCurrent);
       this.extraLifeCurrent++;
     }
@@ -408,13 +410,13 @@ export class PlayerEntity extends PhysicsEntity {
     }
     this.score += value;
     this.scoreCS = this.score ^ this.game.scoreKey;
-    this.game.hud.setScore(this.score);
+    this.game.hud.setScore(this.pid, this.score);
   }
 
   getExtend(id: number): void {
     if (id < 0 || id >= Data.EXTENDS.length) return;
     if (!this.extendList[id]) {
-      this.game.hud.getExtend(id);
+      this.game.hud.getExtend(this.pid, id);
       this.extendOrder.push(id);
     }
     this.extendList[id] = true;
@@ -432,7 +434,7 @@ export class PlayerEntity extends PhysicsEntity {
       for (let i = 0; i < this.extendOrder.length; i++) {
         if (this.extendOrder[i] !== i) flPerfect = false;
       }
-      this.game.hud.clearExtends();
+      this.game.hud.clearExtends(this.pid);
       this.extendList = [];
       this.extendOrder = [];
       this.executeExtend(flPerfect);
@@ -454,7 +456,7 @@ export class PlayerEntity extends PhysicsEntity {
     this.game.destroyList(Data.SHOOT);
 
     this.lives++;
-    this.game.hud.setLives(this.lives);
+    this.game.hud.setLives(this.pid, this.lives);
 
     if (flPerfect) {
       const mc = this.game.depthMan.attach('hammer_fx_perfect', Data.DP_INTERF);
@@ -555,12 +557,32 @@ export class PlayerEntity extends PhysicsEntity {
     this.game.fxMan.attachFx(this.x, Data.GAME_HEIGHT, 'hammer_fx_death_player');
     this.game.statsMan.inc(Data.STAT_DEATH, 1);
     this.lives--;
-    this.game.hud.setLives(this.lives);
+    this.game.hud.setLives(this.pid, this.lives);
     if (this.lives >= 0) {
       this.resurrect();
     } else {
-      // Single player: the other players' lives (and the life sharing option) never matter
-      for (const p of this.game.getList(Data.PLAYER) as PlayerEntity[]) {
+      // Game over, unless the life sharing option takes a life from another player
+      let fl_over = true;
+      const l = this.game.getList(Data.PLAYER) as PlayerEntity[];
+      for (const p of l) {
+        if (p.lives >= 0) {
+          fl_over = false;
+        }
+      }
+      if (!fl_over) {
+        if (this.game.hasOption(Data.OPT_LIFE_SHARING)) {
+          for (const p of l) {
+            if (p.uniqId !== this.uniqId && p.lives > 0) {
+              p.lives--;
+              this.game.hud.setLives(p.pid, p.lives);
+              this.resurrect();
+              return;
+            }
+          }
+        }
+      }
+
+      for (const p of l) {
         this.game.registerScore(p.pid, p.score);
       }
       this.game.onGameOver();
@@ -1754,7 +1776,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 36. extra Igor
       case 36:
         this.lives++;
-        game.hud.setLives(this.lives);
+        game.hud.setLives(this.pid, this.lives);
         game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
         break;
 
@@ -2128,7 +2150,7 @@ export class PlayerEntity extends PhysicsEntity {
       case 104:
       case 105:
         this.lives++;
-        game.hud.setLives(this.lives);
+        game.hud.setLives(this.pid, this.lives);
         game.fxMan.attachShine(item.x, item.y - Data.CASE_HEIGHT * 0.5);
         game.randMan.remove(Data.RAND_ITEMS_ID, id);
         break;
@@ -2193,7 +2215,7 @@ export class PlayerEntity extends PhysicsEntity {
       // *** 116. Ankhel jewel
       case 116:
         this.lives++;
-        game.hud.setLives(this.lives);
+        game.hud.setLives(this.pid, this.lives);
         this.getScore(item, 70000);
         break;
 

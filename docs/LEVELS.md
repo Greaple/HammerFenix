@@ -97,3 +97,14 @@ The Learning mode and the demo levels it ends in. Not compared with the original
 | shareware 1 to 5  | Adventure rules: enemies, messages, level banner                                      | ok         | Two enemies on levels 1 to 4. Level 2 shows the Adventure's level 2 name, as the original's code does                                          |
 | shareware 6       | Messages, then the timer ends the demo (`$e_goto` 999 at cycle 500)                   | ok         | The game locks and leaves for `$out`: back to the menu                                                                                         |
 | shareware, any    | Game over with no lives left leaves for `$out`, no results page                       | ok         | Tested (`onGameOver`), and seen in the browser                                                                                                 |
+
+## Co-op (4.2)
+
+The Adventure's levels with two players. Not compared with the original running (the Ruffle side-by-side cannot start this mode). Checked against `MultiCoop.mt` in the tests and in the browser.
+
+| Level       | What to check                                                        | Result     | Notes                                                                                         |
+| ----------- | -------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------- |
+| adventure 0 | Igor and Sandy fall in at columns 5 and 14; two-player bar and pause | ok         | Sandy's skin and head, a score and a life each, no level number, the pause shows both players |
+| adventure 0 | The join screen, then the game with the devices chosen               | ok         | Keyboard sides and a fake controller; real controllers were not tried                         |
+| adventure 1 | A recorded game with two bots replays the same                       | ok         | `tests/replays/coop-01.json`                                                                  |
+| adventure   | A whole game for two: `$multi` level scripts, portals, game over     | needs play | Ideally beside a video of the original                                                        |

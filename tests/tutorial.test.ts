@@ -62,12 +62,12 @@ describe('tutorial and shareware modes', () => {
   it('shows the light interface: no score, no lives', () => {
     const hud = session.game.hud as unknown as {
       fl_light: boolean;
-      lifeIcons: unknown[];
-      scoreField: { visible: boolean } | null;
+      lives: unknown[][];
+      scores: ({ visible: boolean } | null)[];
     };
     expect(hud.fl_light).toBe(true);
-    expect(hud.lifeIcons).toEqual([]);
-    expect(hud.scoreField?.visible).toBe(false);
+    expect(hud.lives[0]).toEqual([]);
+    expect(hud.scores[0]?.visible).toBe(false);
   });
 
   it('has no hurry up', () => {
@@ -152,9 +152,9 @@ describe('tutorial and shareware modes', () => {
     });
 
     it('shows its lives and score, and names itself on the pause screen', () => {
-      const hud = session.game.hud as unknown as { fl_light: boolean; lifeIcons: unknown[] };
+      const hud = session.game.hud as unknown as { fl_light: boolean; lives: unknown[][] };
       expect(hud.fl_light).toBe(false);
-      expect(hud.lifeIcons.length).toBe(2);
+      expect(hud.lives[0].length).toBe(2);
       session.game.onPause();
       expect(pauseText('sector')).toBe(`${lang(14)} «${lang(17)}»`);
       session.game.onUnpause();

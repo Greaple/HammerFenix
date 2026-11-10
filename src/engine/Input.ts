@@ -1,4 +1,11 @@
-import { EMPTY_PAD, type MenuAction, PadManager, type PadLayout, padLayout } from './Gamepad';
+import {
+  EMPTY_PAD,
+  type MenuAction,
+  PadManager,
+  type PadLayout,
+  type PadRef,
+  padLayout,
+} from './Gamepad';
 import { ACTION_BITS, type InputPlayer, type InputRecorder } from './InputRecording';
 
 export type { MenuAction } from './Gamepad';
@@ -44,6 +51,15 @@ export const Key = {
 
 /** The keys of each of a player's moves, as Flash key codes. */
 export type PlayerKeys = Record<PlayerAction, readonly number[]>;
+
+/**
+ * What a player plays with once they chose it (G.3): a side of the keyboard (the keys their
+ * mode gave a player, by that player's pid) or a controller.
+ */
+export type PlayerDevice = { kind: 'keys'; side: number } | ({ kind: 'pad' } & PadRef);
+
+/** The keys of a player on a controller: none. */
+const NO_KEYS: PlayerKeys = { jump: [], down: [], left: [], right: [], attack: [] };
 
 /** Flash key code of a letter. */
 const code = (letter: string) => letter.charCodeAt(0);
@@ -172,6 +188,10 @@ export class InputController {
   private ctrlLocked: Set<PlayerAction>[] = [new Set()];
   /** Actions held this tick, as `ACTION_BITS`, by pid. */
   private masks: number[] = [0];
+  /** The device each player chose (`setPlayerDevices`), null until they do. */
+  private devices: (PlayerDevice | null)[] | null = null;
+  /** The devices pressed at the last `joinPresses`. */
+  private joinHeld = new Set<string>();
   private recorder: InputRecorder | null = null;
   private player: InputPlayer | null = null;
 
@@ -244,9 +264,72 @@ export class InputController {
     return this.keys[pid] ?? DEFAULT_KEYS;
   }
 
-  /** Every player back on the default keys, for a new game. */
+  /**
+   * Every player back on the default keys and the controllers in connection order, for a new
+   * game.
+   */
   resetKeys(): void {
     this.keys = this.keys.map(() => DEFAULT_KEYS);
+    this.devices = null;
+    this.pads.release();
+  }
+
+  // ------------------------------------------------- Choosing a device (G.3)
+
+  /**
+   * The devices pressed since the last call: a keyboard side (any key of `sides[side]`) or a
+   * controller (any button, also one no player holds). Read from the live devices, never from
+   * a replay. A first call tells what is already held, to be ignored.
+   */
+  joinPresses(sides: readonly PlayerKeys[]): PlayerDevice[] {
+    const now = new Map<string, PlayerDevice>();
+    const dialogOpen =
+      typeof document !== 'undefined' && document.querySelector('dialog[open]') !== null;
+    if (!dialogOpen) {
+      sides.forEach((keys, side) => {
+        if (PLAYER_ACTIONS.some((a) => keys[a].some((c) => this.codesHeld.has(c)))) {
+          now.set(`keys${side}`, { kind: 'keys', side });
+        }
+      });
+      for (const pad of this.pads.pressed()) {
+        now.set(`pad${pad.index}:${pad.id}`, { kind: 'pad', ...pad });
+      }
+    }
+    const fresh = [...now].filter(([key]) => !this.joinHeld.has(key)).map(([, d]) => d);
+    this.joinHeld = new Set(now.keys());
+    return fresh;
+  }
+
+  /** Whether a device was pressed at the last `joinPresses`. */
+  get joinHolding(): boolean {
+    return this.joinHeld.size > 0;
+  }
+
+  /**
+   * Gives each player the device they chose: the keys of a keyboard side and no controller, or
+   * a controller and no keys. A player with null keeps what they have.
+   */
+  setPlayerDevices(devices: readonly (PlayerDevice | null)[], sides: readonly PlayerKeys[]): void {
+    this.setPlayerCount(devices.length);
+    this.devices = [...devices];
+    devices.forEach((d, pid) => {
+      if (d) this.keys[pid] = d.kind === 'keys' ? (sides[d.side] ?? NO_KEYS) : NO_KEYS;
+    });
+    this.pads.assign(devices.map((d) => (d?.kind === 'pad' ? d : null)));
+  }
+
+  /** The device player `pid` chose, or null when the players did not choose. */
+  playerDevice(pid: number): PlayerDevice | null {
+    return this.devices?.[pid] ?? null;
+  }
+
+  /** The players whose chosen controller is unplugged. */
+  lostPlayers(): number[] {
+    const out: number[] = [];
+    this.devices?.forEach((d, pid) => {
+      if (d?.kind === 'pad' && this.pads.idOf(pid) === '') out.push(pid);
+    });
+    return out;
   }
 
   setDevice(device: InputDevice): void {

@@ -7,7 +7,8 @@ import { InputController } from '../../src/engine/Input';
 import type { Replay } from '../../src/engine/InputRecording';
 import { SwfLibrary } from '../../src/engine/swf/SwfLibrary';
 import type { SwfLibraryData } from '../../src/engine/swf/types';
-import { GameDataStore } from '../../src/game/Data';
+import { Data, GameDataStore } from '../../src/game/Data';
+import type { PlayerEntity } from '../../src/game/entity/Player';
 import { GameSession } from '../../src/game/GameSession';
 
 const PUBLIC = join(__dirname, '../../public');
@@ -55,6 +56,7 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 /** Compact, comparable state of the game: what a regression snapshot records. */
 export function snapshotState(session: GameSession) {
   const p = session.game.player;
+  const others = (session.game.getList(Data.PLAYER) as PlayerEntity[]).filter((o) => o !== p);
   return {
     level: session.game.world.currentId,
     dim: session.game.currentDim,
@@ -70,6 +72,19 @@ export function snapshotState(session: GameSession) {
           anim: p.animId,
         }
       : null,
+    // The players after the first, in a game that has them (the co-op mode)
+    ...(others.length > 0
+      ? {
+          others: others.map((o) => ({
+            x: r2(o.x),
+            y: r2(o.y),
+            lives: o.lives,
+            score: o.score,
+            weapon: o.currentWeapon,
+            anim: o.animId,
+          })),
+        }
+      : {}),
     bads: session.game.getBads().map((b) => `${b.constructor.name} ${r2(b.x)},${r2(b.y)}`),
     items: session.game.getItems().map((i) => `${i.id}:${i.subId ?? ''} ${r2(i.x)},${r2(i.y)}`),
     bombs: session.game.getBombs().length,

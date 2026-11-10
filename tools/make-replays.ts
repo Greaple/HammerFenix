@@ -7,7 +7,7 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ACTION_BITS, InputRecorder } from '../src/engine/InputRecording';
+import { ACTION_BITS, InputRecorder, type InputRuns } from '../src/engine/InputRecording';
 import { Random } from '../src/game/Random';
 
 const OUT = join(new URL('..', import.meta.url).pathname, 'tests/replays');
@@ -27,7 +27,7 @@ const MOVES: [number, number][] = [
   [down, 1],
 ];
 
-function bot(seed: number, ticks: number): [number, number][] {
+function bot(seed: number, ticks: number): InputRuns {
   const rand = new Random(seed);
   const total = MOVES.reduce((n, [, w]) => n + w, 0);
   const rec = new InputRecorder();
@@ -49,7 +49,19 @@ function bot(seed: number, ticks: number): [number, number][] {
   return rec.toReplay('adventure', 0, 0).input;
 }
 
-const FIXTURES: { name: string; level: number; seed: number; ticks: number; mode?: string }[] = [
+interface Fixture {
+  name: string;
+  level: number;
+  seed: number;
+  ticks: number;
+  mode?: string;
+  /** The level set, when it is not the mode's name. */
+  set?: string;
+  /** A second player, with their own bot. */
+  players?: 2;
+}
+
+const FIXTURES: Fixture[] = [
   { name: 'village', level: 0, seed: 1001, ticks: 1200 },
   { name: 'level-01', level: 1, seed: 1002, ticks: 1600 },
   { name: 'level-05', level: 5, seed: 1003, ticks: 1600 },
@@ -58,17 +70,28 @@ const FIXTURES: { name: string; level: number; seed: number; ticks: number; mode
   { name: 'level-40', level: 40, seed: 1006, ticks: 1600 },
   // The Learning mode (`$mode` tutorial): it plays its own set, from level 0
   { name: 'tutorial', level: 0, seed: 1007, ticks: 1600, mode: 'tutorial' },
+  // The co-op mode (`$mode` multicoop): the adventure with two players
+  {
+    name: 'coop-01',
+    level: 1,
+    seed: 1008,
+    ticks: 1600,
+    mode: 'multicoop',
+    set: 'adventure',
+    players: 2,
+  },
 ];
 
 mkdirSync(OUT, { recursive: true });
 for (const f of FIXTURES) {
   const replay = {
     version: 1,
-    set: f.mode ?? 'adventure',
+    set: f.set ?? f.mode ?? 'adventure',
     level: f.level,
     seed: f.seed,
     ...(f.mode ? { mode: f.mode } : {}),
     input: bot(f.seed, f.ticks),
+    ...(f.players === 2 ? { otherInputs: [bot(f.seed + 5000, f.ticks)] } : {}),
   };
   writeFileSync(join(OUT, `${f.name}.json`), JSON.stringify(replay) + '\n');
   console.log(`tests/replays/${f.name}.json (${f.ticks} ticks)`);

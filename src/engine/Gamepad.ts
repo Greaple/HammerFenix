@@ -134,18 +134,38 @@ class Pad {
   }
 }
 
+/** A controller, as the Gamepad API names it. */
+export interface PadRef {
+  readonly index: number;
+  readonly id: string;
+}
+
+function getPads(): readonly (Gamepad | null)[] {
+  return typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
+    ? navigator.getGamepads()
+    : [];
+}
+
 /**
  * The controllers, given to the players in connection order (G.2): the first one plugged in is
  * player 1's, the next player 2's. Controllers beyond the number of players wait, and take the
  * place of a player's controller that is unplugged (so in a solo game the next one takes over).
  * A player keeps their place when another player's controller is unplugged, and a controller
  * plugged in then takes the free place.
+ *
+ * In a two-player game started from the menu the players choose their controllers themselves
+ * (`assign`, G.3).
  */
 export class PadManager {
   /** The controller of each player, by pid. */
   private readonly slots: (Pad | null)[] = [null];
   /** Controllers with no player, in connection order. */
   private waiting: Pad[] = [];
+  /**
+   * The players chose their controllers (`assign`, G.3): a free place then stays free until
+   * the next `assign` or `release`, instead of going to the next controller.
+   */
+  private fixed = false;
 
   /** A controller was given to player `pid` (plugged in, or taking a free place). */
   onConnect?: (id: string, pid: number) => void;
@@ -168,6 +188,40 @@ export class PadManager {
     this.fill();
   }
 
+  /** The controllers plugged in that have a button pressed, whoever holds them (G.3: joining). */
+  pressed(): PadRef[] {
+    const out: PadRef[] = [];
+    for (const pad of getPads()) {
+      if (pad?.connected && pad.buttons.some((b) => b.pressed)) {
+        out.push({ index: pad.index, id: pad.id });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Gives each player the controller they chose, or none (G.3). The other controllers wait,
+   * and no longer take a free place by themselves.
+   */
+  assign(list: readonly (PadRef | null)[]): void {
+    const known = [...this.slots, ...this.waiting].filter((p): p is Pad => p !== null);
+    const slots = list.map((d) =>
+      d
+        ? (known.find((p) => p.index === d.index && p.id === d.id) ?? new Pad(d.index, d.id))
+        : null,
+    );
+    this.waiting = known.filter((p) => !slots.includes(p));
+    this.slots.splice(0, this.slots.length, ...slots);
+    this.fixed = true;
+  }
+
+  /** Back to the controllers in connection order (a new game). */
+  release(): void {
+    if (!this.fixed) return;
+    this.fixed = false;
+    this.fill();
+  }
+
   /** Whether a player has a controller. */
   get connected(): boolean {
     return this.slots.some((p) => p !== null);
@@ -180,10 +234,7 @@ export class PadManager {
 
   /** Reads every player's controller now (`EMPTY_PAD` for a player without one). */
   read(): PadState[] {
-    const pads =
-      typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
-        ? navigator.getGamepads()
-        : [];
+    const pads = getPads();
     this.update(pads);
     return this.slots.map((p) => (p ? p.read(pads[p.index]!) : EMPTY_PAD));
   }
@@ -208,6 +259,7 @@ export class PadManager {
 
   /** Gives the waiting controllers to the players without one, in order. */
   private fill(): void {
+    if (this.fixed) return;
     for (let pid = 0; pid < this.slots.length && this.waiting.length > 0; pid++) {
       if (this.slots[pid]) continue;
       const p = this.waiting.shift()!;

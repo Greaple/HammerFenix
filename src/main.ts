@@ -226,8 +226,10 @@ async function main(): Promise<void> {
       shell.showMenu();
       return;
     }
-    // Only Adventure games started from the menu count for the profile (site guide, section 4)
-    const record = session.siteMode === 'solo' ? profile.recordGame(result) : null;
+    // Only Adventure games started from the menu count for the profile (site guide, section 4).
+    // The co-op mode is the Adventure for two and sends its items too (`MultiCoop.saveScore`)
+    const counts = session.siteMode === 'solo' || session.siteMode === 'multicoop';
+    const record = counts ? profile.recordGame(result) : null;
     shell.showResult(result, record);
   };
   (window as any).profile = profile;

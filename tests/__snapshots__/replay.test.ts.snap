@@ -1,5 +1,223 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`replays > coop-01.json matches its snapshot and replays identically 1`] = `
+[
+  {
+    "bads": [
+      "CeriseBad 208,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": false,
+    "items": [],
+    "level": 2,
+    "others": [
+      {
+        "anim": 3,
+        "lives": 1,
+        "score": 0,
+        "weapon": 1,
+        "x": 210.98,
+        "y": -140.18,
+      },
+    ],
+    "player": {
+      "anim": 3,
+      "lives": 1,
+      "score": 0,
+      "weapon": 1,
+      "x": 210.98,
+      "y": -508.5,
+    },
+    "tick": 200,
+  },
+  {
+    "bads": [
+      "CeriseBad 188.59,300",
+    ],
+    "bombs": 1,
+    "clear": false,
+    "dim": 0,
+    "gameOver": false,
+    "items": [],
+    "level": 2,
+    "others": [
+      {
+        "anim": 3,
+        "lives": 1,
+        "score": 0,
+        "weapon": 1,
+        "x": 387.48,
+        "y": 413.71,
+      },
+    ],
+    "player": {
+      "anim": 1,
+      "lives": 1,
+      "score": 0,
+      "weapon": 1,
+      "x": 262.26,
+      "y": 240,
+    },
+    "tick": 400,
+  },
+  {
+    "bads": [
+      "CeriseBad 281.8,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": false,
+    "items": [
+      "4: 370,240",
+      "41: 30,240",
+    ],
+    "level": 2,
+    "others": [
+      {
+        "anim": 0,
+        "lives": 0,
+        "score": 0,
+        "weapon": 1,
+        "x": 119.9,
+        "y": 300,
+      },
+    ],
+    "player": {
+      "anim": 1,
+      "lives": 0,
+      "score": 5,
+      "weapon": 1,
+      "x": 64,
+      "y": 180,
+    },
+    "tick": 600,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 800,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 1000,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 1200,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 1400,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 1600,
+  },
+  {
+    "bads": [
+      "CeriseBad 169.6,300",
+    ],
+    "bombs": 0,
+    "clear": false,
+    "dim": 0,
+    "gameOver": true,
+    "items": [],
+    "level": 2,
+    "player": {
+      "anim": 3,
+      "lives": 0,
+      "score": 755,
+      "weapon": 1,
+      "x": 56.99,
+      "y": 384.9,
+    },
+    "tick": 1600,
+  },
+]
+`;
+
 exports[`replays > level-01.json matches its snapshot and replays identically 1`] = `
 [
   {

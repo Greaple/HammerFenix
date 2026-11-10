@@ -16,10 +16,12 @@ export interface GameRecord {
 
 /**
  * The options each mode offers on the menu, in the menu's order. The quest texts say which mode
- * each is for (quests 63, 64, 72, 74); the multiplayer ones come with their modes (Phase 4).
+ * each is for (quests 63, 64, 72, 74, and 68 to 70 for the co-op mode); the other modes' come
+ * with them (Phase 4).
  */
 export const MODE_OPTIONS: Record<string, readonly string[]> = {
   solo: [Data.OPT_MIRROR, Data.OPT_NIGHTMARE, Data.OPT_NINJA, Data.OPT_BOMB_EXPERT],
+  multicoop: [Data.OPT_MIRROR_MULTI, Data.OPT_NIGHTMARE_MULTI, Data.OPT_LIFE_SHARING],
 };
 
 /** The part of `Storage` the profile uses, so tests can pass their own. */

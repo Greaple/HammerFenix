@@ -77,11 +77,16 @@ interface ModeEntry {
   enabled: boolean;
 }
 
-/** The modes a new player has: Adventure and the free Learning mode (site guide, section 3). */
+/**
+ * The modes of the menu. A new player has the Adventure and the free Learning mode (site guide,
+ * section 3); quests unlock the others (`give mode=` in `quests.xml`).
+ */
 const MODES: ModeEntry[] = [
   { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
   // Item 107, "Livre des étoiles"
   { mode: 'tutorial', icon: { item: 107 }, enabled: true },
+  // Unlocked by quest 67 ("Sandy commence l'aventure !"); item 1221 is one of Sandy's kit
+  { mode: 'multicoop', icon: { item: 1221 }, enabled: true },
 ];
 
 interface TabEntry {
@@ -137,6 +142,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
       'Faites des quêtes, débloquez de nouveaux modes de jeu et gagnez des points pour monter la Pyramide !',
     tutorialDesc:
       'Apprenez les techniques de base avant de vous lancer dans l’Aventure. Illimité et gratuit.',
+    multicoop: 'Multi Coopératif',
+    multicoopDesc:
+      'L’Aventure à deux sur le même ordinateur, avec Sandy. La partie s’arrête dès qu’un joueur n’a plus de vie.',
+    modeLockedBy: 'Ce mode se débloque avec la quête « {0} »',
     start: 'Commencer',
     soon: 'bientôt',
     gameOver: 'Partie terminée',
@@ -177,6 +186,9 @@ const TEXT: Record<Lang, Record<string, string>> = {
     alwaysOn: 'Toujours active une fois débloquée',
     mirror: 'Miroir',
     nightmare: 'Cauchemar',
+    mirrormulti: 'Miroir',
+    nightmaremulti: 'Cauchemar',
+    lifesharing: 'Partage de vies',
     ninja: 'Ninjutsu',
     bombexpert: 'Explosifs instables',
     boost: 'Tornade',
@@ -204,6 +216,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     soloDesc: 'Find quests, unblock new game modes and obtain points to climb up the pyramid!',
     tutorialDesc:
       'Learn the basic techniques before playing the Adventure mode. Free and unlimited.',
+    multicoop: 'Two Players',
+    multicoopDesc:
+      'The Adventure for two at the same computer, with Sandy. The game ends as soon as a player has no life left.',
+    modeLockedBy: 'This mode is unlocked by the quest “{0}”',
     start: 'Start game',
     soon: 'soon',
     gameOver: 'Game over',
@@ -244,6 +260,9 @@ const TEXT: Record<Lang, Record<string, string>> = {
     alwaysOn: 'Always on once unlocked',
     mirror: 'Mirror',
     nightmare: 'Nightmare',
+    mirrormulti: 'Mirror',
+    nightmaremulti: 'Nightmare',
+    lifesharing: 'Lives sharing',
     ninja: 'Ninjutsu',
     bombexpert: 'Unstable explosives',
     boost: 'Tornado',
@@ -270,6 +289,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
       '¡Haz exploraciones, desbloquea nuevos modos de juego y gana puntos para subir en la pirámide!',
     tutorialDesc:
       'Aprende las técnicas básicas antes de lanzarte al modo Aventura. Ilimitado y gratuito.',
+    multicoop: 'Cooperativo',
+    multicoopDesc:
+      'La Aventura para dos en el mismo ordenador, con Sandy. La partida termina en cuanto un jugador se queda sin vidas.',
+    modeLockedBy: 'Este modo se desbloquea con la exploración «{0}»',
     start: 'Comenzar',
     soon: 'pronto',
     gameOver: 'Fin de la partida',
@@ -310,6 +333,9 @@ const TEXT: Record<Lang, Record<string, string>> = {
     alwaysOn: 'Siempre activa una vez desbloqueada',
     mirror: 'Espejo',
     nightmare: 'Pesadilla',
+    mirrormulti: 'Espejo',
+    nightmaremulti: 'Pesadilla',
+    lifesharing: 'Compartir vidas',
     ninja: 'Ninjutsu',
     bombexpert: 'Explosivos inestables',
     boost: 'Tornado',
@@ -689,12 +715,17 @@ export class Shell {
     const out: MenuEntry[] = [];
     for (const mode of MODES) {
       out.push({ kind: 'mode', mode });
-      if (!mode.enabled) continue;
+      if (!mode.enabled || this.isLocked(mode)) continue;
       for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
     }
     for (const tab of TABS) out.push({ kind: 'tab', tab });
     out.push({ kind: 'settings' });
     return out;
+  }
+
+  /** A mode the profile does not have yet: a quest gives it. */
+  private isLocked(mode: ModeEntry): boolean {
+    return !this.profile.data.modes.includes(mode.mode);
   }
 
   /** The mode's options on the menu; the Tornade boost, which applies to every game, last. */
@@ -722,7 +753,7 @@ export class Shell {
       if (e.oid === Data.OPT_BOOST) return; // no box to untick (quest 62)
       this.profile.toggleOption(e.oid);
       this.render();
-    } else if (e.mode.enabled) {
+    } else if (e.mode.enabled && !this.isLocked(e.mode)) {
       this.onStart?.(e.mode.mode);
     }
   }
@@ -1130,20 +1161,24 @@ export class Shell {
     this.text(t.modes, 'title', W / 2, top + 10, { color: C.heading });
 
     MODES.forEach((m, i) => {
-      const y = top + 46 + i * 38;
+      const y = top + 44 + i * 30;
       const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
       const sel = n === this.selected;
-      const row = this.button([42, y, 336, 34], () => this.clickEntry(n), sel);
-      const ic = this.icon(m.icon, 66, y + 17, 26, row);
-      if (!m.enabled) ic.alpha = 0.45;
-      this.text(t[m.mode], 'label', 90, y + 7, {
+      const locked = m.enabled && this.isLocked(m);
+      const open = m.enabled && !locked;
+      const row = this.button([42, y, 336, 28], () => this.clickEntry(n), sel);
+      const ic = this.icon(m.icon, 66, y + 14, 22, row);
+      if (!open) ic.alpha = 0.45;
+      this.text(t[m.mode], 'label', 90, y + 5, {
         align: 'left',
-        size: 18,
-        color: sel ? C.gold : m.enabled ? C.ink : C.todo,
+        size: 16,
+        color: sel ? C.gold : open ? C.ink : C.todo,
         parent: row,
       });
-      if (!m.enabled) {
-        this.text(t.soon, 'label', 364, y + 10, {
+      if (locked) {
+        this.padlock(352, y + 8, row, sel ? C.gold : C.inkSoft);
+      } else if (!m.enabled) {
+        this.text(t.soon, 'label', 364, y + 8, {
           align: 'right',
           size: 12,
           color: sel ? C.gold : C.todo,
@@ -1154,9 +1189,17 @@ export class Shell {
 
     const mode = cur.kind === 'mode' || cur.kind === 'option' ? cur.mode : null;
     const shown = mode ?? MODES[0];
-    this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 128, { width: 320, color: C.inkSoft });
-    if (shown.enabled && this.modeOptions(shown).length > 0) {
-      this.drawOptions(shown, entries, top + 166);
+    const canStart = shown.enabled && !this.isLocked(shown);
+    this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 133, { width: 320, color: C.inkSoft });
+    if (canStart && this.modeOptions(shown).length > 0) {
+      this.drawOptions(shown, entries, top + 172);
+    } else if (shown.enabled && !canStart) {
+      this.text(fmt(t.modeLockedBy, this.questForMode(shown.mode)), 'body', W / 2, top + 198, {
+        width: 320,
+        size: 11,
+        italic: true,
+        color: C.inkSoft,
+      });
     }
 
     // The quest and fridge pages
@@ -1195,7 +1238,7 @@ export class Shell {
 
     if (cur.kind === 'tab') this.actionButton(t[cur.tab.screen], BUTTON_Y, () => this.confirm());
     else if (cur.kind === 'settings') this.actionButton(t.settings, BUTTON_Y, () => this.confirm());
-    else if (shown.enabled) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
+    else if (canStart) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
     else this.actionButton(t.start, BUTTON_Y, null);
   }
 
@@ -1274,6 +1317,14 @@ export class Shell {
       }
     });
     if (hint) this.text(hint, 'body', W / 2, y0 + 82, { size: 10, italic: true, color: C.inkSoft });
+  }
+
+  /** The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). */
+  private questForMode(mode: string): string {
+    const q = this.profile.quests.quests.find((x) =>
+      x.actions.some((a) => a.type === 'give' && a.attrs.mode === mode),
+    );
+    return q ? this.texts.getQuestName(q.id) : '?';
   }
 
   /** The name of the quest that gives option `oid` (`give option=` in `quests.xml`). */
@@ -1738,10 +1789,21 @@ export class Shell {
       this.text(`${this.texts.getStatic(1)} ${lvl}`, 'label', W / 2, y, { size: 17 });
       const sector = this.texts.getSectorName(0, lvl);
       if (sector) this.text(sector, 'body', W / 2, y + 22, { color: C.inkSoft });
-      this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
-        size: 26,
-        color: C.heading,
-      });
+      const data = r.stats.data;
+      if (Array.isArray(data)) {
+        this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
+          size: 26,
+          color: C.heading,
+        });
+      } else {
+        // The co-op mode sends no score, only each player's (`MultiCoop.saveScore`)
+        [
+          `Igor : ${formatScore(data.s0 ?? 0)} pts`,
+          `Sandy : ${formatScore(data.s1 ?? 0)} pts`,
+        ].forEach((line, i) => {
+          this.text(line, 'label', W / 2, y + 40 + i * 20, { size: 17, color: C.heading });
+        });
+      }
       y += 82;
     }
 

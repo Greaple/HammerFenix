@@ -8,8 +8,11 @@ export interface ScoreStats {
   reachedLevel: number;
   /** `$item2` (`GameMode.getPicks2`): pick count per item id, score items at id + 1000. */
   item2: number[];
-  /** `$data`: the game log (`manager.history`) as rebuilt by `Adventure.onGameOver`. */
-  data: string[];
+  /**
+   * `$data`: the game log (`manager.history`) as rebuilt by `Adventure.onGameOver`, or each
+   * player's score in the co-op mode (`MultiCoop.saveScore`: `$s0`, `$s1`).
+   */
+  data: string[] | { s0: number; s1: number };
 }
 
 /**

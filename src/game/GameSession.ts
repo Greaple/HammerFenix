@@ -20,6 +20,7 @@ import { realTimer } from './Chrono';
 import { padStartText } from './gui/PadGlyphs';
 import { Log } from './Log';
 import { Adventure } from './mode/Adventure';
+import { MultiCoop } from './mode/MultiCoop';
 import { Tutorial } from './mode/Tutorial';
 import type { GameMode } from './mode/GameMode';
 
@@ -92,8 +93,8 @@ export class GameSession {
   /** `GameManager.musics` */
   readonly musics = MUSIC_TRACKS;
   /**
-   * The site's `$mode` of the current game (`GameManager.isMode`): `solo` (Adventure) or
-   * `tutorial`. The debug tools' games keep the mode of the game before; a set change goes back
+   * The site's `$mode` of the current game (`GameManager.isMode`): `solo` (Adventure),
+   * `tutorial` or `multicoop`. The debug tools' games keep the mode of the game before; a set change goes back
    * to `solo`.
    */
   mode = 'solo';
@@ -200,6 +201,8 @@ export class GameSession {
       startGameInstance: () => {
         this.startGame(0, undefined, this.readyMode ?? 'solo');
         this.siteMode = this.readyMode;
+        // In a two-player mode the players first choose their devices (G.3)
+        this.game.askJoin();
       },
       startText: () =>
         this.input.device === 'gamepad'
@@ -348,12 +351,17 @@ export class GameSession {
   }
 
   /**
-   * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. `solo` (`Adventure`)
-   * and `tutorial` are ported; any other plays the Adventure, which plays the other sets too.
+   * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. `solo` (`Adventure`),
+   * `tutorial` and `multicoop` are ported; any other plays the Adventure, which plays the other
+   * sets too. Deviation: the co-op starts on `firstLevel` too (level 0 in the original), for the
+   * debug tools.
    */
   private createMode(firstLevel: number): GameMode {
     if (this.isTutorial()) {
       return new Tutorial(this);
+    }
+    if (this.isMultiCoop()) {
+      return new MultiCoop(this, firstLevel);
     }
     return new Adventure(this, firstLevel);
   }
@@ -361,6 +369,11 @@ export class GameSession {
   /** `GameManager.isTutorial`: the `$mode`, so also true in the demo the tutorial leads to. */
   isTutorial(): boolean {
     return this.mode === 'tutorial';
+  }
+
+  /** `GameManager.isMultiCoop` */
+  isMultiCoop(): boolean {
+    return this.mode === 'multicoop';
   }
 
   /**

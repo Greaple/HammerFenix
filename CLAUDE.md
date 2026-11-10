@@ -30,7 +30,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `src/engine/`: loop (`GameLoop.ts`, fixed 32 Hz logic, 40 Hz movie clips stepped before each tick; `Timer.tmod` is 1 except in bullet time), audio, input, SWF runtime (`swf/`), save codec
 - SWF frame scripts run in `swf/Avm1.ts`. They read an entity's fields through `mc.scriptHost` (e.g. the player's `head`, `skin`, `currentWeapon`), so keep the original field names on entities.
 - `src/game/GameSession.ts`: the long-lived manager (the original's `GameManager`, plus the loop, the Loader, settings, recordings). It builds a new mode object for each game: `session.game`.
-- `src/game/mode/`: `GameMode.ts` (port of `Mode.mt` + `mode/GameMode.mt`, what every mode shares) and one file per mode extending it with the original's overrides: `Adventure.ts`, `Tutorial.ts` (the menu's Learning mode) and `Shareware.ts` (the demo levels the tutorial ends in). `GameSession.createMode` picks the mode from the site's `$mode` (`session.mode`). A game's state is on the mode (`world`, `player`, lists, flags); entities see it as `game` (`IGameContext`).
+- `src/game/mode/`: `GameMode.ts` (port of `Mode.mt` + `mode/GameMode.mt`, what every mode shares) and one file per mode extending it with the original's overrides: `Adventure.ts`, `Tutorial.ts` (the menu's Learning mode), `Shareware.ts` (the demo levels the tutorial ends in) and `MultiCoop.ts` (two players; a game the menu starts asks each for their device, `gui/JoinScreen.ts`). `GameSession.createMode` picks the mode from the site's `$mode` (`session.mode`). A game's state is on the mode (`world`, `player`, lists, flags); entities see it as `game` (`IGameContext`).
 - `src/game/entity/`: `Entity.ts` (Entity, Animator, Physics, Mover), `Player.ts` (Player + PlayerController + SpecialManager), `Bad.ts` (all enemies), `Bomb.ts`, `Shoot.ts`, `Item.ts`
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
 - `src/game/Data.ts`: port of `Data.mt`. Values must match the original exactly.
@@ -56,7 +56,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 
 - `tests/replay.test.ts` plays every `tests/replays/*.json` headless (`tests/helpers/headless.ts`) and compares the state with `tests/__snapshots__/`. A diff means game behavior changed. If the change is intended, check the diff, then run `npx vitest run -u` to accept it.
 - Add replays by recording in the browser (Debug > Record & Replay, save the file into `tests/replays/`) or with `npx tsx tools/make-replays.ts` (seeded random input).
-- In code: `session.startRecording(level)`, `session.stopRecording()`, `await session.playReplay(replay)`; `session.startGame(level, seed, mode)` starts a new game (`mode` is the site's `$mode`: `solo` or `tutorial`; a replay keeps it in its `mode` field).
+- In code: `session.startRecording(level)`, `session.stopRecording()`, `await session.playReplay(replay)`; `session.startGame(level, seed, mode)` starts a new game (`mode` is the site's `$mode`: `solo`, `tutorial` or `multicoop`; a replay keeps it in its `mode` field).
 
 ## End of each session
 

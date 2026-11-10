@@ -1,7 +1,7 @@
 import { Container, Sprite, type Texture } from 'pixi.js';
 import type { AudioEngine } from '../../engine/Audio';
 import { DepthManager } from '../../engine/DepthManager';
-import type { InputController } from '../../engine/Input';
+import type { InputController, PlayerKeys } from '../../engine/Input';
 import type { SwfLibrary } from '../../engine/swf/SwfLibrary';
 import { type SwfMovieClip, SwfTextField } from '../../engine/swf/SwfMovieClip';
 import { Data, type GameDataStore } from '../Data';
@@ -21,6 +21,7 @@ import { RandomManager } from '../RandomManager';
 import { StatsManager } from '../StatsManager';
 import { Chrono } from '../Chrono';
 import { GameHud } from '../gui/GameHud';
+import { JoinScreen } from '../gui/JoinScreen';
 import { type PadButton, padGlyph } from '../gui/PadGlyphs';
 import type { IGameContext } from '../GameContext';
 import type { GameSession } from '../GameSession';
@@ -232,6 +233,14 @@ export abstract class GameMode implements IGameContext {
   protected pausePadLayer: Container | null = null;
   /** `requestPause` waits for the controls to be unlocked. */
   protected pauseAsked = false;
+  /** The players are choosing their devices (G.3, `startJoin`): the game is paused under it. */
+  protected join: JoinScreen | null = null;
+  /** The players to ask (`askJoin`), once the controls are unlocked. */
+  protected joinAsked: number[] | null = null;
+  /** The players choose their devices in this game (`askJoin`). */
+  protected fl_join = false;
+  /** The keys the mode gave each player, by pid: the keyboard sides a player can choose. */
+  protected joinSides: PlayerKeys[] = [];
   protected darknessMC: SwfMovieClip | null = null;
   /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
   protected darknessHoles: SwfMovieClip[] = [];
@@ -325,13 +334,7 @@ export abstract class GameMode implements IGameContext {
    */
   protected initInterface(): void {
     this.hud?.destroy();
-    this.hud = new GameHud(this, 0, 2, 0);
-    const p = (this.getList(Data.PLAYER) as PlayerEntity[])[0];
-    if (p) {
-      this.hud.setScore(p.score, true);
-      this.hud.setLives(p.lives);
-    }
-    this.hud.clearExtends();
+    this.hud = new GameHud(this);
   }
 
   /** `GameMode.initPlayer`: what the mode gives a new player. */
@@ -1657,6 +1660,53 @@ export abstract class GameMode implements IGameContext {
     return this.specialPicks[id];
   }
 
+  // ------------------------------------------ Choosing the devices (G.3)
+
+  /**
+   * Port addition (G.3): in a game of two players or more, each player first chooses what they
+   * play with (`JoinScreen`). The session asks it for the games the menu starts; the others
+   * (debug tools, recordings, replays) keep the keys the mode gave and the controllers in
+   * connection order.
+   */
+  askJoin(): void {
+    const pl = this.getList(Data.PLAYER) as PlayerEntity[];
+    if (pl.length < 2) return;
+    this.fl_join = true;
+    this.joinSides = pl.map((p) => this.input.playerKeys(p.pid));
+    this.joinAsked = pl.map((p) => p.pid);
+  }
+
+  /** Whether the players are choosing their devices. */
+  get joining(): boolean {
+    return this.join !== null;
+  }
+
+  /**
+   * Shows the join screen for the players asked, over the paused game. During a level change
+   * the controls are locked, and it waits for the next tick that allows it, as `requestPause`.
+   */
+  protected startJoin(fl_lost: boolean): void {
+    if (this.fl_pause) this.onUnpause();
+    if (this.fl_lock || !this.joinAsked) return;
+    const pids = this.joinAsked;
+    this.joinAsked = null;
+    this.pauseAsked = false;
+    this.fl_pause = true;
+    this.lock();
+    this.world.lock();
+    this.join = new JoinScreen(this, pids, this.joinSides, fl_lost);
+  }
+
+  /** The join screen's tick; the game goes on once every player has a device. */
+  protected updateJoin(): void {
+    if (!this.join?.update()) return;
+    this.join.destroy();
+    this.join = null;
+    this.fl_pause = false;
+    this.unlock();
+    this.world.unlock();
+  }
+
   // ------------------------------------------------------- Pause & Instructions
 
   /**
@@ -1665,7 +1715,7 @@ export abstract class GameMode implements IGameContext {
    * waits for the next tick that allows it. Called by `GameSession.requestPause`.
    */
   requestPause(): void {
-    if (this.fl_pause) return;
+    if (this.fl_pause || this.join) return;
     this.onPause();
     if (!this.fl_pause) this.pauseAsked = true;
   }
@@ -1866,6 +1916,7 @@ export abstract class GameMode implements IGameContext {
   }
 
   togglePause(): void {
+    if (this.join) return;
     if (this.fl_pause) this.onUnpause();
     else this.onPause();
   }
@@ -2015,6 +2066,21 @@ export abstract class GameMode implements IGameContext {
     // Chrono
     this.gameChrono.update();
     this.input.poll();
+
+    // The players choose their devices (G.3): at the start, and again for a player whose
+    // controller is unplugged. Nothing else is read meanwhile.
+    if (this.fl_join && !this.fl_gameOver) {
+      if (!this.join) {
+        const lost = this.input.lostPlayers();
+        const fl_lost = lost.length > 0 && !this.joinAsked;
+        if (fl_lost) this.joinAsked = lost;
+        if (this.joinAsked) this.startJoin(fl_lost);
+      }
+      if (this.join) {
+        this.updateJoin();
+        return;
+      }
+    }
 
     // Check pause key toggle (P, and Escape: `GameMode.main` pauses with it on the site)
     if (this.input.consumePress('pause')) {
@@ -2329,6 +2395,7 @@ export abstract class GameMode implements IGameContext {
     this.view?.destroy();
     this.pausePadLayer?.destroy({ children: true });
     this.pausePadLayer = null;
+    this.join = null;
     this.depthMan.destroy();
     this.mc.removeMovieClip();
     this.lock();

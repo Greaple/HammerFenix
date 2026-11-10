@@ -72,9 +72,10 @@ describe('game over', () => {
     expect(r.score).toBe(score);
     expect(r.runId).toBeNull();
     expect(r.stats.reachedLevel).toBe(6);
-    expect(r.stats.data[0]).toBe('F=' + packageJson.version);
-    expect(r.stats.data[1]).toMatch(/^T=\d+$/);
-    expect(r.stats.data.length).toBe(2);
+    const data = r.stats.data as string[];
+    expect(data[0]).toBe('F=' + packageJson.version);
+    expect(data[1]).toMatch(/^T=\d+$/);
+    expect(data.length).toBe(2);
   });
 
   it('sends the item picks, the score items at id + 1000', () => {
