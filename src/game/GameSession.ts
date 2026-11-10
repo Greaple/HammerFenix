@@ -20,6 +20,7 @@ import { realTimer } from './Chrono';
 import { padStartText } from './gui/PadGlyphs';
 import { Log } from './Log';
 import { Adventure } from './mode/Adventure';
+import { Tutorial } from './mode/Tutorial';
 import type { GameMode } from './mode/GameMode';
 
 const SAVE_KEY = 'hammerfenix_save_v1';
@@ -43,6 +44,14 @@ export const MUSIC_TRACKS: readonly string[] = ['music_ingame', 'music_boss', 'm
 
 /** The dimensions the adventure's portals lead to (`Adventure.initWorld`). */
 const ADVENTURE_DIMENSIONS = ['deepnight', 'hiko', 'ayame', 'hk'];
+
+/**
+ * The level sets of the modes that have their own (`initWorld`), by `$mode`: the Learning mode's
+ * lessons, then the demo levels it leads to (`Tutorial`, `Shareware`).
+ */
+const MODE_SETS: Record<string, string[]> = {
+  tutorial: ['tutorial', 'shareware'],
+};
 
 /**
  * The page's side of the game: what stays from one game to the next. It stands for the
@@ -82,6 +91,17 @@ export class GameSession {
   scoreKey = 0;
   /** `GameManager.musics` */
   readonly musics = MUSIC_TRACKS;
+  /**
+   * The site's `$mode` of the current game (`GameManager.isMode`): `solo` (Adventure) or
+   * `tutorial`. The debug tools' games keep the mode of the game before; a set change goes back
+   * to `solo`.
+   */
+  mode = 'solo';
+  /**
+   * The site's `$out`: the page the free modes leave for (`Tutorial`, `Shareware`). The site's
+   * try page gave `/subscribe.html`; the port has no pages, and its page goes back to the menu.
+   */
+  readonly out = 'menu';
   /**
    * The player's settings (the site's "Options" page, roadmap 2C.5), saved in `localStorage`.
    * The next game reads them (`setParameters`).
@@ -178,7 +198,7 @@ export class GameSession {
       gameRoot: this.gameRoot,
       getLangStr: (id) => this.dataStore.getStatic(id),
       startGameInstance: () => {
-        this.startGame(0);
+        this.startGame(0, undefined, this.readyMode ?? 'solo');
         this.siteMode = this.readyMode;
       },
       startText: () =>
@@ -204,6 +224,8 @@ export class GameSession {
   ): Promise<GameSession> {
     const session = new GameSession(app, lib, dataStore, audio, input, preferredSet);
     await session.loadSets(preferredSet);
+    // The menu starts a mode at once (`startNow`), so every mode's sets are loaded ahead
+    for (const mode of Object.keys(MODE_SETS)) await session.loadModeSets(mode);
     session.startGame();
     return session;
   }
@@ -222,6 +244,11 @@ export class GameSession {
         // non-critical if optional dimension file fails
       }
     }
+  }
+
+  /** Loads the sets a mode brings with it (`MODE_SETS`), if any. */
+  private async loadModeSets(mode: string): Promise<void> {
+    for (const name of MODE_SETS[mode] ?? []) await this.dataStore.loadLevelSet(name);
   }
 
   // ------------------------------------------------------------- Persistence
@@ -288,13 +315,18 @@ export class GameSession {
   // -------------------------------------------------------- Game Lifecycle
 
   /**
-   * A new game on level `startLevelId` of the current set. The original loads a new page for
-   * each game, so a new `GameManager`, Loader and mode: here the previous mode is destroyed, the
+   * A new game of the site's `$mode` (the mode of the game before, if not given), on level
+   * `startLevelId` of the current set for the Adventure. The original loads a new page for each
+   * game, so a new `GameManager`, Loader and mode: here the previous mode is destroyed, the
    * manager's state reset, and a new mode started.
    */
-  startGame(startLevelId = 0, seed = Random.makeSeed()): void {
+  startGame(startLevelId = 0, seed = Random.makeSeed(), mode = this.mode): void {
     // Before the new seed: destroying the entities must not draw from the new game's numbers
     this.dropMode();
+
+    this.mode = mode;
+    // `GameManager` constructor: the tutorial plays with the system families ("using sysfam")
+    if (this.isTutorial()) this.config.setFamilies(SYSTEM_FAMILIES);
 
     this.seed = seed;
     this.rand.reseed(seed);
@@ -316,11 +348,19 @@ export class GameSession {
   }
 
   /**
-   * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. Only `solo`
-   * (`Adventure`) is ported, and it plays the other sets too.
+   * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. `solo` (`Adventure`)
+   * and `tutorial` are ported; any other plays the Adventure, which plays the other sets too.
    */
   private createMode(firstLevel: number): GameMode {
+    if (this.isTutorial()) {
+      return new Tutorial(this);
+    }
     return new Adventure(this, firstLevel);
+  }
+
+  /** `GameManager.isTutorial`: the `$mode`, so also true in the demo the tutorial leads to. */
+  isTutorial(): boolean {
+    return this.mode === 'tutorial';
   }
 
   /**
@@ -424,7 +464,7 @@ export class GameSession {
   }
 
   /** `GameManager.redirect`: the game leaves for a page of the site (the end of the set). */
-  redirect(url: string, params: string): void {
+  redirect(url: string, params: string | null): void {
     this.game.lock();
     this.loader.exitGame(url, params);
   }
@@ -443,6 +483,8 @@ export class GameSession {
 
   /** The Loader is done: the results screen takes over (3.1c, `Shell`). */
   private onGameEnd(result: GameResult): void {
+    // The original leaves the page here, which ends its music (the demo's still plays)
+    this.audio.stopMusic();
     this.lastResult = result;
     this.onGameResult?.(result);
   }
@@ -565,6 +607,7 @@ export class GameSession {
     this.input.stopRecording();
     const { set, level, seed, families, options, detail, shake } = this.recordStart;
     this.lastRecording = this.recorder.toReplay(set, level, seed, families, options);
+    if (this.mode !== 'solo') this.lastRecording.mode = this.mode;
     // Low details and no shaking change the random draws, so the replay keeps them
     if (detail === 0) this.lastRecording.detail = 0;
     if (shake === 0) this.lastRecording.shake = 0;
@@ -579,12 +622,14 @@ export class GameSession {
     if (replay.set !== this.currentSetName) {
       await this.changeSet(replay.set, replay.level);
     }
+    const mode = replay.mode ?? 'solo';
+    await this.loadModeSets(mode);
     this.setParameters(replay.families ?? SYSTEM_FAMILIES, replay.options ?? '', {
       ...this.settings,
       detail: replay.detail ?? 1,
       shake: replay.shake ?? 1,
     });
-    this.startGame(replay.level, replay.seed);
+    this.startGame(replay.level, replay.seed, mode);
     const player = new InputPlayer(replay.input, replay.otherInputs);
     this.input.startReplay(player);
     return player;
@@ -600,7 +645,7 @@ export class GameSession {
     this.stopInputCapture();
     await this.loadSets(setName);
     this.currentSetName = setName;
-    this.startGame(levelId);
+    this.startGame(levelId, undefined, 'solo');
   }
 
   destroy(): void {

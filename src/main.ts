@@ -209,14 +209,23 @@ async function main(): Promise<void> {
     // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
     shell.fadeOut(() => session.levelShown);
     session.start();
-    // The site's start query answers with the profile's families; the page sent the options
-    session.setParameters(profile.familiesParam, profile.optionsParam(mode));
+    // The site's start query answers with the profile's families; the page sent the options.
+    // The Learning mode's page sent none (`try.html`), and the game takes the system families
+    session.setParameters(
+      profile.familiesParam,
+      mode === 'tutorial' ? '' : profile.optionsParam(mode),
+    );
     session.startNow(mode);
   };
   canvasContainer?.addEventListener('pointerdown', () => session.clickStart());
   // The Loader is done (score saved, or the end of the set): the results replace the game
   session.onGameResult = (result) => {
     session.stop();
+    // The free modes leave for the site's `$out` with nothing to show: back to the menu
+    if (result.kind === 'exitGame' && result.url === session.out) {
+      shell.showMenu();
+      return;
+    }
     // Only Adventure games started from the menu count for the profile (site guide, section 4)
     const record = session.siteMode === 'solo' ? profile.recordGame(result) : null;
     shell.showResult(result, record);

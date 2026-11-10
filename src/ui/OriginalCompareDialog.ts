@@ -4,7 +4,10 @@
  * The original starts from `loader.swf`, as on hammerfest.fr: it loads `game.swf` and the musics
  * (`../sfx/`) from its `base` folder, then a click starts a local game. Flash resolves relative
  * URLs against the page, so `base` must point at `original-swf/`. Flashvars: `lang` and
- * `mode=solo` (Adventure; `GameManager.isMode`). `game.swf` embeds `xml_dev`, so the original
+ * `mode=solo` (Adventure; `GameManager.isMode`). No other mode can start here: this `loader.swf`
+ * sets `$mode` to `solo` itself (the first lines of `Loader`'s constructor), whatever the page
+ * gives it (tried with `mode=tutorial`, roadmap 4.6: the Adventure started). `game.swf` embeds
+ * `xml_dev`, so the original
  * always runs in dev mode (`GameManager.isDev`): its debug keys work, and it uses the dev item
  * families (`0,7,1000,1001,1002,1` to `19`), not the no-site ones the port's debug toolbar uses.
  *

@@ -78,9 +78,9 @@ function defaultStorage(): Storage | null {
  */
 export class GameParameters {
   /** The families as received, comma separated (`families`). */
-  readonly families: string[];
-  readonly specialItemFamilies: number[] = [];
-  readonly scoreItemFamilies: number[] = [];
+  families: string[] = [];
+  specialItemFamilies: number[] = [];
+  scoreItemFamilies: number[] = [];
   private readonly options = new Map<string, boolean>();
   /** For `toString()` and the replays only. */
   readonly optionList: string[] = [];
@@ -106,12 +106,7 @@ export class GameParameters {
     }
 
     // Families
-    this.families = f.split(',');
-    for (const s of this.families) {
-      const id = parseInt(s, 10);
-      if (id >= 1000) this.scoreItemFamilies.push(id);
-      else this.specialItemFamilies.push(id);
-    }
+    this.setFamilies(f);
 
     // Misc data
     this.setSound(settings);
@@ -120,6 +115,21 @@ export class GameParameters {
 
     if (!this.fl_detail) {
       this.setLowDetails();
+    }
+  }
+
+  /**
+   * The constructor's families. Also called by the session where the original's `GameManager`
+   * changes `$families` before it builds the parameters (the tutorial's system families).
+   */
+  setFamilies(f: string): void {
+    this.families = f.split(',');
+    this.specialItemFamilies = [];
+    this.scoreItemFamilies = [];
+    for (const s of this.families) {
+      const id = parseInt(s, 10);
+      if (id >= 1000) this.scoreItemFamilies.push(id);
+      else this.specialItemFamilies.push(id);
     }
   }
 

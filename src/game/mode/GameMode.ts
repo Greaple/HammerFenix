@@ -62,7 +62,8 @@ export interface MapEvent {
  *
  * Not ported: the color filter (`setColorHex`, `resetCol`: its only call, the water tint, is
  * commented out in the original), `attachRadius`, `getPicks` (replaced by `getPicks2` there),
- * `printBetaInfos`, and `endMode` (it leads to the level editor).
+ * `printBetaInfos`, and Escape's `endMode` in local mode (`getControls`: the port is never
+ * local).
  */
 export abstract class GameMode implements IGameContext {
   /** `Mode.manager`: the session, which stands for the original's `GameManager`. */
@@ -507,7 +508,8 @@ export abstract class GameMode implements IGameContext {
   /** `GameMechanics.onViewReady`: the level can be played. */
   protected onViewReady(): void {
     this.onLevelReady();
-    this.manager.onLevelChange?.(this.world.currentId, this.manager.currentSetName);
+    // The page shows the level and the game's level set (its main world's)
+    this.manager.onLevelChange?.(this.world.currentId, this.dimensions[0].set.name);
   }
 
   /** `ViewManager.onRestoreReady` + `GameMechanics.onRestoreReady` */
@@ -1611,6 +1613,11 @@ export abstract class GameMode implements IGameContext {
     this.setMusicVolume(this.fl_mute ? 0 : 1);
   }
 
+  /** `Mode.endMode`: the mode ends by itself. */
+  endMode(): void {
+    this.stopMusic();
+  }
+
   /** `Mode.stopMusic` */
   stopMusic(): void {
     this.wantedTrack = null;
@@ -2234,6 +2241,13 @@ export abstract class GameMode implements IGameContext {
 
     if (this.countList(Data.BAD_CLEAR) > 0) {
       this.fxMan.detachExit();
+    }
+
+    // No exit arrow in the tutorial
+    if (this.fxMan.mc_exitArrow) {
+      if (this.manager.isTutorial()) {
+        this.fxMan.detachExit();
+      }
     }
 
     // Nightmare: calm enemies get angry

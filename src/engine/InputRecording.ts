@@ -35,6 +35,8 @@ export interface Replay {
    */
   families?: string;
   options?: string;
+  /** The site's `$mode` of the game (`tutorial`...); absent means `solo`, the Adventure. */
+  mode?: string;
   /**
    * `$detail` and `$shake` when 0 (they change the random draws); absent means on, as in the
    * replays recorded before the settings screen.

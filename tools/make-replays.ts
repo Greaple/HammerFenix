@@ -49,22 +49,25 @@ function bot(seed: number, ticks: number): [number, number][] {
   return rec.toReplay('adventure', 0, 0).input;
 }
 
-const FIXTURES = [
+const FIXTURES: { name: string; level: number; seed: number; ticks: number; mode?: string }[] = [
   { name: 'village', level: 0, seed: 1001, ticks: 1200 },
   { name: 'level-01', level: 1, seed: 1002, ticks: 1600 },
   { name: 'level-05', level: 5, seed: 1003, ticks: 1600 },
   { name: 'level-12', level: 12, seed: 1004, ticks: 1600 },
   { name: 'level-25', level: 25, seed: 1005, ticks: 1600 },
   { name: 'level-40', level: 40, seed: 1006, ticks: 1600 },
+  // The Learning mode (`$mode` tutorial): it plays its own set, from level 0
+  { name: 'tutorial', level: 0, seed: 1007, ticks: 1600, mode: 'tutorial' },
 ];
 
 mkdirSync(OUT, { recursive: true });
 for (const f of FIXTURES) {
   const replay = {
     version: 1,
-    set: 'adventure',
+    set: f.mode ?? 'adventure',
     level: f.level,
     seed: f.seed,
+    ...(f.mode ? { mode: f.mode } : {}),
     input: bot(f.seed, f.ticks),
   };
   writeFileSync(join(OUT, `${f.name}.json`), JSON.stringify(replay) + '\n');

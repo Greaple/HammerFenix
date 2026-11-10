@@ -81,7 +81,7 @@ interface ModeEntry {
 const MODES: ModeEntry[] = [
   { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
   // Item 107, "Livre des étoiles"
-  { mode: 'tutorial', icon: { item: 107 }, enabled: false },
+  { mode: 'tutorial', icon: { item: 107 }, enabled: true },
 ];
 
 interface TabEntry {
@@ -1155,7 +1155,9 @@ export class Shell {
     const mode = cur.kind === 'mode' || cur.kind === 'option' ? cur.mode : null;
     const shown = mode ?? MODES[0];
     this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 128, { width: 320, color: C.inkSoft });
-    if (shown.enabled) this.drawOptions(shown, entries, top + 166);
+    if (shown.enabled && this.modeOptions(shown).length > 0) {
+      this.drawOptions(shown, entries, top + 166);
+    }
 
     // The quest and fridge pages
     const counts = this.counts();
