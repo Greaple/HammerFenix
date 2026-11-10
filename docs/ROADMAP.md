@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from here (updated 2026-11-09):
+Phases 1, 2, 2B, 3 and 5 (except 5.4 and 5.5), Phase 2C (except 2C.9) and the UI batches are done. We are starting Phase 4. Order so far (updated 2026-11-10):
 
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
@@ -13,7 +13,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 5. 2C.3 (disguises, key E and controller Y), 2C.4 (world map, key C) and 2C.8 (`Data.mt` checked constant by constant) are done.
 6. 2C.5 (settings page: the gear on the mode menu) and 2C.7 (`Timer.tmod` for bullet time, clip steps before the logic, aqua and wind) are done.
 7. 2C.6 is done (blend modes, timeline filters, glows, script functions, box blur). Left in 2C: 2C.9, the light hole, which needs a real Flash Player or a video. Worth a look in play: explosions, torches and portals now blend as the original (only the HUD and pause screen were compared in Ruffle).
-8. G.2 is done (one input per player: keys, controllers, locks and recordings). Next: Phase 4, starting with 4.1 (Time Attack) and 4.2 (two-player co-op, with G.3).
+8. G.2 is done (one input per player: keys, controllers, locks and recordings). Next: Phase 4, starting with 4.0 (split `GameSession.ts` into `GameMode` and `Adventure`), then the order in Phase 4 ("Order").
 
 Working notes:
 
@@ -154,7 +154,15 @@ Port addition: the Flash game had the keyboard only. Controllers go through the 
 
 Time Attack and two-player co-op are unlocked by quests (`give mode=` in `quests.xml`), through the profile from 3.2.
 
-- [ ] 4.1 Time Attack (`TimeAttack.mt`) and its interface (`initTime` in `gui/GameInterface.mt`)
+Order (cost and dependencies, 2026-11-10): 4.0, then 4.6 Tutorial (single player, already on the menu as "coming soon"), 4.5, 4.1, 4.2 with G.3, 4.3 (needs 4.1 and 4.2), then 4.4 last. Shareware and Fjv (the rest of 4.6) can come any time after 4.0. The heaviest tasks are 4.4 (Soccer), 4.0 (the split) and 4.2 with G.3 (a second player touches the interface, deaths, lives and the results screen).
+
+Risk for every mode: the Ruffle side-by-side starts the Adventure. Check first whether the original's dev mode can start another mode (`GameManager.startMode`, `isDev`, the Loader's parameters); if not, compare by reading the code and against videos of the original, and note it.
+
+Each mode: port it from the original, add it to the mode menu (locked until its quest when it has one), spot-check its level set (2B checklist; data is already checked by 2B.0), record a replay, update PORT_STATUS.md.
+
+- [ ] 4.0 Split `src/game/GameSession.ts` (2,953 lines) into a base `GameMode` (port of `mode/GameMode.mt`) and an `Adventure` subclass (`mode/Adventure.mt`), with the same overrides as the original (`initGame`, `goto`, `onLevelClear`, `onGameOver`, `saveScore`, `isBossLevel`...), so the other modes can extend `GameMode` as theirs do. No behavior change: the replay snapshots must not move. Keep the debug handles (`window.gameSession`) working.
+
+- [ ] 4.1 Time Attack (`TimeAttack.mt`) and its interface (`initTime` in `gui/GameInterface.mt`). The original's rankings were on the site; with no server, keep personal best times in `localStorage` (a design call for the maintainer, as for the other site screens).
 - [ ] 4.2 Two-player co-op (`MultiCoop.mt`), 2-player interface (`initMulti`), with co-op on controllers (G.3)
 - [ ] 4.3 Time Attack multi (`TimeAttackMulti.mt`)
 - [ ] 4.4 Soccer (`Soccer.mt`, `SoccerSelector.mt`, `gui/SoccerInterface.mt`)
