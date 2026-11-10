@@ -105,8 +105,11 @@ describe('script functions (2C.6)', () => {
       expect(p._x).toBeLessThan(80);
       expect(p.zIndex).toBeGreaterThanOrEqual(16384);
     }
+    // The speeds before the move: main() turns a particle back at an edge by flipping `vit`
+    // after moving it, so reading it afterwards gives the wrong sign for that particle
+    const vit = parts.map((p) => num(p, 'vit'));
     mc.stepAnimation(); // frame 3: main()
-    parts.forEach((p, i) => expect(p._x).toBeCloseTo(x0[i] + num(p, 'vit')));
+    parts.forEach((p, i) => expect(p._x).toBeCloseTo(x0[i] + vit[i]));
     // Frame 4 goes back to 3: main() runs every frame, and init() never again
     for (let i = 0; i < 40; i++) mc.stepAnimation();
     expect(mc.children.filter((c) => c instanceof SwfMovieClip && c.zIndex >= 16384)).toHaveLength(

@@ -15,7 +15,7 @@ Phases 1, 2, 2B, 3 and 5 (except 5.4 and 5.5), Phase 2C (except 2C.9) and the UI
 7. 2C.6 is done (blend modes, timeline filters, glows, script functions, box blur). Left in 2C: 2C.9, the light hole, which needs a real Flash Player or a video. Worth a look in play: explosions, torches and portals now blend as the original (only the HUD and pause screen were compared in Ruffle).
 8. G.2 is done (one input per player: keys, controllers, locks and recordings).
 9. 4.0 is done: `GameSession` is the manager, and each game is a new `Adventure` (a `GameMode` subclass, `src/game/mode/`). A new mode needs its class, an entry in `GameSession.createMode` and its level sets in `MODE_SETS`.
-10. 4.6a is done: the Learning mode (`Tutorial`) starts from the menu and ends in the demo levels (`Shareware`), then back to the menu. Next: 4.5 Boss Rush, then the order in Phase 4 ("Order"). Found on the way: `tests/avm1.test.ts` "sphinx's particle emitter" fails about 1 run in 15, on the code before 4.6 too (the test's clip draws from an unseeded random; the failure is `expected 80 to be close to 78` at line 109).
+10. 4.6a is done: the Learning mode (`Tutorial`) starts from the menu and ends in the demo levels (`Shareware`), then back to the menu. Next: 4.5 Boss Rush, then the order in Phase 4 ("Order"). Found on the way and fixed: `tests/avm1.test.ts` "sphinx's particle emitter" failed about 1 run in 15. The test read each particle's speed after the move, but the clip's `main()` flips the speed of a particle that reaches an edge, after moving it; it now reads the speeds before.
 
 Working notes:
 
