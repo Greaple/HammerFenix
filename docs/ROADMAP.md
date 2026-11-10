@@ -13,7 +13,7 @@ Phases 1, 2, 3 and 5 and the UI batches are done. We are in Phase 2B. Order from
 5. 2C.3 (disguises, key E and controller Y), 2C.4 (world map, key C) and 2C.8 (`Data.mt` checked constant by constant) are done.
 6. 2C.5 (settings page: the gear on the mode menu) and 2C.7 (`Timer.tmod` for bullet time, clip steps before the logic, aqua and wind) are done.
 7. 2C.6 is done (blend modes, timeline filters, glows, script functions, box blur). Left in 2C: 2C.9, the light hole, which needs a real Flash Player or a video. Worth a look in play: explosions, torches and portals now blend as the original (only the HUD and pause screen were compared in Ruffle).
-8. G.2 (one input per player), then Phase 4 with co-op on controllers (G.3).
+8. G.2 is done (one input per player: keys, controllers, locks and recordings). Next: Phase 4, starting with 4.1 (Time Attack) and 4.2 (two-player co-op, with G.3).
 
 Working notes:
 
@@ -127,12 +127,12 @@ Port addition: the Flash game had the keyboard only. Controllers go through the 
 
 - [x] G.1 Solo controller (`src/engine/Gamepad.ts`, PORT_STATUS.md "Engine"). The screens show the buttons of the device used last (keyboard, controller or touch): the menu button, the pause screen, the Loader's start text, the help dialog and the touch buttons. In dialogs, A, B or Start close them. The right trigger also drops bombs. Button icons come from three Figma Community sheets (`assets-src/pad-icons/`). Not done: a give-up combination on the controller (Ctrl+Shift+K has none).
   - standard mapping (`Gamepad.mapping === 'standard'`): D-pad and left stick move (dead zone with some hysteresis), A or up jumps, B, X or R2 drops a bomb, down is down, Start pauses, Back or Select switches the music;
-  - the first controller is player 1; the others are ignored until G.2;
+  - the first controller is player 1; the next ones go to the next players (G.2);
   - the site screens (`Shell.ts`) and the loader's "click to continue" work with the D-pad, A (confirm) and B (back);
   - a short notice when a controller connects; unplugging it during a game pauses the game;
   - the help dialog shows the controller layout (FR/EN/ES in `PageText.ts`);
   - tests with a fake `navigator.getGamepads`; log the addition in PORT_STATUS.md "Engine".
-- [ ] G.2 One input per player, before Phase 4: `InputController` keeps one action mask per player and each `PlayerController` reads its own. Keyboard keys per player as the original's modes set them (`setKeys`, `setAlt`): MultiCoop player 1 on the arrows and Enter, player 2 on R, F, D, G and A; TimeAttackMulti and Soccer have their own (`TimeAttackMulti.mt`, `Soccer.mt`). Controllers are given to players in connection order. Recordings store one mask per player; old replays still play. Tested headless with two players.
+- [x] G.2 One input per player, before Phase 4: `InputController` keeps one action mask per player and each `PlayerController` reads its own. Keyboard keys per player as the original's modes set them (`setKeys`, `setAlt`): MultiCoop player 1 on the arrows and Enter, player 2 on R, F, D, G and A; TimeAttackMulti and Soccer have their own (`TimeAttackMulti.mt`, `Soccer.mt`). Controllers are given to players in connection order. Recordings store one mask per player; old replays still play. Tested headless with two players. Done: see PORT_STATUS.md "Engine" (G.2) and `tests/players.test.ts`. A letter key is the layout's letter, as in Flash, so the modes' AZERTY letters fall right on AZERTY keyboards. Left for Phase 4: the modes' own `setKeys` calls and the 2-player interface; for G.3, joining.
 - [ ] G.3 Co-op on controllers, with 4.2: when a 2-player mode starts, each controller or keyboard side presses a button to join (player 1, then player 2), shown in the 2-player interface; a controller unplugged during the game pauses it until it is back. The same for Time Attack multi (4.3) and Soccer (4.4).
 - [ ] G.4 Optional: remapping keys and buttons, saved in `localStorage`. Check first the SWF's unused key setup screen (`#910`).
 

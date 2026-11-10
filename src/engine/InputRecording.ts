@@ -15,9 +15,13 @@ export const ACTION_BITS: Record<ControlAction, number> = {
   sound: 1 << 10,
 };
 
+/** A run-length encoded list of input masks: `[mask, ticks]` pairs. */
+export type InputRuns = [number, number][];
+
 /**
  * A recorded game: where it starts, its seed, and the held actions of every logic tick.
- * `input` is run-length encoded as `[mask, ticks]` pairs.
+ * `input` is player 1's masks (with the game's own keys: pause, music...), run-length encoded as
+ * `[mask, ticks]` pairs.
  */
 export interface Replay {
   version: 1;
@@ -37,38 +41,59 @@ export interface Replay {
    */
   detail?: number;
   shake?: number;
-  input: [number, number][];
+  input: InputRuns;
+  /**
+   * The masks of players 2 and on, one list each, as long as `input` (G.2). Absent in a game
+   * with one player.
+   */
+  otherInputs?: InputRuns[];
 }
 
-/** Collects one input mask per logic tick. */
+/** Collects each player's input mask, every logic tick. */
 export class InputRecorder {
-  private readonly runs: [number, number][] = [];
+  /** The masks of each player, by pid. */
+  private readonly tracks: InputRuns[] = [];
+  private count = 0;
 
-  push(mask: number): void {
-    const last = this.runs[this.runs.length - 1];
-    if (last && last[0] === mask) last[1]++;
-    else this.runs.push([mask, 1]);
+  /**
+   * Adds a tick: each player's mask, by pid. A player who joins later had nothing held before;
+   * one who is gone holds nothing.
+   */
+  push(masks: readonly number[]): void {
+    while (this.tracks.length < masks.length) {
+      this.tracks.push(this.count > 0 ? [[0, this.count]] : []);
+    }
+    this.tracks.forEach((runs, pid) => {
+      const mask = masks[pid] ?? 0;
+      const last = runs[runs.length - 1];
+      if (last && last[0] === mask) last[1]++;
+      else runs.push([mask, 1]);
+    });
+    this.count++;
   }
 
   get ticks(): number {
-    return this.runs.reduce((n, [, count]) => n + count, 0);
+    return this.count;
   }
 
   toReplay(set: string, level: number, seed: number, families?: string, options?: string): Replay {
-    return {
+    const copy = (runs: InputRuns): InputRuns => runs.map(([m, n]) => [m, n]);
+    const replay: Replay = {
       version: 1,
       set,
       level,
       seed,
       families,
       options,
-      input: this.runs.map(([m, n]) => [m, n]),
+      input: copy(this.tracks[0] ?? []),
     };
+    if (this.tracks.length > 1) replay.otherInputs = this.tracks.slice(1).map(copy);
+    return replay;
   }
 }
 
-/** Plays a replay's input masks back, one per logic tick. */
-export class InputPlayer {
+/** Plays one player's masks back. */
+class Track {
   private run = 0;
   private used = 0;
 
@@ -78,11 +103,6 @@ export class InputPlayer {
     return this.run >= this.input.length;
   }
 
-  get ticks(): number {
-    return this.input.reduce((n, [, count]) => n + count, 0);
-  }
-
-  /** The next tick's mask, or 0 (nothing held) once the replay is over. */
   next(): number {
     if (this.done) return 0;
     const [mask, count] = this.input[this.run];
@@ -91,5 +111,31 @@ export class InputPlayer {
       this.used = 0;
     }
     return mask;
+  }
+}
+
+/** Plays a replay's input masks back, one per player each logic tick. */
+export class InputPlayer {
+  private readonly tracks: Track[];
+  readonly ticks: number;
+
+  /** `input` is player 1's masks, `otherInputs` the other players' (`Replay`). */
+  constructor(input: readonly [number, number][], otherInputs: readonly InputRuns[] = []) {
+    this.tracks = [input, ...otherInputs].map((runs) => new Track(runs));
+    this.ticks = input.reduce((n, [, count]) => n + count, 0);
+  }
+
+  /** The number of players the replay holds. */
+  get players(): number {
+    return this.tracks.length;
+  }
+
+  get done(): boolean {
+    return this.tracks[0].done;
+  }
+
+  /** The next tick's masks, by pid; 0 (nothing held) once the replay is over. */
+  next(): number[] {
+    return this.tracks.map((t) => t.next());
   }
 }

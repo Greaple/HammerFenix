@@ -1,9 +1,9 @@
 import type { ControlAction } from './Input';
 
 /**
- * Controllers (roadmap G.1). Port addition: the Flash game had the keyboard only.
+ * Controllers (roadmap G.1, G.2). Port addition: the Flash game had the keyboard only.
  *
- * Reads player 1's controller with the Gamepad API's standard mapping
+ * Reads the players' controllers with the Gamepad API's standard mapping
  * (`Gamepad.mapping === 'standard'`). A controller without it is read with the same button
  * numbers, which most of them follow.
  */
@@ -61,7 +61,7 @@ const ACTIVE_AXIS = 0.5;
 
 type Dir = 'left' | 'right' | 'up' | 'down';
 
-/** What one read of player 1's controller gives. */
+/** What one read of a controller gives. */
 export interface PadState {
   /** Game actions held. */
   readonly actions: Set<ControlAction>;
@@ -71,40 +71,23 @@ export interface PadState {
   readonly active: boolean;
 }
 
-const EMPTY: PadState = { actions: new Set(), menu: new Set(), active: false };
+export const EMPTY_PAD: PadState = { actions: new Set(), menu: new Set(), active: false };
 
-/**
- * Player 1's controller: the first one connected. The others are ignored (one input per
- * player is G.2). When it is unplugged, the next connected one takes over.
- */
-export class PadReader {
-  /** `Gamepad.index` of player 1's controller, or -1. */
-  private index = -1;
-  private padId = '';
+/** One controller, by its `Gamepad.index` and `id`, and the state of its left stick. */
+class Pad {
   private readonly stick = new Set<Dir>();
 
-  /** Player 1's controller was plugged in (or first seen). */
-  onConnect?: (id: string) => void;
-  /** Player 1's controller was unplugged. */
-  onDisconnect?: (id: string) => void;
+  constructor(
+    readonly index: number,
+    readonly id: string,
+  ) {}
 
-  get connected(): boolean {
-    return this.index >= 0;
+  /** Whether `pad` is this controller, still plugged in. */
+  is(pad: Gamepad | null | undefined): pad is Gamepad {
+    return !!pad && pad.connected && pad.index === this.index && pad.id === this.id;
   }
 
-  /** `Gamepad.id` of player 1's controller, or `''`. */
-  get id(): string {
-    return this.padId;
-  }
-
-  get layout(): PadLayout {
-    return padLayout(this.padId);
-  }
-
-  /** Reads player 1's controller now. */
-  read(): PadState {
-    const pad = this.find();
-    if (!pad) return EMPTY;
+  read(pad: Gamepad): PadState {
     const btn = (i: number) => pad.buttons[i]?.pressed === true;
     const s = this.readStick(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
 
@@ -138,31 +121,6 @@ export class PadReader {
     return { actions, menu, active };
   }
 
-  /** Player 1's controller, after noticing it was plugged in or unplugged. */
-  private find(): Gamepad | null {
-    const pads =
-      typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
-        ? navigator.getGamepads()
-        : [];
-    if (this.index >= 0) {
-      const pad = pads[this.index];
-      if (pad && pad.connected && pad.id === this.padId) return pad;
-      const id = this.padId;
-      this.index = -1;
-      this.padId = '';
-      this.stick.clear();
-      this.onDisconnect?.(id);
-    }
-    for (const pad of pads) {
-      if (!pad || !pad.connected) continue;
-      this.index = pad.index;
-      this.padId = pad.id;
-      this.onConnect?.(pad.id);
-      return pad;
-    }
-    return null;
-  }
-
   private readStick(x: number, y: number): Set<Dir> {
     const set = (d: Dir, v: number, t: { PRESS: number; RELEASE: number }) => {
       if (v > t.PRESS) this.stick.add(d);
@@ -173,5 +131,88 @@ export class PadReader {
     set('up', -y, STICK_Y);
     set('down', y, STICK_Y);
     return this.stick;
+  }
+}
+
+/**
+ * The controllers, given to the players in connection order (G.2): the first one plugged in is
+ * player 1's, the next player 2's. Controllers beyond the number of players wait, and take the
+ * place of a player's controller that is unplugged (so in a solo game the next one takes over).
+ * A player keeps their place when another player's controller is unplugged, and a controller
+ * plugged in then takes the free place.
+ */
+export class PadManager {
+  /** The controller of each player, by pid. */
+  private readonly slots: (Pad | null)[] = [null];
+  /** Controllers with no player, in connection order. */
+  private waiting: Pad[] = [];
+
+  /** A controller was given to player `pid` (plugged in, or taking a free place). */
+  onConnect?: (id: string, pid: number) => void;
+  /** The controller of player `pid` was unplugged. */
+  onDisconnect?: (id: string, pid: number) => void;
+
+  get playerCount(): number {
+    return this.slots.length;
+  }
+
+  /**
+   * Sets the number of players. The controllers of the players gone wait again, first in line;
+   * new players take the waiting ones.
+   */
+  setPlayerCount(n: number): void {
+    n = Math.max(1, n);
+    const freed = this.slots.splice(n).filter((p): p is Pad => p !== null);
+    while (this.slots.length < n) this.slots.push(null);
+    this.waiting.unshift(...freed);
+    this.fill();
+  }
+
+  /** Whether a player has a controller. */
+  get connected(): boolean {
+    return this.slots.some((p) => p !== null);
+  }
+
+  /** `Gamepad.id` of player `pid`'s controller, or `''`. */
+  idOf(pid: number): string {
+    return this.slots[pid]?.id ?? '';
+  }
+
+  /** Reads every player's controller now (`EMPTY_PAD` for a player without one). */
+  read(): PadState[] {
+    const pads =
+      typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
+        ? navigator.getGamepads()
+        : [];
+    this.update(pads);
+    return this.slots.map((p) => (p ? p.read(pads[p.index]!) : EMPTY_PAD));
+  }
+
+  /** Notices the controllers unplugged and plugged in since the last read. */
+  private update(pads: readonly (Gamepad | null)[]): void {
+    for (let pid = 0; pid < this.slots.length; pid++) {
+      const p = this.slots[pid];
+      if (p && !p.is(pads[p.index])) {
+        this.slots[pid] = null;
+        this.onDisconnect?.(p.id, pid);
+      }
+    }
+    this.waiting = this.waiting.filter((p) => p.is(pads[p.index]));
+    const known = [...this.slots, ...this.waiting];
+    for (const pad of pads) {
+      if (!pad || !pad.connected || known.some((p) => p?.is(pad))) continue;
+      this.waiting.push(new Pad(pad.index, pad.id));
+    }
+    this.fill();
+  }
+
+  /** Gives the waiting controllers to the players without one, in order. */
+  private fill(): void {
+    for (let pid = 0; pid < this.slots.length && this.waiting.length > 0; pid++) {
+      if (this.slots[pid]) continue;
+      const p = this.waiting.shift()!;
+      this.slots[pid] = p;
+      this.onConnect?.(p.id, pid);
+    }
   }
 }

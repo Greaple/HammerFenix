@@ -1,4 +1,4 @@
-import { type MenuAction, PadReader, type PadLayout } from './Gamepad';
+import { EMPTY_PAD, type MenuAction, PadManager, type PadLayout, padLayout } from './Gamepad';
 import { ACTION_BITS, type InputPlayer, type InputRecorder } from './InputRecording';
 
 export type { MenuAction } from './Gamepad';
@@ -9,48 +9,67 @@ export type { MenuAction } from './Gamepad';
  */
 export type InputDevice = 'keyboard' | 'gamepad' | 'touch';
 
-/**
- * `music` is M, `suicide` Ctrl+Shift+K, `disguise` E and `map` C, the keys
- * `GameMode.getControls` reads besides the controls (the music switch, giving up the game, the
- * next disguise, the world map). The original's disguise key is D, which moves right here (WASD
- * and ZQSD). `sound` (O) opens the sound settings from the pause, a port addition.
- */
-export type ControlAction =
-  | 'left'
-  | 'right'
-  | 'jump'
-  | 'down'
-  | 'attack'
-  | 'pause'
-  | 'music'
-  | 'suicide'
-  | 'disguise'
-  | 'map'
-  | 'sound';
+/** A player's moves (`PlayerController`): each player has their own. */
+export type PlayerAction = 'left' | 'right' | 'jump' | 'down' | 'attack';
 
-const KEY_MAP: Record<string, ControlAction> = {
-  ArrowLeft: 'left',
-  KeyA: 'left',
-  KeyQ: 'left', // AZERTY friendly!
-  ArrowRight: 'right',
-  KeyD: 'right',
-  ArrowUp: 'jump',
-  KeyW: 'jump',
-  KeyZ: 'jump', // AZERTY friendly!
-  ArrowDown: 'down',
-  KeyS: 'down',
-  Space: 'attack',
-  ControlLeft: 'attack',
-  ControlRight: 'attack',
-  KeyX: 'attack',
-  KeyJ: 'attack',
-  KeyP: 'pause',
-  Escape: 'pause',
-  KeyM: 'music',
-  KeyE: 'disguise',
-  KeyC: 'map',
-  KeyO: 'sound',
+/**
+ * The keys `GameMode.getControls` reads besides the players' moves, held in player 1's mask:
+ * `music` is M, `suicide` Ctrl+Shift+K, `disguise` E and `map` C (the music switch, giving up
+ * the game, the next disguise, the world map). The original's disguise key is D, which moves
+ * right here (WASD and ZQSD). `sound` (O) opens the sound settings from the pause, a port
+ * addition.
+ */
+export type GameAction = 'pause' | 'music' | 'suicide' | 'disguise' | 'map' | 'sound';
+
+export type ControlAction = PlayerAction | GameAction;
+
+export const PLAYER_ACTIONS: readonly PlayerAction[] = ['left', 'right', 'jump', 'down', 'attack'];
+
+function isPlayerAction(a: ControlAction): a is PlayerAction {
+  return (PLAYER_ACTIONS as readonly string[]).includes(a);
+}
+
+/** `Key.*`: the Flash key codes the original names. */
+export const Key = {
+  ENTER: 13,
+  SHIFT: 16,
+  CONTROL: 17,
+  ESCAPE: 27,
+  SPACE: 32,
+  LEFT: 37,
+  UP: 38,
+  RIGHT: 39,
+  DOWN: 40,
+} as const;
+
+/** The keys of each of a player's moves, as Flash key codes. */
+export type PlayerKeys = Record<PlayerAction, readonly number[]>;
+
+/** Flash key code of a letter. */
+const code = (letter: string) => letter.charCodeAt(0);
+
+/**
+ * `PlayerController`'s own keys, which every player has until their mode calls `setKeys`: the
+ * arrows, Space and Ctrl (`setAlt`) for the bomb. Port addition: W A S D (Z Q S D on AZERTY)
+ * move too, and X or J drops a bomb.
+ */
+export const DEFAULT_KEYS: PlayerKeys = {
+  jump: [Key.UP, code('W'), code('Z')],
+  down: [Key.DOWN, code('S')],
+  left: [Key.LEFT, code('A'), code('Q')],
+  right: [Key.RIGHT, code('D')],
+  attack: [Key.SPACE, Key.CONTROL, code('X'), code('J')],
 };
+
+/** The game's keys (P or Escape pauses). Ctrl+Shift+K gives up the game (`GameMode.main`). */
+const GAME_KEYS: [GameAction, readonly number[]][] = [
+  ['pause', [code('P'), Key.ESCAPE]],
+  ['music', [code('M')]],
+  ['disguise', [code('E')]],
+  ['map', [code('C')]],
+  ['sound', [code('O')]],
+];
+const SUICIDE_KEYS = [Key.CONTROL, Key.SHIFT, code('K')];
 
 /** Flash key codes (`Key.*`) of the keys that are not a letter or a digit. */
 const FLASH_KEY_CODES: Record<string, number> = {
@@ -66,6 +85,10 @@ const FLASH_KEY_CODES: Record<string, number> = {
   Escape: 27,
   Space: 32,
   Home: 36,
+  ArrowLeft: 37,
+  ArrowUp: 38,
+  ArrowRight: 39,
+  ArrowDown: 40,
   NumpadMultiply: 106,
   NumpadAdd: 107,
   NumpadSubtract: 109,
@@ -73,10 +96,15 @@ const FLASH_KEY_CODES: Record<string, number> = {
 };
 
 /**
- * The Flash key code (`Key.isDown`'s argument) of a `KeyboardEvent.code`. Port addition: the
- * top row digits count as the numpad's (96 to 105), since laptops have no numpad.
+ * The Flash key code (`Key.isDown`'s argument) of a key, from its `KeyboardEvent.code` and
+ * `key`. A letter is the letter the keyboard layout gives (`key`), as Flash's key codes were:
+ * the original's modes chose their letters for AZERTY (Z Q S D). A letter key that gives no
+ * Latin letter counts by its place on a QWERTY keyboard. Port addition: the top row digits count
+ * as the numpad's (96 to 105), since laptops have no numpad.
  */
-export function flashKeyCode(code: string): number | undefined {
+export function flashKeyCode(code: string, key?: string): number | undefined {
+  if (key && /^[a-z]$/i.test(key) && /^Key[A-Z]$/.test(code))
+    return key.toUpperCase().charCodeAt(0);
   if (/^Key[A-Z]$/.test(code)) return code.charCodeAt(3);
   if (/^(Numpad|Digit)\d$/.test(code)) return 96 + Number(code.slice(-1));
   return FLASH_KEY_CODES[code];
@@ -84,12 +112,6 @@ export function flashKeyCode(code: string): number | undefined {
 
 /** Keys the browser would act on (Home scrolls, Alt opens the menu) while the dev keys are on. */
 const DEV_PREVENT = new Set([18, 36]);
-
-/** The action of key event `e`: Ctrl+Shift+K gives up the game (`GameMode.main`). */
-function actionOf(e: KeyboardEvent): ControlAction | undefined {
-  if (e.code === 'KeyK') return e.ctrlKey && e.shiftKey ? 'suicide' : undefined;
-  return KEY_MAP[e.code];
-}
 
 /** The keyboard's and touch buttons' menu moves: the arrows, the bomb key confirms, pause goes back. */
 const MENU_OF: [MenuAction, ControlAction][] = [
@@ -108,24 +130,31 @@ function startDevice(): InputDevice {
 }
 
 /**
- * Unified input controller combining Keyboard (QWERTY + AZERTY + Arrows),
- * player 1's controller (`Gamepad.ts`), and on-screen touch controls.
+ * The input of every player: the keyboard (each player's keys, `PlayerKeys`), the controllers
+ * (`Gamepad.ts`, one per player in connection order) and player 1's on-screen touch buttons.
+ *
+ * Input is sampled once per logic tick by `poll()` into one action mask per player (G.2), so a
+ * tick sees one consistent state. Those masks can be recorded, or replaced by a replay's. The
+ * game's own keys (pause, music...) go in player 1's mask, from every device.
  *
  * Implements Hammerfest's lockable edge-triggered presses (`consumePress` for menus and game
- * keys, `keyIsDown` for the player's controller) alongside continuous `isDown(action)` (used
+ * keys, `keyIsDown` for each player's controller) alongside continuous `isDown(action)` (used
  * for pogo-jumping on `jump`).
- *
- * Input is sampled once per logic tick by `poll()`, so a tick sees one consistent state. That
- * sample can be recorded, or replaced by a replay's.
  */
 export class InputController {
-  private readonly keyHeld = new Set<ControlAction>();
+  /** Keys held now: the Flash key code of each `KeyboardEvent.code` held. */
+  private readonly keysDown = new Map<string, number>();
+  /** Flash key codes held now, and in this tick's sample (for the dev keys). */
+  private codesHeld = new Set<number>();
+  private codesSampled = new Set<number>();
   private readonly touchHeld = new Set<ControlAction>();
-  private padHeld = new Set<ControlAction>();
+  private readonly pads = new PadManager();
+  /** `Gamepad.id` of the controller used last, for its button names. */
+  private lastPadId = '';
+  /** Menu moves of the players' controllers at the last poll. */
   private padMenu = new Set<MenuAction>();
-  private readonly pad = new PadReader();
   /**
-   * Set while a dialog is open, and after until the controller is let go: its buttons then
+   * Set while a dialog is open, and after until the controllers are let go: their buttons then
    * act on the dialog (`onDialogPad`), not on the game or the menu under it.
    */
   private padBlocked = false;
@@ -134,16 +163,15 @@ export class InputController {
   private menuSampled = new Set<MenuAction>();
   private readonly menuLocked = new Set<MenuAction>();
   private readonly locked = new Set<ControlAction>();
+  /** The keys of each player, by pid (`PlayerController.setKeys`). */
+  private keys: PlayerKeys[] = [DEFAULT_KEYS];
   /**
-   * The player's key locks (`PlayerController.keyLocks`), apart from the menus' and the game's:
-   * released only when the controller runs (`releaseControllerLocks`).
+   * Each player's key locks (`PlayerController.keyLocks`), apart from the menus' and the
+   * game's: released only when that player's controller runs (`releaseControllerLocks`).
    */
-  private readonly ctrlLocked = new Set<ControlAction>();
-  /** Flash key codes held now, and in this tick's sample (for the dev keys). */
-  private readonly codesHeld = new Set<number>();
-  private codesSampled = new Set<number>();
-  /** Actions held this tick, as `ACTION_BITS`. */
-  private sampled = 0;
+  private ctrlLocked: Set<PlayerAction>[] = [new Set()];
+  /** Actions held this tick, as `ACTION_BITS`, by pid. */
+  private masks: number[] = [0];
   private recorder: InputRecorder | null = null;
   private player: InputPlayer | null = null;
 
@@ -160,27 +188,65 @@ export class InputController {
   /** The last device that was not a controller, for when it is unplugged. */
   private otherDevice: InputDevice = this.device;
   onDeviceChange?: (device: InputDevice) => void;
-  /** Player 1's controller was plugged in, or unplugged. */
-  onPadConnect?: (id: string) => void;
-  onPadDisconnect?: (id: string) => void;
+  /** A player's controller was plugged in (or given to them), or unplugged. */
+  onPadConnect?: (id: string, pid: number) => void;
+  onPadDisconnect?: (id: string, pid: number) => void;
   /** A controller press while a dialog is open. */
   onDialogPad?: (action: MenuAction) => void;
 
   constructor() {
-    this.pad.onConnect = (id) => this.onPadConnect?.(id);
-    this.pad.onDisconnect = (id) => {
-      if (this.device === 'gamepad') this.setDevice(this.otherDevice);
-      this.onPadDisconnect?.(id);
+    this.pads.onConnect = (id, pid) => this.onPadConnect?.(id, pid);
+    this.pads.onDisconnect = (id, pid) => {
+      if (this.device === 'gamepad' && !this.pads.connected) this.setDevice(this.otherDevice);
+      this.onPadDisconnect?.(id, pid);
     };
   }
 
-  /** How player 1's controller names its buttons. */
+  /** How the controller used last names its buttons (else player 1's). */
   get padLayout(): PadLayout {
-    return this.pad.layout;
+    const ids = Array.from({ length: this.playerCount }, (_, pid) => this.pads.idOf(pid));
+    return padLayout(ids.includes(this.lastPadId) ? this.lastPadId : ids[0]);
   }
 
+  /** Whether a player has a controller. */
   get padConnected(): boolean {
-    return this.pad.connected;
+    return this.pads.connected;
+  }
+
+  /** The number of players: each has their own mask, keys and controller. */
+  get playerCount(): number {
+    return this.masks.length;
+  }
+
+  /**
+   * Sets the number of players (`GameMode.insertPlayer`). New players have the default keys
+   * and the next controllers.
+   */
+  setPlayerCount(n: number): void {
+    n = Math.max(1, n);
+    const fit = <T>(list: T[], make: () => T) => {
+      list.length = Math.min(list.length, n);
+      while (list.length < n) list.push(make());
+    };
+    fit(this.keys, () => DEFAULT_KEYS);
+    fit(this.ctrlLocked, () => new Set());
+    fit(this.masks, () => 0);
+    this.pads.setPlayerCount(n);
+  }
+
+  /** Player `pid`'s keys (`PlayerController.setKeys`, `setAlt`). */
+  setPlayerKeys(pid: number, keys: PlayerKeys): void {
+    if (pid >= this.playerCount) this.setPlayerCount(pid + 1);
+    this.keys[pid] = keys;
+  }
+
+  playerKeys(pid: number): PlayerKeys {
+    return this.keys[pid] ?? DEFAULT_KEYS;
+  }
+
+  /** Every player back on the default keys, for a new game. */
+  resetKeys(): void {
+    this.keys = this.keys.map(() => DEFAULT_KEYS);
   }
 
   setDevice(device: InputDevice): void {
@@ -206,6 +272,16 @@ export class InputController {
 
   private pointerDevice: InputDevice | null = null;
 
+  /** Whether the game reads key `kc` (the browser must not act on it too). */
+  private isGameKey(kc: number, e: KeyboardEvent): boolean {
+    const all = [DEFAULT_KEYS, ...this.keys];
+    return (
+      (kc === code('K') && e.ctrlKey && e.shiftKey) ||
+      all.some((k) => PLAYER_ACTIONS.some((a) => k[a].includes(kc))) ||
+      GAME_KEYS.some(([a, codes]) => a !== 'pause' && codes.includes(kc))
+    );
+  }
+
   private readonly handleKeyDown = (e: KeyboardEvent) => {
     this.setDevice('keyboard');
     const tag = (e.target as HTMLElement | null)?.tagName;
@@ -213,37 +289,28 @@ export class InputController {
     if (document.querySelector('dialog[open]')) return;
 
     this.onAnyGesture?.();
-    const kc = flashKeyCode(e.code);
-    if (kc !== undefined) {
-      this.codesHeld.add(kc);
-      // Ctrl and a digit is the dev level jump, not the browser's tab switch
-      if (this.devKeys && (DEV_PREVENT.has(kc) || (e.ctrlKey && kc >= 96 && kc <= 105))) {
-        e.preventDefault();
-      }
-    }
-    const act = actionOf(e);
-    if (!act) return;
-    if (act !== 'pause') e.preventDefault();
-    this.keyHeld.add(act);
+    // A key keeps the code it was pressed with, even if Shift or Alt changes its letter
+    const kc = this.keysDown.get(e.code) ?? flashKeyCode(e.code, e.key);
+    if (kc === undefined) return;
+    this.keysDown.set(e.code, kc);
+    this.codesHeld = new Set(this.keysDown.values());
+    // Ctrl and a digit is the dev level jump, not the browser's tab switch
+    const dev = this.devKeys && (DEV_PREVENT.has(kc) || (e.ctrlKey && kc >= 96 && kc <= 105));
+    if (dev || this.isGameKey(kc, e)) e.preventDefault();
   };
 
   private readonly handleKeyUp = (e: KeyboardEvent) => {
-    const kc = flashKeyCode(e.code);
-    if (kc !== undefined) this.codesHeld.delete(kc);
-    if (e.code === 'KeyK') this.keyHeld.delete('suicide');
-    const act = KEY_MAP[e.code];
-    if (!act) return;
-    this.keyHeld.delete(act);
+    this.keysDown.delete(e.code);
+    this.codesHeld = new Set(this.keysDown.values());
   };
 
   private readonly handleBlur = () => {
-    this.codesHeld.clear();
-    this.keyHeld.clear();
+    this.keysDown.clear();
+    this.codesHeld = new Set();
     this.touchHeld.clear();
-    this.padHeld.clear();
     this.locked.clear();
     this.menuLocked.clear();
-    this.ctrlLocked.clear();
+    for (const l of this.ctrlLocked) l.clear();
   };
 
   attach(): void {
@@ -266,10 +333,12 @@ export class InputController {
 
   /** Holds or releases a key by its Flash key code, as the keyboard does (for tests). */
   setKeyCode(code: number, pressed: boolean): void {
-    if (pressed) this.codesHeld.add(code);
-    else this.codesHeld.delete(code);
+    if (pressed) this.keysDown.set(`#${code}`, code);
+    else this.keysDown.delete(`#${code}`);
+    this.codesHeld = new Set(this.keysDown.values());
   }
 
+  /** Player 1's on-screen buttons. */
   setTouch(action: ControlAction, pressed: boolean): void {
     this.onAnyGesture?.();
     if (pressed) {
@@ -280,27 +349,44 @@ export class InputController {
     }
   }
 
-  /** Polls player 1's controller and updates lock states once per simulation tick. */
+  /** Samples every device into the players' masks, and updates the locks, once per tick. */
   poll(): void {
-    this.pollPad();
+    const pads = this.pollPads();
+    const held = this.codesHeld;
+    const anyHeld = (codes: readonly number[]) => codes.some((c) => held.has(c));
 
-    let mask = 0;
-    for (const [act, bit] of Object.entries(ACTION_BITS) as [ControlAction, number][]) {
-      if (this.keyHeld.has(act) || this.touchHeld.has(act) || this.padHeld.has(act)) mask |= bit;
+    let masks = this.keys.map((keys, pid) => {
+      let mask = 0;
+      for (const a of PLAYER_ACTIONS) {
+        if (anyHeld(keys[a]) || pads[pid].actions.has(a)) mask |= ACTION_BITS[a];
+      }
+      return mask;
+    });
+    // The game's keys, from every device, and player 1's touch buttons
+    let game = 0;
+    for (const [a, codes] of GAME_KEYS) if (anyHeld(codes)) game |= ACTION_BITS[a];
+    if (SUICIDE_KEYS.every((c) => held.has(c))) game |= ACTION_BITS.suicide;
+    for (const a of this.touchHeld) game |= ACTION_BITS[a];
+    for (const pad of pads) {
+      for (const a of pad.actions) if (!isPlayerAction(a)) game |= ACTION_BITS[a];
     }
+    masks[0] |= game;
+
     if (this.player) {
-      mask = this.player.next();
+      const replayed = this.player.next();
+      masks = masks.map((_, pid) => replayed[pid] ?? 0);
       if (this.player.done) this.player = null; // replay over: back to live input
     }
-    this.sampled = mask;
-    this.recorder?.push(mask);
+    this.masks = masks;
+    this.recorder?.push(masks);
     this.codesSampled =
       this.devKeys && !this.recorder && !this.player ? new Set(this.codesHeld) : new Set();
 
-    // Menu moves: live input, never a replay's
+    // Menu moves: live input, never a replay's. The keyboard's are the default keys.
     this.menuSampled = new Set(this.padMenu);
     for (const [m, act] of MENU_OF) {
-      if (this.keyHeld.has(act) || this.touchHeld.has(act)) this.menuSampled.add(m);
+      const codes = isPlayerAction(act) ? DEFAULT_KEYS[act] : GAME_KEYS[0][1];
+      if (anyHeld(codes) || this.touchHeld.has(act)) this.menuSampled.add(m);
     }
     for (const m of [...this.menuLocked]) {
       if (!this.menuSampled.has(m)) this.menuLocked.delete(m);
@@ -314,31 +400,41 @@ export class InputController {
   }
 
   /**
-   * Reads player 1's controller into `padHeld` and `padMenu`. While a dialog is open its
-   * presses go to `onDialogPad` instead, and the game and menus see nothing until it is let
-   * go, so the press that closed the dialog does not act again under it.
+   * Reads the players' controllers. While a dialog is open their presses go to `onDialogPad`
+   * instead, and the game and menus see nothing until they are let go, so the press that
+   * closed the dialog does not act again under it.
    */
-  private pollPad(): void {
-    const state = this.pad.read();
-    if (state.active) this.setDevice('gamepad');
+  private pollPads() {
+    let states = this.pads.read();
+    const active = states.some((s) => s.active);
+    states.forEach((s, pid) => {
+      if (s.active) this.lastPadId = this.pads.idOf(pid);
+    });
+    if (active) this.setDevice('gamepad');
+    const menu = new Set(states.flatMap((s) => [...s.menu]));
     const dialogOpen =
       typeof document !== 'undefined' && document.querySelector('dialog[open]') !== null;
     if (dialogOpen) {
       if (this.padBlocked) {
-        for (const m of state.menu) if (!this.padDialogHeld.has(m)) this.onDialogPad?.(m);
+        for (const m of menu) if (!this.padDialogHeld.has(m)) this.onDialogPad?.(m);
       }
       this.padBlocked = true;
-      this.padDialogHeld = state.menu;
-    } else if (this.padBlocked && !state.active) {
+      this.padDialogHeld = menu;
+    } else if (this.padBlocked && !active) {
       this.padBlocked = false;
     }
-    const usable = !this.padBlocked;
-    this.padHeld = usable ? state.actions : new Set();
-    this.padMenu = usable ? state.menu : new Set();
+    if (this.padBlocked) states = states.map(() => EMPTY_PAD);
+    this.padMenu = this.padBlocked ? new Set() : menu;
+    return states;
   }
 
-  isDown(action: ControlAction): boolean {
-    return (this.sampled & ACTION_BITS[action]) !== 0;
+  /**
+   * Whether `action` is held at this tick's sample: by player `pid` for a move, in player 1's
+   * mask for the game's keys.
+   */
+  isDown(action: ControlAction, pid = 0): boolean {
+    const mask = isPlayerAction(action) ? (this.masks[pid] ?? 0) : this.masks[0];
+    return (mask & ACTION_BITS[action]) !== 0;
   }
 
   /**
@@ -376,15 +472,15 @@ export class InputController {
 
   /** Forgets the current sample and key locks, so a new game starts from a clean input state. */
   resetState(): void {
-    this.sampled = 0;
+    this.masks = this.masks.map(() => 0);
     this.locked.clear();
     this.menuLocked.clear();
-    this.ctrlLocked.clear();
+    for (const l of this.ctrlLocked) l.clear();
   }
 
   /**
    * Edge-triggered press for the menus and the game's own keys (`GameMode.keyLock`): its lock
-   * is released on the first poll the action is up. The player uses `keyIsDown`.
+   * is released on the first poll the action is up. The players use `keyIsDown`.
    */
   consumePress(action: ControlAction): boolean {
     if (this.isDown(action) && !this.locked.has(action)) {
@@ -410,7 +506,7 @@ export class InputController {
 
   /**
    * Edge-triggered menu move (the site screens, the loader): the keyboard's arrows, bomb key
-   * (confirm) and pause key (back), or the controller's D-pad and stick, A or Start (confirm)
+   * (confirm) and pause key (back), or the controllers' D-pad and stick, A or Start (confirm)
    * and B (back). Locked until released, apart from the game's actions.
    */
   consumeMenu(action: MenuAction): boolean {
@@ -421,24 +517,27 @@ export class InputController {
     return false;
   }
 
-  /** `PlayerController.keyIsDown`: held and not locked by the controller; locks it. */
-  keyIsDown(action: ControlAction): boolean {
-    if (this.isDown(action) && !this.ctrlLocked.has(action)) {
-      this.ctrlLocked.add(action);
+  /** `PlayerController.keyIsDown`: held by player `pid` and not locked by them; locks it. */
+  keyIsDown(action: PlayerAction, pid = 0): boolean {
+    const locks = this.ctrlLocked[pid];
+    if (this.isDown(action, pid) && locks && !locks.has(action)) {
+      locks.add(action);
       return true;
     }
     return false;
   }
 
   /** `PlayerController.lockKey` */
-  lockKey(action: ControlAction): void {
-    this.ctrlLocked.add(action);
+  lockKey(action: PlayerAction, pid = 0): void {
+    this.ctrlLocked[pid]?.add(action);
   }
 
-  /** The start of `PlayerController.getControls`: unlocks the keys no longer held. */
-  releaseControllerLocks(): void {
-    for (const act of [...this.ctrlLocked]) {
-      if (!this.isDown(act)) this.ctrlLocked.delete(act);
+  /** The start of `PlayerController.getControls`: unlocks player `pid`'s keys no longer held. */
+  releaseControllerLocks(pid = 0): void {
+    const locks = this.ctrlLocked[pid];
+    if (!locks) return;
+    for (const act of [...locks]) {
+      if (!this.isDown(act, pid)) locks.delete(act);
     }
   }
 }

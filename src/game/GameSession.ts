@@ -526,18 +526,31 @@ export class GameSession implements IGameContext {
     this.world.goto(startLevelId);
     this.world.fl_entered = true;
     this.onWorldRead();
-    // insertPlayer: attached hidden; onLevelReady shows it
-    this.player = PlayerEntity.attach(
-      this,
-      BaseEntity.x_ctr(this.world.current.playerX),
-      BaseEntity.y_ctr(this.world.current.playerY),
-    );
-    this.player.hide();
+    // Every player back on `PlayerController`'s own keys
+    this.input.resetKeys();
+    // Attached hidden; onLevelReady shows it
+    this.player = this.insertPlayer(this.world.current.playerX, this.world.current.playerY);
     // `GameInterface.initSingle` reads the new player's score and lives
     this.hud.setScore(this.player.score, true);
     this.hud.setLives(this.player.lives);
     this.hud.clearExtends();
     // The first level shows once its IA map is parsed (updateWorld), without a scroll
+  }
+
+  /**
+   * `GameMode.insertPlayer`: a new player at case (`cx`, `cy`), hidden, numbered after the
+   * players alive. The input then reads one action mask per player (G.2).
+   */
+  insertPlayer(cx: number, cy: number): PlayerEntity {
+    let pid = 0;
+    for (const p of this.getList(Data.PLAYER)) {
+      if (!p.fl_destroy) pid++;
+    }
+    const p = PlayerEntity.attach(this, BaseEntity.x_ctr(cx), BaseEntity.y_ctr(cy));
+    p.hide();
+    p.pid = pid;
+    this.input.setPlayerCount(pid + 1);
+    return p;
   }
 
   /**
@@ -2899,7 +2912,7 @@ export class GameSession implements IGameContext {
       shake: replay.shake ?? 1,
     });
     this.initGame(replay.level, replay.seed);
-    const player = new InputPlayer(replay.input);
+    const player = new InputPlayer(replay.input, replay.otherInputs);
     this.input.startReplay(player);
     return player;
   }

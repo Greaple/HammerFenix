@@ -42,9 +42,9 @@ function bot(seed: number, ticks: number): [number, number][] {
       r -= w;
     }
     const hold = 3 + rand.random(30);
-    for (let i = 0; i < hold && rec.ticks < ticks; i++) rec.push(mask);
+    for (let i = 0; i < hold && rec.ticks < ticks; i++) rec.push([mask]);
     // Release between presses, so attack and jump trigger again
-    for (let i = 0; i < 2 && rec.ticks < ticks; i++) rec.push(0);
+    for (let i = 0; i < 2 && rec.ticks < ticks; i++) rec.push([0]);
   }
   return rec.toReplay('adventure', 0, 0).input;
 }

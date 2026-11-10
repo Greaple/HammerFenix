@@ -45,7 +45,8 @@ describe('flashKeyCode', () => {
     expect(flashKeyCode('Digit7')).toBe(103); // laptops: the top row stands for the numpad
     expect(flashKeyCode('ShiftRight')).toBe(16);
     expect(flashKeyCode('NumpadDivide')).toBe(111);
-    expect(flashKeyCode('ArrowLeft')).toBeUndefined();
+    expect(flashKeyCode('ArrowLeft')).toBe(37);
+    expect(flashKeyCode('F1')).toBeUndefined();
   });
 });
 

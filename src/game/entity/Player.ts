@@ -1,3 +1,4 @@
+import { Key } from '../../engine/Input';
 import { Timer } from '../../engine/Timer';
 import type { SwfMovieClip } from '../../engine/swf/SwfMovieClip';
 import { type AnimDef, Data } from '../Data';
@@ -29,11 +30,70 @@ import { Log } from '../Log';
 import { ArrowSupa, BallSupa, BubbleSupa, IceMeteorSupa, SmokeSupa, TonsSupa } from './Supa';
 
 /**
+ * The keys of `entity.PlayerController` (`class/hammer/entity/PlayerController.mt`): a mode
+ * gives each player their keyboard keys with `setKeys` and `setAlt` (`MultiCoop.initGame`).
+ * `InputController` reads them into that player's action mask (G.2); the rest of the controller
+ * (`getControls`) is `PlayerEntity.updateControls`.
+ *
+ * The original reads a key's alternative (`alts`) only through `keyIsDown`; here it counts
+ * everywhere. Only the bomb key has one, and the bomb is only read through `keyIsDown`.
+ */
+export class PlayerController {
+  jump: number;
+  down: number;
+  left: number;
+  right: number;
+  attack: number;
+  readonly alts: number[] = [];
+
+  constructor(private readonly player: PlayerEntity) {
+    // Kept here only: the player has no pid yet (`insertPlayer` gives it), and the input starts
+    // every player on these keys (`DEFAULT_KEYS`, with the port's W A S D)
+    this.jump = Key.UP;
+    this.down = Key.DOWN;
+    this.left = Key.LEFT;
+    this.right = Key.RIGHT;
+    this.attack = Key.SPACE;
+    this.alts[this.attack] = Key.CONTROL;
+  }
+
+  /** `setKeys`: the player's keys, as Flash key codes. */
+  setKeys(j: number, d: number, l: number, r: number, a: number): void {
+    this.jump = j;
+    this.down = d;
+    this.left = l;
+    this.right = r;
+    this.attack = a;
+    this.apply();
+  }
+
+  /** `setAlt`: a second key for key `id`. */
+  setAlt(id: number, idAlt: number): void {
+    this.alts[id] = idAlt;
+    this.apply();
+  }
+
+  private apply(): void {
+    const keys = (id: number) => (this.alts[id] === undefined ? [id] : [id, this.alts[id]]);
+    this.player.game.input.setPlayerKeys(this.player.pid, {
+      jump: keys(this.jump),
+      down: keys(this.down),
+      left: keys(this.left),
+      right: keys(this.right),
+      attack: keys(this.attack),
+    });
+  }
+}
+
+/**
  * Port of `entity.Player` + `entity.PlayerController` + `SpecialManager`
  * (`class/hammer/entity/Player.mt`, `PlayerController.mt`, `SpecialManager.mt`).
  */
 export class PlayerEntity extends PhysicsEntity {
-  readonly pid = 0;
+  /** Player 1 is 0: set by `GameSession.insertPlayer`. */
+  pid = 0;
+  /** The player's keys (`ctrl`). */
+  readonly ctrl: PlayerController = new PlayerController(this);
 
   baseWalkAnim: AnimDef = Data.ANIM_PLAYER_WALK;
   baseStopAnim: AnimDef = Data.ANIM_PLAYER_STOP;
@@ -1010,16 +1070,17 @@ export class PlayerEntity extends PhysicsEntity {
 
   private updateControls(): void {
     const input = this.game.input;
+    const pid = this.pid;
 
     // Last keys held: their locks go only here, so not while the controls are locked
-    input.releaseControllerLocks();
+    input.releaseControllerLocks(pid);
 
     if (this.fl_stable) {
       this.waterJump = 3;
     }
 
-    const leftDown = input.isDown('left');
-    const rightDown = input.isDown('right');
+    const leftDown = input.isDown('left', pid);
+    const rightDown = input.isDown('right', pid);
 
     if (leftDown) {
       if (this.game.fl_ice || this.game.fl_aqua) {
@@ -1063,13 +1124,18 @@ export class PlayerEntity extends PhysicsEntity {
     }
 
     // Water air-jumps
-    if (this.game.fl_aqua && this.waterJump > 0 && !this.fl_stable && input.keyIsDown('jump')) {
+    if (
+      this.game.fl_aqua &&
+      this.waterJump > 0 &&
+      !this.fl_stable &&
+      input.keyIsDown('jump', pid)
+    ) {
       this.airJump();
       this.waterJump--;
     }
 
     // Standard / continuous pogo jump on ground
-    if (this.fl_stable && input.isDown('jump')) {
+    if (this.fl_stable && input.isDown('jump', pid)) {
       this.dy = this.actives[88] ? -Data.PLAYER_JUMP * 0.5 : -Data.PLAYER_JUMP;
       this.game.audio.playSound('sound_jump', Data.CHAN_PLAYER);
       this.playAnim(Data.ANIM_PLAYER_JUMP_UP);
@@ -1079,12 +1145,12 @@ export class PlayerEntity extends PhysicsEntity {
         this.getScore(this, 10);
       }
       this.game.statsMan.inc(Data.STAT_JUMP, 1);
-      input.lockKey('jump');
+      input.lockKey('jump', pid);
     }
 
     // Attack / bomb drop / bomb kick
     // The key is read (and locked) before the cooldown test, as in `keyIsDown(attack) && coolDown==0`
-    if (input.keyIsDown('attack') && this.coolDown === 0) {
+    if (input.keyIsDown('attack', pid) && this.coolDown === 0) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
 
@@ -1100,7 +1166,7 @@ export class PlayerEntity extends PhysicsEntity {
       } else {
         this.kickBomb(bombList, 1.0);
       }
-    } else if (input.keyIsDown('down') && this.fl_upKick) {
+    } else if (input.keyIsDown('down', pid) && this.fl_upKick) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;
       if (this.actives[115]) dist *= 1.2;
       const bombList = this.game.getClose(Data.BOMB, this.x, this.y, dist, false) as BombEntity[];

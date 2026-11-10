@@ -9,9 +9,10 @@
  * hidden browser pane throttles real time); the original runs in real time in Ruffle and gets
  * its keys on its focused `#container`.
  */
+import { DEFAULT_KEYS, PLAYER_ACTIONS, type PlayerAction } from '../src/engine/Input';
 import type { GameSession } from '../src/game/GameSession';
 
-type Action = 'left' | 'right' | 'jump' | 'down' | 'attack';
+type Action = PlayerAction;
 /** `[ms, action, down]` key events from the start of a plan. */
 export type Plan = [number, Action, boolean | 0 | 1][];
 
@@ -86,7 +87,8 @@ export function step(n: number): void {
 /** Plays a key plan on the port, tick by tick. Returns the player's `[ms, x, y]` every 4 ticks. */
 export function planPort(plan: Plan, totalMs: number): number[][] {
   const s = session() as any;
-  const held: Set<string> = s.input.keyHeld;
+  // Each move by its first default key (the arrows, Space)
+  const press = (a: Action, down: boolean) => s.input.setKeyCode(DEFAULT_KEYS[a][0], down);
   const ev = plan.slice().sort((a, b) => a[0] - b[0]);
   const trace: number[][] = [];
   let k = 0;
@@ -94,13 +96,12 @@ export function planPort(plan: Plan, totalMs: number): number[][] {
     const ms = (t * 1000) / 32;
     while (k < ev.length && ev[k][0] <= ms) {
       const [, a, d] = ev[k++];
-      if (d) held.add(a);
-      else held.delete(a);
+      press(a, !!d);
     }
     step(1);
     if (t % 4 === 0) trace.push([Math.round(ms), Math.round(s.player.x), Math.round(s.player.y)]);
   }
-  held.clear();
+  for (const a of PLAYER_ACTIONS) press(a, false);
   return trace;
 }
 
