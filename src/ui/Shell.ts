@@ -66,8 +66,11 @@ export const GAME_OVER_FILE = 'images/gameOver.webp';
 
 type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound';
 
-/** An item clip used as an icon: special items below 1000, score items from 1000. */
-type Icon = { item: number } | { clip: string };
+/**
+ * An item clip used as an icon: special items below 1000, score items from 1000; `twice` draws
+ * two, one behind the other (the two-player Time Attack, as the site's two clocks).
+ */
+type Icon = { item: number; twice?: boolean } | { clip: string };
 
 interface ModeEntry {
   /** The site's `$mode`. */
@@ -78,16 +81,34 @@ interface ModeEntry {
 }
 
 /**
- * The modes of the menu. A new player has the Adventure and the free Learning mode (site guide,
- * section 3); quests unlock the others (`give mode=` in `quests.xml`).
+ * The modes of the menu, as a grid read row by row: one-player modes on the left, two-player
+ * ones on the right, so each row pairs related modes (the port's layout; the site listed them in
+ * one column). A new player has the Adventure and the free Learning mode (site guide, section
+ * 3); quests unlock the others (`give mode=` in `quests.xml`). The modes not ported yet show as
+ * coming soon. Icons echo the site's (`menu/i*.gif`: a clock, two clocks, a ball, a bolt).
  */
 const MODES: ModeEntry[] = [
   { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
-  // Item 107, "Livre des étoiles"
-  { mode: 'tutorial', icon: { item: 107 }, enabled: true },
   // Unlocked by quest 67 ("Sandy commence l'aventure !"); item 1221 is one of Sandy's kit
   { mode: 'multicoop', icon: { item: 1221 }, enabled: true },
+  // Item 7, the shoe that speeds Igor up (4.1); unlocked by quest 73
+  { mode: 'timeattack', icon: { item: 7 }, enabled: false },
+  { mode: 'multitime', icon: { item: 7, twice: true }, enabled: false },
+  // Item 113, Tuberculoz's cape (4.5)
+  { mode: 'bossrush', icon: { item: 113 }, enabled: false },
+  // The soccer ball (`entity.bomb.player.SoccerBall`, 4.4)
+  { mode: 'soccer', icon: { clip: 'hammer_bomb_soccer' }, enabled: false },
+  // Item 107, "Livre des étoiles"
+  { mode: 'tutorial', icon: { item: 107 }, enabled: true },
 ];
+
+/** Mode cards: two columns. */
+const CARD = { x: [42, 214], y: 138, w: 164, h: 38, gap: 5 };
+/** Top of the area under the cards: the selected mode's options or description. */
+const DETAIL_Y = 309;
+/** The quest and fridge cards. */
+const TAB_Y = 410;
+const TAB_H = 40;
 
 interface TabEntry {
   screen: 'quests' | 'fridge';
@@ -127,15 +148,16 @@ const GEAR = { x: 360, y: 478, r: 18 };
 const PAUSE_BUTTON_Y = 392;
 
 /**
- * Texts. Mode names and descriptions, "Quêtes" and "Réfrigérateur" are the site guide's
- * (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), the fridge rule its section 4,
- * the quest rule its section 6, the option names those of the quests that unlock them
- * (`xml/lang`, quests 62 to 74; "Tornado" is the port's own, as only the French text names it);
- * the others are the port's own.
+ * Texts. The names and descriptions of the Adventure and Learning, "Quêtes" and "Réfrigérateur"
+ * are the site guide's (`guide.html` of hammerfest.fr, hfest.net and hammerfest.es), the fridge
+ * rule its section 4, the quest rule its section 6, the option names those of the quests that
+ * unlock them (`xml/lang`, quests 62 to 74; "Tornado" is the port's own, as only the French text
+ * names it). From the game's lang files: "Time Attack" (static 20, quest 73), the SoccerFest's
+ * name (quest 66) and description (static 32), and the boss rush's name (static 36, its pause
+ * screen's title). The others, the cards' short texts among them, are the port's own.
  */
 const TEXT: Record<Lang, Record<string, string>> = {
   fr: {
-    modes: 'Modes de jeu',
     solo: 'Aventure',
     tutorial: 'Apprentissage',
     soloDesc:
@@ -145,9 +167,27 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multicoop: 'Multi Coopératif',
     multicoopDesc:
       'L’Aventure à deux sur le même ordinateur, avec Sandy. La partie s’arrête dès qu’un joueur n’a plus de vie.',
+    timeattack: 'Time Attack',
+    timeattackDesc: 'Traversez les niveaux le plus vite possible : chaque seconde compte.',
+    multitime: 'Time Attack à deux',
+    multitimeDesc: 'Le Time Attack à deux sur le même ordinateur.',
+    bossrush: 'Tubercourse',
+    bossrushDesc:
+      'L’Aventure contre la montre, avec un Igor plus rapide qui pose deux bombes à la fois.',
+    soccer: 'SoccerFest',
+    soccerDesc:
+      'Amenez le ballon dans le but adverse. Tous les coups sont permis ! Ce mode se joue à 2 sur le même ordinateur.',
+    soloShort: 'La grande aventure',
+    tutorialShort: 'Les bases, gratuit',
+    multicoopShort: 'L’Aventure à deux',
+    timeattackShort: 'Contre la montre',
+    multitimeShort: 'La course à deux',
+    bossrushShort: 'L’Aventure express',
+    soccerShort: 'Le football à deux',
     modeLockedBy: 'Ce mode se débloque avec la quête « {0} »',
     start: 'Commencer',
-    soon: 'bientôt',
+    soon: 'Bientôt',
+    soonNote: 'Ce mode n’est pas encore disponible dans HammerFenix.',
     gameOver: 'Partie terminée',
     endGame: 'Fin de l’aventure !',
     collected: 'Objets trouvés',
@@ -210,7 +250,6 @@ const TEXT: Record<Lang, Record<string, string>> = {
     volumeHint: 'Réglez l’intensité du volume sonore avec cette option.',
   },
   en: {
-    modes: 'Game modes',
     solo: 'Adventure',
     tutorial: 'Learning',
     soloDesc: 'Find quests, unblock new game modes and obtain points to climb up the pyramid!',
@@ -219,9 +258,27 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multicoop: 'Two Players',
     multicoopDesc:
       'The Adventure for two at the same computer, with Sandy. The game ends as soon as a player has no life left.',
+    timeattack: 'Time Attack',
+    timeattackDesc: 'Clear the levels as fast as you can: every second counts.',
+    multitime: 'Time Attack for Two',
+    multitimeDesc: 'Time Attack for two at the same computer.',
+    bossrush: 'Tuberace',
+    bossrushDesc:
+      'The Adventure against the clock, with a faster Igor who can drop two bombs at once.',
+    soccer: 'Soccerfest',
+    soccerDesc:
+      'Kick the ball into your opponent’s goal. Everything’s allowed! This mode is for 2 players at the same computer.',
+    soloShort: 'The great adventure',
+    tutorialShort: 'The basics, for free',
+    multicoopShort: 'The Adventure for two',
+    timeattackShort: 'Against the clock',
+    multitimeShort: 'A race for two',
+    bossrushShort: 'The express Adventure',
+    soccerShort: 'Football for two',
     modeLockedBy: 'This mode is unlocked by the quest “{0}”',
     start: 'Start game',
-    soon: 'soon',
+    soon: 'Soon',
+    soonNote: 'This mode is not in HammerFenix yet.',
     gameOver: 'Game over',
     endGame: 'End of the adventure!',
     collected: 'Items found',
@@ -282,7 +339,6 @@ const TEXT: Record<Lang, Record<string, string>> = {
     volumeHint: 'Turn up or down the volume with this option.',
   },
   es: {
-    modes: 'Modos de juego',
     solo: 'Aventura',
     tutorial: 'Aprendizaje',
     soloDesc:
@@ -292,9 +348,26 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multicoop: 'Cooperativo',
     multicoopDesc:
       'La Aventura para dos en el mismo ordenador, con Sandy. La partida termina en cuanto un jugador se queda sin vidas.',
+    timeattack: 'Contrarreloj',
+    timeattackDesc: 'Supera los niveles lo más rápido posible: cada segundo cuenta.',
+    multitime: 'Contrarreloj a dos',
+    multitimeDesc: 'La Contrarreloj para dos en el mismo ordenador.',
+    bossrush: 'Tubercarrera',
+    bossrushDesc: 'La Aventura contrarreloj, con un Igor más rápido que pone dos bombas a la vez.',
+    soccer: 'Fútbolfest',
+    soccerDesc:
+      'Lleva el balón a la portería contraria. ¡Todo está permitido! Este modo es para 2 jugadores en el mismo ordenador.',
+    soloShort: 'La gran aventura',
+    tutorialShort: 'Lo básico, gratis',
+    multicoopShort: 'La Aventura a dos',
+    timeattackShort: 'Contra el reloj',
+    multitimeShort: 'Una carrera a dos',
+    bossrushShort: 'La Aventura exprés',
+    soccerShort: 'Fútbol a dos',
     modeLockedBy: 'Este modo se desbloquea con la exploración «{0}»',
     start: 'Comenzar',
-    soon: 'pronto',
+    soon: 'Pronto',
+    soonNote: 'Este modo aún no está en HammerFenix.',
     gameOver: 'Fin de la partida',
     endGame: '¡Fin de la aventura!',
     collected: 'Objetos encontrados',
@@ -425,6 +498,14 @@ export class Shell {
   private record: GameRecord | null = null;
   /** Index in `menuEntries()`. */
   private selected = 0;
+  /**
+   * The mode chosen on the menu (`$mode`): its options or description show under the cards, and
+   * the action button starts it. The arrows only move the focus (`selected`); confirming a card
+   * chooses it, and confirming the chosen card starts it, as two clicks do.
+   */
+  private chosen = MODES[0].mode;
+  /** Where each menu entry was drawn (`[x, y, w, h]`), for the arrows. */
+  private readonly navRects = new Map<number, [number, number, number, number]>();
   private questSel = 0;
   private questTop = 0;
   private fridgeSel = 0;
@@ -657,18 +738,13 @@ export class Shell {
     const ok = inp.consumeMenu('ok');
     const esc = inp.consumeMenu('back');
     switch (this.screen) {
-      case 'menu': {
-        const entries = this.menuEntries();
-        if (up) this.select(this.selected - 1);
-        if (down) this.select(this.selected + 1);
-        if (entries[this.selected].kind === 'tab' && (left || right)) {
-          // the two tabs side by side
-          const first = entries.findIndex((e) => e.kind === 'tab');
-          this.select(this.selected === first ? first + 1 : first);
-        }
+      case 'menu':
+        if (up) this.navigate(0, -1);
+        if (down) this.navigate(0, 1);
+        if (left) this.navigate(-1, 0);
+        if (right) this.navigate(1, 0);
         if (ok) this.confirm();
         break;
-      }
       case 'result':
         if (ok || up || esc) this.showMenu();
         break;
@@ -753,21 +829,19 @@ export class Shell {
       if (e.oid === Data.OPT_BOOST) return; // no box to untick (quest 62)
       this.profile.toggleOption(e.oid);
       this.render();
+    } else if (e.mode.mode !== this.chosen) {
+      this.chosen = e.mode.mode;
+      this.render();
     } else if (e.mode.enabled && !this.isLocked(e.mode)) {
       this.onStart?.(e.mode.mode);
     }
   }
 
   /**
-   * A click on menu entry `i`: tabs open and options tick at once; a mode is selected, and
+   * A click on menu entry `i`: tabs open and options tick at once; a mode is chosen, and
    * started when it already was.
    */
   private clickEntry(i: number): void {
-    const e = this.menuEntries()[i];
-    if (e.kind === 'mode' && this.selected !== i) {
-      this.select(i);
-      return;
-    }
     this.selected = i;
     this.confirm();
     if (this.screen === 'menu') this.render();
@@ -1098,6 +1172,14 @@ export class Shell {
 
   /** An item or other clip fitted in a `size` px cell centered on (x, y). */
   private icon(icon: Icon, x: number, y: number, size: number, parent?: Container): Container {
+    if ('item' in icon && icon.twice) {
+      const pair = new Container();
+      const one = { item: icon.item };
+      this.icon(one, x - size * 0.18, y - size * 0.12, size * 0.8, pair).alpha = 0.8;
+      this.icon(one, x + size * 0.14, y + size * 0.1, size * 0.8, pair);
+      (parent ?? this.root).addChild(pair);
+      return pair;
+    }
     let mc;
     if ('item' in icon) {
       const id = icon.item;
@@ -1155,51 +1237,36 @@ export class Shell {
     const t = this.t;
     const entries = this.menuEntries();
     const cur = entries[this.selected];
+    this.navRects.clear();
     this.drawTitle(2, 290);
     const top = 124;
     this.panel(26, top, 368, H - 8 - top);
-    this.text(t.modes, 'title', W / 2, top + 10, { color: C.heading });
 
-    MODES.forEach((m, i) => {
-      const y = top + 44 + i * 30;
-      const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
-      const sel = n === this.selected;
-      const locked = m.enabled && this.isLocked(m);
-      const open = m.enabled && !locked;
-      const row = this.button([42, y, 336, 28], () => this.clickEntry(n), sel);
-      const ic = this.icon(m.icon, 66, y + 14, 22, row);
-      if (!open) ic.alpha = 0.45;
-      this.text(t[m.mode], 'label', 90, y + 5, {
-        align: 'left',
-        size: 16,
-        color: sel ? C.gold : open ? C.ink : C.todo,
-        parent: row,
-      });
-      if (locked) {
-        this.padlock(352, y + 8, row, sel ? C.gold : C.inkSoft);
-      } else if (!m.enabled) {
-        this.text(t.soon, 'label', 364, y + 8, {
-          align: 'right',
-          size: 12,
-          color: sel ? C.gold : C.todo,
-          parent: row,
-        });
-      }
-    });
+    MODES.forEach((m, i) => this.drawModeCard(m, i, entries));
 
-    const mode = cur.kind === 'mode' || cur.kind === 'option' ? cur.mode : null;
-    const shown = mode ?? MODES[0];
+    // Under the cards: the options of the chosen mode, else its description
+    const shown = MODES.find((m) => m.mode === this.chosen) ?? MODES[0];
     const canStart = shown.enabled && !this.isLocked(shown);
-    this.text(t[shown.mode + 'Desc'], 'body', W / 2, top + 133, { width: 320, color: C.inkSoft });
     if (canStart && this.modeOptions(shown).length > 0) {
-      this.drawOptions(shown, entries, top + 172);
-    } else if (shown.enabled && !canStart) {
-      this.text(fmt(t.modeLockedBy, this.questForMode(shown.mode)), 'body', W / 2, top + 198, {
+      this.drawOptions(shown, entries, DETAIL_Y);
+    } else {
+      const desc = this.text(t[shown.mode + 'Desc'], 'body', W / 2, DETAIL_Y + 4, {
         width: 320,
-        size: 11,
-        italic: true,
         color: C.inkSoft,
       });
+      const note = !shown.enabled
+        ? t.soonNote
+        : canStart
+          ? ''
+          : fmt(t.modeLockedBy, this.questForMode(shown.mode));
+      if (note) {
+        this.text(note, 'body', W / 2, desc.y + desc.height + 6, {
+          width: 320,
+          size: 11,
+          italic: true,
+          color: C.inkSoft,
+        });
+      }
     }
 
     // The quest and fridge pages
@@ -1207,26 +1274,27 @@ export class Shell {
     TABS.forEach((tb, i) => {
       const n = entries.findIndex((e) => e.kind === 'tab' && e.tab === tb);
       const sel = n === this.selected;
-      const x = i === 0 ? 42 : 214;
-      const y = top + 270;
-      const btn = this.button([x, y, 164, 50], () => this.clickEntry(n), sel, 10);
+      const x = CARD.x[i];
+      const y = TAB_Y;
+      const btn = this.button([x, y, CARD.w, TAB_H], () => this.clickEntry(n), sel, 10);
+      this.navRects.set(n, [x, y, CARD.w, TAB_H]);
       if (!sel) {
         btn.addChildAt(
           new Graphics()
-            .roundRect(x, y, 164, 50, 10)
+            .roundRect(x, y, CARD.w, TAB_H, 10)
             .stroke({ color: C.wood, width: 1, alpha: 0.35 }),
           1,
         );
       }
-      this.icon(tb.icon, x + 26, y + 25, 32, btn);
-      this.text(t[tb.screen], 'label', x + 48, y + 8, {
+      this.icon(tb.icon, x + 24, y + TAB_H / 2, 28, btn);
+      this.text(t[tb.screen], 'label', x + 46, y + 4, {
         align: 'left',
         size: 15,
         color: sel ? C.gold : C.ink,
         parent: btn,
       });
       const [have, all] = tb.screen === 'quests' ? counts.quests : counts.fridge;
-      this.text(`${have} / ${all}`, 'body', x + 48, y + 29, {
+      this.text(`${have} / ${all}`, 'body', x + 46, y + 23, {
         align: 'left',
         size: 11,
         color: sel ? C.gold : C.inkSoft,
@@ -1242,12 +1310,99 @@ export class Shell {
     else this.actionButton(t.start, BUTTON_Y, null);
   }
 
+  /**
+   * Mode card `i` of the grid: its icon, name and short text, a padlock while a quest has yet to
+   * give it, "Soon" for a mode not ported yet. Wood when focused; the chosen one has a darker
+   * frame.
+   */
+  private drawModeCard(m: ModeEntry, i: number, entries: MenuEntry[]): void {
+    const t = this.t;
+    const x = CARD.x[i % 2];
+    const y = CARD.y + Math.floor(i / 2) * (CARD.h + CARD.gap);
+    const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
+    const sel = n === this.selected;
+    const chosen = m.mode === this.chosen;
+    const locked = m.enabled && this.isLocked(m);
+    const open = m.enabled && !locked;
+    const card = this.button([x, y, CARD.w, CARD.h], () => this.clickEntry(n), sel, 8);
+    this.navRects.set(n, [x, y, CARD.w, CARD.h]);
+    if (!sel) {
+      const b = chosen ? 2 : 1;
+      card.addChildAt(
+        new Graphics()
+          .roundRect(x + b / 2, y + b / 2, CARD.w - b, CARD.h - b, 8)
+          .fill({ color: C.wood, alpha: chosen ? 0.14 : 0.05 })
+          .stroke({ color: C.wood, width: b, alpha: chosen ? 0.9 : 0.35 }),
+        1,
+      );
+    }
+    const ic = this.icon(m.icon, x + 20, y + CARD.h / 2, 26, card);
+    if (!open) ic.alpha = 0.45;
+    const textX = x + 38;
+    // Room for the text, and for the padlock beside the name
+    const room = x + CARD.w - 6 - textX;
+    const name = this.text(t[m.mode], 'label', textX, y + 4, {
+      align: 'left',
+      size: 14,
+      color: sel ? C.gold : open ? C.ink : C.todo,
+      parent: card,
+    });
+    fitWidth(name, locked ? room - 14 : room);
+    if (locked) this.padlock(x + CARD.w - 15, y + 6, card, sel ? C.gold : C.inkSoft);
+    const line = this.text(m.enabled ? t[m.mode + 'Short'] : t.soon, 'body', textX, y + 21, {
+      align: 'left',
+      size: 10,
+      italic: !m.enabled,
+      color: sel ? C.gold : open ? C.inkSoft : C.todo,
+      parent: card,
+    });
+    fitWidth(line, room);
+  }
+
+  /**
+   * Arrows on the menu: the nearest entry in that direction, as drawn (cards, options, tabs,
+   * gear), favoring the same row or column. Up and down wrap around; left and right stop at
+   * the edge.
+   */
+  private navigate(dx: number, dy: number): void {
+    const from = this.navRects.get(this.selected);
+    if (!from) {
+      this.select(0);
+      return;
+    }
+    const center = ([x, y, w, h]: [number, number, number, number]) => [x + w / 2, y + h / 2];
+    const best = (fx: number, fy: number): number => {
+      let pick = -1;
+      let score = Infinity;
+      for (const [n, r] of this.navRects) {
+        if (n === this.selected) continue;
+        const [cx, cy] = center(r);
+        const along = dx !== 0 ? (cx - fx) * dx : (cy - fy) * dy;
+        const across = dx !== 0 ? Math.abs(cy - fy) : Math.abs(cx - fx);
+        // Within 60 degrees of the direction: nothing far to the side
+        if (along <= 1 || across > along * 1.75) continue;
+        const sc = along + across * 3;
+        if (sc < score) {
+          score = sc;
+          pick = n;
+        }
+      }
+      return pick;
+    };
+    const [fx, fy] = center(from);
+    let n = best(fx, fy);
+    // Wrap: as if coming from beyond the other edge
+    if (n < 0 && dy !== 0) n = best(fx, dy > 0 ? -1000 : H + 1000);
+    if (n >= 0) this.select(n);
+  }
+
   /** The settings button: a gear on a round wood button, as the tabs when selected. */
   private drawGear(entries: MenuEntry[]): void {
     const n = entries.findIndex((e) => e.kind === 'settings');
     const sel = n === this.selected;
     const { x, y, r } = GEAR;
     const btn = this.button([x - r, y - r, 2 * r, 2 * r], () => this.clickEntry(n), sel, r);
+    this.navRects.set(n, [x - r, y - r, 2 * r, 2 * r]);
     if (!sel) {
       btn.addChildAt(
         new Graphics().circle(x, y, r - 0.5).stroke({ color: C.wood, width: 1, alpha: 0.35 }),
@@ -1287,6 +1442,7 @@ export class Shell {
       const n = entries.findIndex((e) => e.kind === 'option' && e.oid === oid);
       const sel = n === this.selected;
       const row = this.button([x - 8, y - 2, 162, 19], () => this.clickEntry(n), sel, 5);
+      this.navRects.set(n, [x - 8, y - 2, 162, 19]);
       const ink = sel ? C.gold : unlocked ? C.ink : C.todo;
       if (unlocked) {
         const box = new Graphics()
@@ -1316,7 +1472,7 @@ export class Shell {
         else hint = ticked ? t.optionOn : t.optionOff;
       }
     });
-    if (hint) this.text(hint, 'body', W / 2, y0 + 82, { size: 10, italic: true, color: C.inkSoft });
+    if (hint) this.text(hint, 'body', W / 2, y0 + 80, { size: 10, italic: true, color: C.inkSoft });
   }
 
   /** The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). */
@@ -1905,6 +2061,11 @@ function speaker(x: number, cy: number, on: boolean, color: number | string): Gr
 }
 
 /** Replaces `{0}`, `{1}`... with the arguments. */
+/** Shrinks a one-line text that would be wider than `w`. */
+function fitWidth(t: Text, w: number): void {
+  if (t.width > w) t.scale.set(w / t.width);
+}
+
 function fmt(s: string, ...args: (string | number)[]): string {
   return s.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)]));
 }
