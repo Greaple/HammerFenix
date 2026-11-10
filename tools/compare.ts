@@ -107,11 +107,11 @@ export function planPort(plan: Plan, totalMs: number): number[][] {
 
 /** A new game in the port, entered into deepnight by the village door (as in the original). */
 export function portToDeepnight(): void {
-  const s = session() as any;
-  s.startNow('solo');
+  session().startNow('solo');
   step(40);
-  s.usePortal(0, null);
-  for (let i = 0; i < 400 && (s.world.set?.name === 'adventure' || s.fl_lock); i++) step(1);
+  const game = session().game as any;
+  game.usePortal(0, null);
+  for (let i = 0; i < 400 && (game.world.set?.name === 'adventure' || game.fl_lock); i++) step(1);
   step(20);
 }
 
