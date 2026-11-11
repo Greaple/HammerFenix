@@ -21,13 +21,56 @@ export type PadButton =
   | 'l1'
   /** The right bumper (RB, R1, R): no icon in the three sheets, drawn in their style. */
   | 'r1'
+  /** The left trigger (G.4): drawn as the right one. */
+  | 'l2'
   | 'r2'
+  /** The stick presses (G.4): drawn. */
+  | 'l3'
+  | 'r3'
   | 'start'
   | 'back'
   | 'dpad'
-  /** The D-pad's up arm, made from the D-pad's icon (no sheet has it in every style). */
-  | 'dpadUp'
+  /** The D-pad's arms, made from the D-pad's icon (no sheet has them in every style). */
+  | DpadArm
   | 'stick';
+
+type DpadArm = 'dpadUp' | 'dpadDown' | 'dpadLeft' | 'dpadRight';
+
+const ARMS: Record<DpadArm, string> = {
+  dpadUp: '↑',
+  dpadDown: '↓',
+  dpadLeft: '←',
+  dpadRight: '→',
+};
+
+function isArm(button: PadButton): button is DpadArm {
+  return button in ARMS;
+}
+
+/** The buttons of the standard mapping, by number (`Gamepad.buttons`). */
+const BY_INDEX: readonly PadButton[] = [
+  'a',
+  'b',
+  'x',
+  'y',
+  'l1',
+  'r1',
+  'l2',
+  'r2',
+  'back',
+  'start',
+  'l3',
+  'r3',
+  'dpadUp',
+  'dpadDown',
+  'dpadLeft',
+  'dpadRight',
+];
+
+/** The button of standard mapping number `i` (G.4: a move's buttons), or null. */
+export function padButtonOf(i: number): PadButton | null {
+  return BY_INDEX[i] ?? null;
+}
 
 type Face = 'a' | 'b' | 'x' | 'y';
 
@@ -42,19 +85,60 @@ const FACE: Record<PadLayout, Record<Face, string>> = {
 };
 
 /** The other buttons' names, as each maker prints them. */
-const OTHER: Record<PadLayout, Record<'l1' | 'r1' | 'r2' | 'start' | 'back' | 'stick', string>> = {
-  xbox: { l1: 'LB', r1: 'RB', r2: 'RT', start: 'MENU', back: 'VIEW', stick: 'L' },
-  generic: { l1: 'L1', r1: 'R1', r2: 'R2', start: 'START', back: 'SELECT', stick: 'L' },
-  playstation: { l1: 'L1', r1: 'R1', r2: 'R2', start: 'OPTIONS', back: 'SHARE', stick: 'L' },
-  nintendo: { l1: 'L', r1: 'R', r2: 'ZR', start: '+', back: '−', stick: 'L' },
+type Other = 'l1' | 'r1' | 'l2' | 'r2' | 'l3' | 'r3' | 'start' | 'back' | 'stick';
+const OTHER: Record<PadLayout, Record<Other, string>> = {
+  xbox: {
+    l1: 'LB',
+    r1: 'RB',
+    l2: 'LT',
+    r2: 'RT',
+    l3: 'LS',
+    r3: 'RS',
+    start: 'MENU',
+    back: 'VIEW',
+    stick: 'L',
+  },
+  generic: {
+    l1: 'L1',
+    r1: 'R1',
+    l2: 'L2',
+    r2: 'R2',
+    l3: 'L3',
+    r3: 'R3',
+    start: 'START',
+    back: 'SELECT',
+    stick: 'L',
+  },
+  playstation: {
+    l1: 'L1',
+    r1: 'R1',
+    l2: 'L2',
+    r2: 'R2',
+    l3: 'L3',
+    r3: 'R3',
+    start: 'OPTIONS',
+    back: 'SHARE',
+    stick: 'L',
+  },
+  nintendo: {
+    l1: 'L',
+    r1: 'R',
+    l2: 'ZL',
+    r2: 'ZR',
+    l3: 'L3',
+    r3: 'R3',
+    start: '+',
+    back: '−',
+    stick: 'L',
+  },
 };
 
 /** The text label of a button (texts, and buttons with no icon). The D-pad has none. */
 export function padLabel(button: PadButton, layout: PadLayout): string {
   if (button === 'dpad') return '';
-  if (button === 'dpadUp') return '↑';
+  if (isArm(button)) return ARMS[button];
   if (button in FACE[layout]) return FACE[layout][button as Face];
-  return OTHER[layout][button as keyof (typeof OTHER)['xbox']];
+  return OTHER[layout][button as Other];
 }
 
 /**
@@ -73,9 +157,9 @@ export const PAD_THEMES: Record<PadTheme, { body: string; ink: string }> = {
  * D-pad and the stick fall back to Xbox's, as all makers draw them alike.
  */
 function iconOf(button: PadButton, layout: PadLayout): PadIconData | undefined {
-  if (button === 'dpadUp') {
+  if (isArm(button)) {
     const dpad = iconOf('dpad', layout);
-    return dpad && { ...dpad, svg: upArm(dpad.svg) };
+    return dpad && { ...dpad, svg: oneArm(dpad.svg, button) };
   }
   if (layout === 'generic') {
     return button === 'start' || button === 'back' ? undefined : PAD_ICON_DATA.xbox?.[button];
@@ -86,18 +170,28 @@ function iconOf(button: PadButton, layout: PadLayout): PadIconData | undefined {
 }
 
 /**
- * A D-pad icon with its up arm standing out: the arms are faded, then the top of the frame
- * (above its 3/8, where every sheet's up arm ends) is drawn again in full.
+ * A D-pad icon with one arm standing out: the arms are faded, then the side of the frame
+ * holding that arm (its outer 3/8, where every sheet's arms end) is drawn again in full.
  */
-function upArm(svg: string): string {
+function oneArm(svg: string, arm: DpadArm): string {
   const open = svg.indexOf('>') + 1;
   const end = svg.lastIndexOf('</svg>');
   const inner = svg.slice(open, end);
-  const vb = /viewBox="([\d.\s-]+)"/.exec(svg)?.[1].split(/\s+/).map(Number) ?? [0, 0, 32, 32];
-  const clip = `<clipPath id="pad-dpad-up"><rect x="${vb[0]}" y="${vb[1]}" width="${vb[2]}" height="${vb[3] * 0.375}"/></clipPath>`;
+  const [x, y, w, h] = /viewBox="([\d.\s-]+)"/.exec(svg)?.[1].split(/\s+/).map(Number) ?? [
+    0, 0, 32, 32,
+  ];
+  const k = 0.375;
+  const rect = {
+    dpadUp: [x, y, w, h * k],
+    dpadDown: [x, y + h * (1 - k), w, h * k],
+    dpadLeft: [x, y, w * k, h],
+    dpadRight: [x + w * (1 - k), y, w * k, h],
+  }[arm];
+  const id = `pad-${arm}`;
+  const clip = `<clipPath id="${id}"><rect x="${rect[0]}" y="${rect[1]}" width="${rect[2]}" height="${rect[3]}"/></clipPath>`;
   return (
     `${svg.slice(0, open)}<defs>${clip}</defs><g opacity="0.2">${inner}</g>` +
-    `<g clip-path="url(#pad-dpad-up)">${inner}</g></svg>`
+    `<g clip-path="url(#${id})">${inner}</g></svg>`
   );
 }
 
@@ -210,34 +304,46 @@ function drawGlyph(button: PadButton, layout: PadLayout, size: number, theme: Pa
   const body = PAD_THEMES[theme].body;
   const ink = PAD_THEMES[theme].ink;
   const c = new Container();
-  if (button === 'dpad') {
+  if (button === 'dpad' || isArm(button)) {
     const t = size / 3;
     const h = size / 2;
-    c.addChild(
-      new Graphics()
-        .roundRect(-t / 2, -h, t, size, t * 0.15)
-        .roundRect(-h, -t / 2, size, t, t * 0.15)
-        .fill(body),
-    );
+    const cross = new Graphics()
+      .roundRect(-t / 2, -h, t, size, t * 0.15)
+      .roundRect(-h, -t / 2, size, t, t * 0.15)
+      .fill(body);
+    c.addChild(cross);
+    if (isArm(button)) {
+      // The arm in full over the faded cross
+      cross.alpha = 0.3;
+      const arm = {
+        dpadUp: [-t / 2, -h, t, h],
+        dpadDown: [-t / 2, 0, t, h],
+        dpadLeft: [-h, -t / 2, h, t],
+        dpadRight: [0, -t / 2, h, t],
+      }[button];
+      c.addChild(new Graphics().roundRect(arm[0], arm[1], arm[2], arm[3], t * 0.15).fill(body));
+    }
     return c;
   }
   const label = padLabel(button, layout);
   if (
     button === 'start' ||
     button === 'back' ||
+    button === 'l2' ||
     button === 'r2' ||
     button === 'l1' ||
     button === 'r1'
   ) {
     const txt = text(label, size * (label.length > 2 ? 0.42 : 0.6), ink);
-    const h = size * (button === 'r2' ? 1 : button === 'l1' || button === 'r1' ? 0.8 : 0.7);
+    const trigger = button === 'l2' || button === 'r2';
+    const h = size * (trigger ? 1 : button === 'l1' || button === 'r1' ? 0.8 : 0.7);
     const w = Math.max(h * 1.2, txt.width + size * 0.5);
     c.addChild(new Graphics().roundRect(-w / 2, -h / 2, w, h, h * 0.3).fill(body), txt);
     return c;
   }
   const r = size / 2;
   c.addChild(new Graphics().circle(0, 0, r).fill(body));
-  if (layout === 'playstation' && button !== 'stick')
+  if (layout === 'playstation' && button in FACE.playstation)
     c.addChild(psShape(button as Face, r * 0.42, ink));
   else c.addChild(text(label, size * 0.56, ink));
   return c;

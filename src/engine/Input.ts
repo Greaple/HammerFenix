@@ -1,8 +1,10 @@
 import {
   EMPTY_PAD,
   type MenuAction,
+  PAD,
   PadManager,
   type PadLayout,
+  type PadMoves,
   type PadRef,
   padLayout,
 } from './Gamepad';
@@ -87,9 +89,19 @@ const GAME_KEYS: [GameAction, readonly number[]][] = [
 ];
 const SUICIDE_KEYS = [Key.CONTROL, Key.SHIFT, code('K')];
 
+/** The game's keys, which a move cannot have (G.4). */
+export const GAME_KEY_CODES: readonly number[] = GAME_KEYS.flatMap(([, codes]) => codes);
+
+/**
+ * What `pollCapture` saw (G.4): a key (its Flash key code, or -1 for a key the game cannot
+ * read) or a controller button.
+ */
+export type CaptureInput = { kind: 'key'; code: number } | { kind: 'button'; button: number };
+
 /** Flash key codes (`Key.*`) of the keys that are not a letter or a digit. */
 const FLASH_KEY_CODES: Record<string, number> = {
   Backspace: 8,
+  Tab: 9,
   Enter: 13,
   NumpadEnter: 13,
   ShiftLeft: 16,
@@ -100,26 +112,33 @@ const FLASH_KEY_CODES: Record<string, number> = {
   AltRight: 18,
   Escape: 27,
   Space: 32,
+  PageUp: 33,
+  PageDown: 34,
+  End: 35,
   Home: 36,
   ArrowLeft: 37,
   ArrowUp: 38,
   ArrowRight: 39,
   ArrowDown: 40,
+  Insert: 45,
+  Delete: 46,
   NumpadMultiply: 106,
   NumpadAdd: 107,
   NumpadSubtract: 109,
+  NumpadDecimal: 110,
   NumpadDivide: 111,
 };
 
 /**
  * The Flash key code (`Key.isDown`'s argument) of a key, from its `KeyboardEvent.code` and
  * `key`. A letter is the letter the keyboard layout gives (`key`), as Flash's key codes were:
- * the original's modes chose their letters for AZERTY (Z Q S D). A letter key that gives no
- * Latin letter counts by its place on a QWERTY keyboard. Port addition: the top row digits count
- * as the numpad's (96 to 105), since laptops have no numpad.
+ * the original's modes chose their letters for AZERTY (Z Q S D). That holds for a letter away
+ * from the QWERTY letter keys too (AZERTY's M is QWERTY's semicolon key). A letter key that
+ * gives no Latin letter counts by its place on a QWERTY keyboard. Port addition: the top row
+ * digits count as the numpad's (96 to 105), since laptops have no numpad.
  */
 export function flashKeyCode(code: string, key?: string): number | undefined {
-  if (key && /^[a-z]$/i.test(key) && /^Key[A-Z]$/.test(code))
+  if (key && /^[a-z]$/i.test(key) && !/^(Numpad|Digit)/.test(code))
     return key.toUpperCase().charCodeAt(0);
   if (/^Key[A-Z]$/.test(code)) return code.charCodeAt(3);
   if (/^(Numpad|Digit)\d$/.test(code)) return 96 + Number(code.slice(-1));
@@ -179,6 +198,11 @@ export class InputController {
   private menuSampled = new Set<MenuAction>();
   private readonly menuLocked = new Set<MenuAction>();
   private readonly locked = new Set<ControlAction>();
+  /**
+   * The keys of a player their mode gives none: `DEFAULT_KEYS`, or the player's own (G.4,
+   * `setMoveKeys`).
+   */
+  private baseKeys: PlayerKeys = DEFAULT_KEYS;
   /** The keys of each player, by pid (`PlayerController.setKeys`). */
   private keys: PlayerKeys[] = [DEFAULT_KEYS];
   /**
@@ -194,6 +218,11 @@ export class InputController {
   private joinHeld = new Set<string>();
   private recorder: InputRecorder | null = null;
   private player: InputPlayer | null = null;
+  /**
+   * A move's new key or button is awaited (G.4): the key pressed since, and the buttons held
+   * at the last `pollCapture` (a button counts once pressed again).
+   */
+  private capture: { key: number | null; held: Set<number> } | null = null;
 
   /**
    * The original's dev keys (`GameManager.fl_debug`) read every key with `isKeyDown`. Off while
@@ -240,7 +269,7 @@ export class InputController {
 
   /**
    * Sets the number of players (`GameMode.insertPlayer`). New players have the default keys
-   * and the next controllers.
+   * (the player's own, G.4) and the next controllers.
    */
   setPlayerCount(n: number): void {
     n = Math.max(1, n);
@@ -248,7 +277,7 @@ export class InputController {
       list.length = Math.min(list.length, n);
       while (list.length < n) list.push(make());
     };
-    fit(this.keys, () => DEFAULT_KEYS);
+    fit(this.keys, () => this.baseKeys);
     fit(this.ctrlLocked, () => new Set());
     fit(this.masks, () => 0);
     this.pads.setPlayerCount(n);
@@ -261,7 +290,7 @@ export class InputController {
   }
 
   playerKeys(pid: number): PlayerKeys {
-    return this.keys[pid] ?? DEFAULT_KEYS;
+    return this.keys[pid] ?? this.baseKeys;
   }
 
   /**
@@ -269,9 +298,66 @@ export class InputController {
    * game.
    */
   resetKeys(): void {
-    this.keys = this.keys.map(() => DEFAULT_KEYS);
+    this.keys = this.keys.map(() => this.baseKeys);
     this.devices = null;
     this.pads.release();
+  }
+
+  // ------------------------------------------------- The player's own keys (G.4)
+
+  /**
+   * The player's own keys and buttons for the moves (`Bindings`): the keys of every player
+   * their mode gives none, from now on, and every controller's buttons.
+   */
+  setMoveKeys(keys: PlayerKeys, buttons: PadMoves): void {
+    const old = this.baseKeys;
+    this.baseKeys = keys;
+    this.keys = this.keys.map((k) => (k === old ? keys : k));
+    this.pads.moves = buttons;
+  }
+
+  /** Waits for a move's new key or button (`pollCapture`) instead of playing them. */
+  startCapture(): void {
+    this.capture = { key: null, held: this.pads.heldButtons() };
+  }
+
+  stopCapture(): void {
+    this.capture = null;
+  }
+
+  get capturing(): boolean {
+    return this.capture !== null;
+  }
+
+  /**
+   * The key pressed since `startCapture` (Escape among them), else a controller button
+   * pressed since the last call (Start among them), else null. A key held down does not
+   * repeat, and a button held when the capture started counts once pressed again.
+   */
+  pollCapture(): CaptureInput | null {
+    const c = this.capture;
+    if (!c) return null;
+    if (c.key !== null) {
+      const kc = c.key;
+      c.key = null;
+      return { kind: 'key', code: kc };
+    }
+    const now = this.pads.heldButtons();
+    const fresh = [...now].filter((b) => !c.held.has(b));
+    c.held = now;
+    if (fresh.length === 0) return null;
+    this.setDevice('gamepad');
+    // Start first: it cancels, even pressed with another button
+    return { kind: 'button', button: fresh.includes(PAD.START) ? PAD.START : fresh[0] };
+  }
+
+  /**
+   * Locks the menu moves held now until they are let go, so the key or button that ended a
+   * capture does not move the menu too.
+   */
+  lockMenuHeld(): void {
+    this.poll();
+    for (const m of this.menuSampled) this.menuLocked.add(m);
   }
 
   // ------------------------------------------------- Choosing a device (G.3)
@@ -357,7 +443,7 @@ export class InputController {
 
   /** Whether the game reads key `kc` (the browser must not act on it too). */
   private isGameKey(kc: number, e: KeyboardEvent): boolean {
-    const all = [DEFAULT_KEYS, ...this.keys];
+    const all = [DEFAULT_KEYS, this.baseKeys, ...this.keys];
     return (
       (kc === code('K') && e.ctrlKey && e.shiftKey) ||
       all.some((k) => PLAYER_ACTIONS.some((a) => k[a].includes(kc))) ||
@@ -374,6 +460,11 @@ export class InputController {
     this.onAnyGesture?.();
     // A key keeps the code it was pressed with, even if Shift or Alt changes its letter
     const kc = this.keysDown.get(e.code) ?? flashKeyCode(e.code, e.key);
+    if (this.capture) {
+      // A move's new key: the browser does nothing with it (Tab, Space, F keys...)
+      e.preventDefault();
+      if (!e.repeat) this.capture.key = kc ?? -1;
+    }
     if (kc === undefined) return;
     this.keysDown.set(e.code, kc);
     this.codesHeld = new Set(this.keysDown.values());

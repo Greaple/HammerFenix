@@ -29,10 +29,20 @@ import {
   TextStyle,
   Texture,
 } from 'pixi.js';
-import type { InputController } from '../engine/Input';
+import {
+  BINDABLE_BUTTONS,
+  type Bindings,
+  bindButton,
+  bindKey,
+  DEFAULT_BINDINGS,
+  isReservedKey,
+  keyName,
+} from '../engine/Bindings';
+import { PAD } from '../engine/Gamepad';
+import { type InputController, Key, type PlayerAction } from '../engine/Input';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
-import { padGlyph } from '../game/gui/PadGlyphs';
+import { padButtonOf, padGlyph, padLabel } from '../game/gui/PadGlyphs';
 import { DEFAULT_SETTINGS, type PlayerSettings, VOLUME_STEP } from '../game/GameParameters';
 import type { GameResult } from '../game/Loader';
 import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
@@ -64,7 +74,7 @@ export const TITLE_FILE = 'images/mainTitle.webp';
  */
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
-type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound' | 'controls';
 
 /**
  * An item clip used as an icon: special items below 1000, score items from 1000; `twice` draws
@@ -128,9 +138,36 @@ type MenuEntry =
   | { kind: 'tab'; tab: TabEntry }
   | { kind: 'settings' };
 
-/** The rows of the settings page, in the guide's order, then the back button. */
-const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'back'] as const;
+/**
+ * The rows of the settings page, in the guide's order, then the controls page (G.4) and the
+ * back button.
+ */
+const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'controls', 'back'] as const;
 type SettingRow = (typeof SETTING_ROWS)[number];
+
+/**
+ * The controls page (G.4): the moves in the order of the SWF's key setup screen (`#910`:
+ * `labLeft`, `labRight`, `labJump`, `labDown`, `labFire1`), then the reset and back rows.
+ */
+const MOVES: readonly PlayerAction[] = ['left', 'right', 'jump', 'down', 'attack'];
+const CTRL_RESET = MOVES.length;
+const CTRL_BACK = MOVES.length + 1;
+/** The controls page's columns: two keyboard slots and the controller's, as `[x, w]`. */
+const CTRL_COLS: readonly [number, number][] = [
+  [124, 90],
+  [218, 90],
+  [312, 76],
+];
+const CTRL_TOP = 96;
+const CTRL_ROW_H = 42;
+
+/** A slot of the controls page waiting for its key or button, and what the last press was. */
+interface Capture {
+  row: number;
+  col: number;
+  /** A press that could not be used: shown under the prompt. */
+  note: string | null;
+}
 
 /**
  * The rows of the sound panel opened from the pause (port addition): details and shaking stay
@@ -248,6 +285,27 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Cochez cette case pour écouter la musique du jeu pendant votre aventure.',
     volume: 'Volume sonore',
     volumeHint: 'Réglez l’intensité du volume sonore avec cette option.',
+    controls: 'Touches et manette',
+    controlsHint: 'Choisissez les touches et les boutons de vos déplacements.',
+    controlsTitle: 'Commandes',
+    keyboard: 'Clavier',
+    pad: 'Manette',
+    mv_left: 'Gauche',
+    mv_right: 'Droite',
+    mv_jump: 'Sauter',
+    mv_down: 'Bas',
+    mv_attack: 'Bombe',
+    resetKeys: 'Touches par défaut',
+    controlsHelp:
+      'Choisissez une case, puis appuyez sur la touche ou le bouton voulu. Une touche ne sert qu’à un déplacement.',
+    controlsNote: 'Le stick suit la croix. À deux joueurs, les touches restent celles du mode.',
+    capKey: 'Appuyez sur la touche souhaitée',
+    capKeyCancel: '[ ECHAP pour annuler ]',
+    capPad: 'Appuyez sur le bouton souhaité',
+    capPadCancel: '[ {0} pour annuler ]',
+    capReserved: 'Cette touche sert déjà au jeu (pause, musique, carte…).',
+    capReservedPad: 'Ce bouton sert déjà au jeu (pause, musique, carte…).',
+    capUnknown: 'Le jeu ne peut pas lire cette touche.',
   },
   en: {
     solo: 'Adventure',
@@ -337,6 +395,26 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Enable this box to listen to the music of the game during your adventure.',
     volume: 'Volume',
     volumeHint: 'Turn up or down the volume with this option.',
+    controls: 'Keys and controller',
+    controlsHint: 'Choose the keys and buttons you move with.',
+    controlsTitle: 'Controls',
+    keyboard: 'Keyboard',
+    pad: 'Controller',
+    mv_left: 'Left',
+    mv_right: 'Right',
+    mv_jump: 'Jump',
+    mv_down: 'Down',
+    mv_attack: 'Bomb',
+    resetKeys: 'Default keys',
+    controlsHelp: 'Choose a box, then press the key or button you want. A key does one move only.',
+    controlsNote: 'The stick follows the D-pad. In two-player games the keys stay the mode’s.',
+    capKey: 'Press the key you want',
+    capKeyCancel: '[ ESC to cancel ]',
+    capPad: 'Press the button you want',
+    capPadCancel: '[ {0} to cancel ]',
+    capReserved: 'The game already uses this key (pause, music, map…).',
+    capReservedPad: 'The game already uses this button (pause, music, map…).',
+    capUnknown: 'The game cannot read this key.',
   },
   es: {
     solo: 'Aventura',
@@ -428,6 +506,27 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Activa esta casilla para escuchar la música del juego durante tu aventura.',
     volume: 'Volumen del sonido',
     volumeHint: 'Puedes cambiar el volumen del sonido con esta opción.',
+    controls: 'Teclas y mando',
+    controlsHint: 'Elige las teclas y los botones con los que te mueves.',
+    controlsTitle: 'Controles',
+    keyboard: 'Teclado',
+    pad: 'Mando',
+    mv_left: 'Izquierda',
+    mv_right: 'Derecha',
+    mv_jump: 'Saltar',
+    mv_down: 'Abajo',
+    mv_attack: 'Bomba',
+    resetKeys: 'Teclas por defecto',
+    controlsHelp:
+      'Elige una casilla y pulsa la tecla o el botón que quieras. Cada tecla sirve para un solo movimiento.',
+    controlsNote: 'El stick sigue a la cruceta. A dos jugadores, las teclas son las del modo.',
+    capKey: 'Pulsa la tecla que quieras',
+    capKeyCancel: '[ ESC para cancelar ]',
+    capPad: 'Pulsa el botón que quieras',
+    capPadCancel: '[ {0} para cancelar ]',
+    capReserved: 'El juego ya usa esta tecla (pausa, música, mapa…).',
+    capReservedPad: 'El juego ya usa este botón (pausa, música, mapa…).',
+    capUnknown: 'El juego no puede leer esta tecla.',
   },
 };
 
@@ -512,6 +611,15 @@ export class Shell {
   private settingSel = 0;
   /** The player's settings, as the settings page shows them. */
   settings: PlayerSettings = { ...DEFAULT_SETTINGS };
+  /** The player's keys and buttons, as the controls page shows them (G.4). */
+  bindings: Bindings = DEFAULT_BINDINGS;
+  /** The controls page's selected row and column. */
+  private ctrlRow = 0;
+  private ctrlCol = 0;
+  /** Set while a slot waits for its key or button. */
+  private capture: Capture | null = null;
+  /** A key or button changed on the controls page. */
+  onBindings?: (b: Bindings) => void;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
@@ -596,6 +704,15 @@ export class Shell {
     this.render();
   }
 
+  /** The controls page (G.4), from the settings page. */
+  showControls(): void {
+    this.screen = 'controls';
+    this.ctrlRow = 0;
+    this.ctrlCol = 0;
+    this.endCapture();
+    this.render();
+  }
+
   /**
    * The sound panel over the paused game (port addition): sound, music and volume, which the
    * game applies at once. `onClose` runs when it closes.
@@ -608,6 +725,7 @@ export class Shell {
   }
 
   hide(): void {
+    this.endCapture();
     this.screen = null;
     this.fadeFrom = null;
     this.fadeReady = null;
@@ -731,6 +849,10 @@ export class Shell {
     if (!this.screen) return;
     const inp = this.input;
     inp.poll();
+    if (this.capture) {
+      this.updateCapture();
+      return;
+    }
     const up = inp.consumeMenu('up');
     const down = inp.consumeMenu('down');
     const left = inp.consumeMenu('left');
@@ -770,6 +892,14 @@ export class Shell {
         }
         if (ok) this.confirmSetting();
         if (esc) this.leaveSettings();
+        break;
+      case 'controls':
+        if (up) this.selectControl(this.ctrlRow - 1, this.ctrlCol);
+        if (down) this.selectControl(this.ctrlRow + 1, this.ctrlCol);
+        if (left && this.ctrlRow < CTRL_RESET) this.selectControl(this.ctrlRow, this.ctrlCol - 1);
+        if (right && this.ctrlRow < CTRL_RESET) this.selectControl(this.ctrlRow, this.ctrlCol + 1);
+        if (ok) this.confirmControl();
+        if (esc) this.leaveControls();
         break;
     }
   }
@@ -876,6 +1006,10 @@ export class Shell {
       this.leaveSettings();
       return;
     }
+    if (row === 'controls') {
+      this.showControls();
+      return;
+    }
     if (row === 'volume') {
       const v = this.settings.volume;
       this.setVolume(v >= 100 ? 0 : v + VOLUME_STEP);
@@ -903,6 +1037,91 @@ export class Shell {
   private setVolume(v: number): void {
     const vol = Math.max(0, Math.min(100, Math.round(v / VOLUME_STEP) * VOLUME_STEP));
     if (vol !== this.settings.volume) this.changeSettings({ volume: vol });
+  }
+
+  // ---------------------------------------------------------- controls (G.4)
+
+  private selectControl(row: number, col: number): void {
+    const rows = CTRL_BACK + 1;
+    const r = (row + rows) % rows;
+    const c = Math.max(0, Math.min(CTRL_COLS.length - 1, col));
+    if (r === this.ctrlRow && c === this.ctrlCol) return;
+    this.ctrlRow = r;
+    this.ctrlCol = c;
+    this.render();
+  }
+
+  /** Space, A or a click: a slot waits for its key or button; the other rows act. */
+  private confirmControl(): void {
+    if (this.ctrlRow === CTRL_BACK) {
+      this.leaveControls();
+    } else if (this.ctrlRow === CTRL_RESET) {
+      this.changeBindings(DEFAULT_BINDINGS);
+    } else {
+      this.capture = { row: this.ctrlRow, col: this.ctrlCol, note: null };
+      this.input.startCapture();
+      this.render();
+    }
+  }
+
+  /** Back to the settings page, on its controls row. */
+  private leaveControls(): void {
+    this.endCapture();
+    this.screen = 'settings';
+    this.settingSel = SETTING_ROWS.indexOf('controls');
+    this.render();
+  }
+
+  /**
+   * While a slot waits: Escape (or the controller's Start) cancels, as the SWF's screen says;
+   * a key goes in a keyboard slot, a button in the controller's. Keys and buttons the game
+   * keeps, or cannot read, leave a note and the slot waits on.
+   */
+  private updateCapture(): void {
+    const cap = this.capture!;
+    const got = this.input.pollCapture();
+    if (!got) return;
+    const action = MOVES[cap.row];
+    const t = this.t;
+    const onPad = cap.col === 2;
+    if (got.kind === 'key') {
+      if (got.code === Key.ESCAPE) return this.stopCapture();
+      if (onPad) return;
+      if (isReservedKey(got.code)) return this.captureNote(t.capReserved);
+      if (got.code < 0 || keyName(got.code) === null) return this.captureNote(t.capUnknown);
+      this.stopCapture();
+      this.changeBindings(bindKey(this.bindings, action, cap.col as 0 | 1, got.code));
+    } else {
+      if (got.button === PAD.START) return this.stopCapture();
+      if (!onPad) return;
+      if (!BINDABLE_BUTTONS.includes(got.button)) return this.captureNote(t.capReservedPad);
+      this.stopCapture();
+      this.changeBindings(bindButton(this.bindings, action, got.button));
+    }
+  }
+
+  private captureNote(note: string): void {
+    if (this.capture) this.capture.note = note;
+    this.render();
+  }
+
+  /** Ends the wait: the key or button that ended it does not move the page too. */
+  private stopCapture(): void {
+    this.endCapture();
+    this.input.lockMenuHeld();
+    this.render();
+  }
+
+  private endCapture(): void {
+    if (!this.capture) return;
+    this.capture = null;
+    this.input.stopCapture();
+  }
+
+  private changeBindings(b: Bindings): void {
+    this.bindings = b;
+    this.onBindings?.(b);
+    this.render();
   }
 
   private changeSettings(change: Partial<PlayerSettings>): void {
@@ -944,11 +1163,15 @@ export class Shell {
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.45 }));
     } else {
       this.drawBackground(
-        this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings',
+        this.screen === 'quests' ||
+          this.screen === 'fridge' ||
+          this.screen === 'settings' ||
+          this.screen === 'controls',
       );
     }
     if (this.screen === 'menu') this.drawMenu();
     else if (this.screen === 'settings' || this.screen === 'sound') this.drawSettings();
+    else if (this.screen === 'controls') this.drawControls();
     else if (this.screen === 'quests') this.drawQuests();
     else if (this.screen === 'fridge') this.drawFridge();
     else if (this.result) this.drawResult(this.result);
@@ -1513,7 +1736,7 @@ export class Shell {
     this.gearAt(W / 2, y0 + 62);
 
     const top = y0 + 98;
-    const rowH = 46;
+    const rowH = inGame ? 46 : 42;
     const count = rows.length - 1;
     rows.forEach((row, i) => {
       if (row === 'back') return;
@@ -1540,6 +1763,19 @@ export class Shell {
       if (row === 'volume') {
         btn.addChild(speaker(56, cy, st.volume > 0, sel ? C.gold : C.wood));
         this.volumeGauge(btn, cy, sel, label.x + label.width);
+        return;
+      }
+      if (row === 'controls') {
+        // The device in use, and a chevron: the row opens a page
+        const color = sel ? C.gold : C.heading;
+        if (this.input.device === 'gamepad') {
+          const g = padGlyph('a', this.input.padLayout, 16, sel ? 'onDark' : 'onLight');
+          g.position.set(63, cy);
+          btn.addChild(g);
+        } else {
+          btn.addChild(keycapIcon(63, cy, color));
+        }
+        this.text('›', 'label', 368, cy - 15, { align: 'right', size: 26, color, parent: btn });
         return;
       }
       const x = 56;
@@ -1619,6 +1855,207 @@ export class Shell {
       color: sel ? C.gold : C.inkSoft,
       parent,
     });
+  }
+
+  /**
+   * The controls page (G.4): each move's two keyboard slots and controller slot, as the SWF's
+   * key setup screen (`#910`) has a key per move; then the default keys and back. A slot that
+   * waits shows the SWF's prompt instead of the help, and the page under it waits too (a
+   * click anywhere cancels).
+   */
+  private drawControls(): void {
+    const t = this.t;
+    const b = this.bindings;
+    const cap = this.capture;
+    this.panel(12, 12, 396, H - 20);
+    this.text(t.controlsTitle, 'title', W / 2, 22, { size: 26, color: C.heading });
+
+    // Column heads
+    const headY = CTRL_TOP - 24;
+    const [k0] = CTRL_COLS[0];
+    const [k1, kw] = CTRL_COLS[1];
+    const [px, pw] = CTRL_COLS[2];
+    this.text(t.keyboard, 'label', (k0 + k1 + kw) / 2, headY, { size: 12, color: C.inkSoft });
+    this.text(t.pad, 'label', px + pw / 2, headY, { size: 12, color: C.inkSoft });
+
+    MOVES.forEach((action, row) => {
+      const y = CTRL_TOP + row * CTRL_ROW_H;
+      const h = CTRL_ROW_H - 6;
+      const cy = y + h / 2;
+      const rowSel = row === this.ctrlRow;
+      this.text(t[`mv_${action}`], 'label', 36, cy - 9, {
+        align: 'left',
+        size: 15,
+        color: rowSel ? C.heading : C.ink,
+      });
+      CTRL_COLS.forEach(([x, w], col) => {
+        const sel = rowSel && col === this.ctrlCol;
+        const waiting = cap?.row === row && cap.col === col;
+        const btn = this.button(
+          [x, y, w - 4, h],
+          () => {
+            this.ctrlRow = row;
+            this.ctrlCol = col;
+            this.confirmControl();
+          },
+          sel || waiting,
+          8,
+        );
+        if (!sel && !waiting) {
+          // An empty well, so the slots read as boxes
+          btn.addChildAt(
+            new Graphics()
+              .roundRect(x, y, w - 4, h, 8)
+              .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
+            0,
+          );
+        }
+        const mid = x + (w - 4) / 2;
+        if (waiting) {
+          this.text('…', 'label', mid, cy - 11, { size: 18, color: C.gold, parent: btn });
+          return;
+        }
+        if (col < 2) this.keySlot(btn, b.keys[action][col], mid, cy, sel);
+        else this.padSlot(btn, b.pad[action], mid, cy, sel);
+      });
+    });
+
+    // The default keys, a smaller row
+    const resetY = CTRL_TOP + MOVES.length * CTRL_ROW_H + 2;
+    const resetSel = this.ctrlRow === CTRL_RESET;
+    const reset = this.button(
+      [W / 2 - 90, resetY, 180, 30],
+      () => {
+        this.ctrlRow = CTRL_RESET;
+        this.confirmControl();
+      },
+      resetSel,
+      15,
+    );
+    this.text(t.resetKeys, 'label', W / 2, resetY + 7, {
+      size: 13,
+      color: resetSel ? C.gold : C.heading,
+      parent: reset,
+    });
+
+    // The help, or the prompt of a slot that waits
+    const helpY = resetY + 46;
+    if (cap) {
+      const onPad = cap.col === 2;
+      this.text(onPad ? t.capPad : t.capKey, 'label', W / 2, helpY, {
+        size: 16,
+        color: C.heading,
+      });
+      const cancel = onPad
+        ? t.capPadCancel.replace('{0}', padLabel('start', this.input.padLayout))
+        : t.capKeyCancel;
+      this.text(cancel, 'label', W / 2, helpY + 24, { size: 12, color: C.inkSoft });
+      if (cap.note) {
+        this.text(cap.note, 'body', W / 2, helpY + 46, {
+          width: 330,
+          size: 11,
+          italic: true,
+          color: C.progress,
+        });
+      }
+    } else {
+      this.text(t.controlsHelp, 'body', W / 2, helpY, {
+        width: 330,
+        size: 11,
+        italic: true,
+        color: C.inkSoft,
+      });
+    }
+    this.text(t.controlsNote, 'body', W / 2, BUTTON_Y - 58, {
+      width: 330,
+      size: 10,
+      color: C.todo,
+    });
+
+    const backSel = this.ctrlRow === CTRL_BACK;
+    this.actionButton(
+      t.back,
+      BUTTON_Y,
+      () => this.leaveControls(),
+      170,
+      true,
+      backSel ? 'auto' : 'pad',
+    );
+
+    if (cap) {
+      // Over the page: a click cancels the wait
+      const veil = new Container();
+      veil.eventMode = 'static';
+      veil.hitArea = new Rectangle(0, 0, W, H);
+      veil.on('pointertap', () => this.stopCapture());
+      this.root.addChild(veil);
+    }
+  }
+
+  /** A keyboard slot's keys, as keycaps side by side, or a dash. */
+  private keySlot(
+    parent: Container,
+    codes: readonly number[],
+    cx: number,
+    cy: number,
+    sel: boolean,
+  ): void {
+    if (codes.length === 0) {
+      this.text('—', 'label', cx, cy - 9, { size: 14, color: sel ? C.gold : C.todo, parent });
+      return;
+    }
+    const caps = codes.map((kc) => {
+      const c = new Container();
+      const k = this.text(keyName(kc, this.lang) ?? '?', 'label', 0, 0, {
+        align: 'left',
+        size: 10,
+        color: C.heading,
+        parent: c,
+      });
+      const w = Math.max(18, k.width + 10);
+      c.addChildAt(
+        new Graphics()
+          .roundRect(0, 1.5, w, 18, 4)
+          .fill(0xc8a878)
+          .roundRect(0, 0, w, 18, 4)
+          .fill(0xfffaf0),
+        0,
+      );
+      k.position.set((w - k.width) / 2, (18 - k.height) / 2);
+      return { c, w };
+    });
+    const gap = 4;
+    let x = cx - (caps.reduce((n, k) => n + k.w, 0) + gap * (caps.length - 1)) / 2;
+    for (const k of caps) {
+      k.c.position.set(x, cy - 10);
+      parent.addChild(k.c);
+      x += k.w + gap;
+    }
+  }
+
+  /** A controller slot's buttons, as the controller in use shows them, or a dash. */
+  private padSlot(
+    parent: Container,
+    buttons: readonly number[],
+    cx: number,
+    cy: number,
+    sel: boolean,
+  ): void {
+    const glyphs = buttons
+      .map((i) => padButtonOf(i))
+      .filter((p) => p !== null)
+      .map((p) => padGlyph(p, this.input.padLayout, 17, sel ? 'onDark' : 'onLight'));
+    if (glyphs.length === 0) {
+      this.text('—', 'label', cx, cy - 9, { size: 14, color: sel ? C.gold : C.todo, parent });
+      return;
+    }
+    const gap = 4;
+    let x = cx - (glyphs.reduce((n, g) => n + g.width, 0) + gap * (glyphs.length - 1)) / 2;
+    for (const g of glyphs) {
+      g.position.set(x + g.width / 2, cy);
+      parent.addChild(g);
+      x += g.width + gap;
+    }
   }
 
   /** A big gear under the settings title. */
@@ -2034,6 +2471,21 @@ function gear(x: number, y: number, r: number, color: number | string): Graphics
     .fill(color)
     .circle(x, y, r * 0.34)
     .cut();
+}
+
+/** A small keyboard 18 px wide centered on (`cx`, `cy`): the controls row's icon (G.4). */
+function keycapIcon(cx: number, cy: number, color: number | string): Graphics {
+  const g = new Graphics().roundRect(cx - 9, cy - 6, 18, 12, 2.5).stroke({ color, width: 1.6 });
+  for (const [dx, dy] of [
+    [-5, -2],
+    [-1.5, -2],
+    [2, -2],
+    [5.5, -2],
+  ]) {
+    g.rect(cx + dx - 1, cy + dy - 1, 2, 2);
+  }
+  g.rect(cx - 4, cy + 2, 8, 1.8);
+  return g.fill(color);
 }
 
 /**

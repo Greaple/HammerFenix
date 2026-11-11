@@ -1,4 +1,4 @@
-import type { ControlAction } from './Input';
+import type { ControlAction, PlayerAction } from './Input';
 
 /**
  * Controllers (roadmap G.1, G.2). Port addition: the Flash game had the keyboard only.
@@ -18,10 +18,15 @@ export const PAD = {
   L1: 4,
   /** Right bumper (R1, RB, R). */
   R1: 5,
+  /** Left trigger (L2, LT, ZL). */
+  L2: 6,
   /** Right trigger (R2, RT, ZR). */
   R2: 7,
   BACK: 8,
   START: 9,
+  /** Stick presses (L3, R3). */
+  L3: 10,
+  R3: 11,
   UP: 12,
   DOWN: 13,
   LEFT: 14,
@@ -87,21 +92,20 @@ class Pad {
     return !!pad && pad.connected && pad.index === this.index && pad.id === this.id;
   }
 
-  read(pad: Gamepad): PadState {
-    const btn = (i: number) => pad.buttons[i]?.pressed === true;
+  /** Reads the controller; the moves are the buttons of `moves` (the stick is the D-pad). */
+  read(pad: Gamepad, moves: PadMoves): PadState {
     const s = this.readStick(pad.axes[0] ?? 0, pad.axes[1] ?? 0);
+    const btn = (i: number) => pad.buttons[i]?.pressed === true || stickHolds(s, i);
 
-    const left = btn(PAD.LEFT) || s.has('left');
-    const right = btn(PAD.RIGHT) || s.has('right');
-    const up = btn(PAD.UP) || s.has('up');
-    const down = btn(PAD.DOWN) || s.has('down');
+    const left = btn(PAD.LEFT);
+    const right = btn(PAD.RIGHT);
+    const up = btn(PAD.UP);
+    const down = btn(PAD.DOWN);
 
     const actions = new Set<ControlAction>();
-    if (left) actions.add('left');
-    if (right) actions.add('right');
-    if (up || btn(PAD.A)) actions.add('jump');
-    if (down) actions.add('down');
-    if (btn(PAD.B) || btn(PAD.X) || btn(PAD.R2)) actions.add('attack');
+    for (const [a, list] of Object.entries(moves) as [PlayerAction, readonly number[]][]) {
+      if (list.some(btn)) actions.add(a);
+    }
     if (btn(PAD.START)) actions.add('pause');
     if (btn(PAD.BACK)) actions.add('music');
     if (btn(PAD.Y)) actions.add('disguise');
@@ -133,6 +137,28 @@ class Pad {
     return this.stick;
   }
 }
+
+/** Whether the stick, pushed to `dirs`, holds D-pad button `i`. */
+function stickHolds(dirs: ReadonlySet<Dir>, i: number): boolean {
+  return (
+    (i === PAD.LEFT && dirs.has('left')) ||
+    (i === PAD.RIGHT && dirs.has('right')) ||
+    (i === PAD.UP && dirs.has('up')) ||
+    (i === PAD.DOWN && dirs.has('down'))
+  );
+}
+
+/** The buttons of each move (G.4, `Bindings.pad`). */
+export type PadMoves = Readonly<Record<PlayerAction, readonly number[]>>;
+
+/** The buttons the game gave the moves before G.4 (`DEFAULT_BINDINGS.pad`). */
+export const DEFAULT_PAD_MOVES: PadMoves = {
+  left: [PAD.LEFT],
+  right: [PAD.RIGHT],
+  jump: [PAD.A, PAD.UP],
+  down: [PAD.DOWN],
+  attack: [PAD.B, PAD.X, PAD.R2],
+};
 
 /** A controller, as the Gamepad API names it. */
 export interface PadRef {
@@ -188,6 +214,29 @@ export class PadManager {
     this.fill();
   }
 
+  /** The buttons of each move, for every controller (G.4). */
+  moves: PadMoves = DEFAULT_PAD_MOVES;
+
+  /**
+   * The buttons held on any controller plugged in, the stick counting as the D-pad (G.4: a
+   * move's new button). Read with the joining's thresholds, apart from the players' sticks.
+   */
+  heldButtons(): Set<number> {
+    const out = new Set<number>();
+    for (const pad of getPads()) {
+      if (!pad?.connected) continue;
+      pad.buttons.forEach((b, i) => {
+        if (b.pressed) out.add(i);
+      });
+      const [x = 0, y = 0] = pad.axes;
+      if (x < -STICK_X.PRESS) out.add(PAD.LEFT);
+      if (x > STICK_X.PRESS) out.add(PAD.RIGHT);
+      if (y < -STICK_Y.PRESS) out.add(PAD.UP);
+      if (y > STICK_Y.PRESS) out.add(PAD.DOWN);
+    }
+    return out;
+  }
+
   /** The controllers plugged in that have a button pressed, whoever holds them (G.3: joining). */
   pressed(): PadRef[] {
     const out: PadRef[] = [];
@@ -236,7 +285,7 @@ export class PadManager {
   read(): PadState[] {
     const pads = getPads();
     this.update(pads);
-    return this.slots.map((p) => (p ? p.read(pads[p.index]!) : EMPTY_PAD));
+    return this.slots.map((p) => (p ? p.read(pads[p.index]!, this.moves) : EMPTY_PAD));
   }
 
   /** Notices the controllers unplugged and plugged in since the last read. */

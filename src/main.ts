@@ -2,6 +2,8 @@ import { Application, UPDATE_PRIORITY } from 'pixi.js';
 import { AudioEngine } from './engine/Audio';
 import { loadGameFonts } from './engine/Fonts';
 import { InputController, type ControlAction } from './engine/Input';
+import { bindingKeys, loadBindings, saveBindings } from './engine/Bindings';
+import { showHelpKeys } from './ui/HelpKeys';
 import { SwfLibrary } from './engine/swf/SwfLibrary';
 import { runQueuedFrameActions } from './engine/swf/SwfMovieClip';
 import { GameDataStore } from './game/Data';
@@ -190,6 +192,19 @@ async function main(): Promise<void> {
   // The settings page (the site's "Options"): the next game reads them
   shell.settings = { ...session.settings };
   shell.onSettings = (settings) => session.setSettings(settings);
+  // The player's own keys and buttons (G.4), from the settings page's controls page
+  const applyBindings = () => {
+    input.setMoveKeys(bindingKeys(shell.bindings), shell.bindings.pad);
+    showHelpKeys(shell.bindings, dataStore.langId);
+    applyPageText(pickLang(dataStore.langId, []));
+  };
+  shell.bindings = loadBindings();
+  applyBindings();
+  shell.onBindings = (b) => {
+    saveBindings(b);
+    applyBindings();
+    showDevice();
+  };
   // Port addition: the sound panel over the paused game (the pause's button, O or R1). The game
   // stops while it shows, and the key that closes it does not reach the game.
   const openSound = () => {
@@ -355,6 +370,8 @@ async function main(): Promise<void> {
   langSelect?.addEventListener('change', async () => {
     await dataStore.setLang(langSelect.value);
     session.saveSettings();
+    showHelpKeys(shell.bindings, dataStore.langId);
+    showDevice();
     applyPageText(lang());
     shell.refresh();
   });
