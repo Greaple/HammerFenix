@@ -245,7 +245,21 @@ async function main(): Promise<void> {
     // The co-op mode is the Adventure for two and sends its items too (`MultiCoop.saveScore`)
     const counts = session.siteMode === 'solo' || session.siteMode === 'multicoop';
     const record = counts ? profile.recordGame(result) : null;
-    shell.showResult(result, record);
+    // A Time Attack game sends a time and its run (`TimeAttack.saveScore`); one the menu
+    // started may set the best time
+    const timed =
+      result.kind === 'gameOver' &&
+      result.runId !== null &&
+      (session.mode === 'timeattack' || session.mode === 'multitime');
+    const time = timed
+      ? profile.timeResult(
+          session.mode,
+          result.runId!,
+          result.score,
+          session.siteMode === session.mode,
+        )
+      : null;
+    shell.showResult(result, record, time);
   };
   (window as any).profile = profile;
   (window as any).shell = shell;

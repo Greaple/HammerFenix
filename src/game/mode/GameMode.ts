@@ -136,6 +136,12 @@ export abstract class GameMode implements IGameContext {
   fl_bombExpert: boolean;
   /** Only `MultiCoop` turns it on (`OPT_BOMB_CONTROL`, Phase 4). */
   fl_bombControl = false;
+  /**
+   * `GameMode.fl_static`: "si true, le comportement initial des monstres sera prévisible
+   * (random sinon)". Walkers and flyers then start in a fixed direction (`Bad.ts`). Only
+   * `TimeAttack` turns it on.
+   */
+  fl_static = false;
   /** `Mode._name`: the mode's name, which `Player` checks against `$time`. */
   _name = '$abstractGameMode';
 
@@ -239,6 +245,8 @@ export abstract class GameMode implements IGameContext {
   protected joinAsked: number[] | null = null;
   /** The players choose their devices in this game (`askJoin`). */
   protected fl_join = false;
+  /** The game was locked when the join screen showed (`startJoin`). */
+  protected joinLocked = false;
   /** The keys the mode gave each player, by pid: the keyboard sides a player can choose. */
   protected joinSides: PlayerKeys[] = [];
   protected darknessMC: SwfMovieClip | null = null;
@@ -1687,14 +1695,23 @@ export abstract class GameMode implements IGameContext {
    */
   protected startJoin(fl_lost: boolean): void {
     if (this.fl_pause) this.onUnpause();
-    if (this.fl_lock || !this.joinAsked) return;
+    if (!this.canJoin() || !this.joinAsked) return;
     const pids = this.joinAsked;
     this.joinAsked = null;
     this.pauseAsked = false;
     this.fl_pause = true;
+    this.joinLocked = this.fl_lock;
     this.lock();
     this.world.lock();
     this.join = new JoinScreen(this, pids, this.joinSides, fl_lost);
+  }
+
+  /**
+   * Whether the join screen can show now: not while the game is locked (a level change). The
+   * Time Attack modes also allow it during their countdown.
+   */
+  protected canJoin(): boolean {
+    return !this.fl_lock;
   }
 
   /** The join screen's tick; the game goes on once every player has a device. */
@@ -1703,7 +1720,8 @@ export abstract class GameMode implements IGameContext {
     this.join.destroy();
     this.join = null;
     this.fl_pause = false;
-    this.unlock();
+    // A game that was locked under the screen (the Time Attack countdown) stays locked
+    if (!this.joinLocked) this.unlock();
     this.world.unlock();
   }
 

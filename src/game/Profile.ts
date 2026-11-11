@@ -24,6 +24,31 @@ export const MODE_OPTIONS: Record<string, readonly string[]> = {
   multicoop: [Data.OPT_MIRROR_MULTI, Data.OPT_NIGHTMARE_MULTI, Data.OPT_LIFE_SHARING],
 };
 
+/**
+ * The level set choices (`$options`) of the Time Attack modes, one per run (`set_ta_N`,
+ * `set_mta_N`). The site's mode menu had a select for them (`.slc`).
+ */
+export const MODE_RUNS: Record<string, readonly string[]> = {
+  timeattack: [Data.OPT_SET_TA_0, Data.OPT_SET_TA_1, Data.OPT_SET_TA_2],
+  multitime: [Data.OPT_SET_MTA_0, Data.OPT_SET_MTA_1, Data.OPT_SET_MTA_2],
+};
+
+/** `TimeAttack.INFINITY`: the time a lost Time Attack game sends. */
+export const NO_TIME = 59 * 60 * 1000 + 59 * 1000 + 999;
+
+/** A Time Attack game's time against the profile's best (`Profile.timeResult`). */
+export interface TimeResult {
+  /** The site's `$mode`: `timeattack` or `multitime`. */
+  mode: string;
+  runId: number;
+  /** The time sent, in milliseconds; `NO_TIME` for a lost game. */
+  time: number;
+  /** The best time before this game, null if none. */
+  best: number | null;
+  /** This game beat the best time (or set the first one). */
+  isNew: boolean;
+}
+
 /** The part of `Storage` the profile uses, so tests can pass their own. */
 export type ProfileStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
@@ -71,6 +96,47 @@ export class Profile {
     return this.data.options.includes(oid);
   }
 
+  /**
+   * The profile can play `mode`. Quests give `timeattack` (73) and `multicoop` (67); no quest
+   * gives `multitime`, so the port's guess: a player who has both has it.
+   */
+  hasMode(mode: string): boolean {
+    if (mode === 'multitime') return this.hasMode('timeattack') && this.hasMode('multicoop');
+    return this.data.modes.includes(mode);
+  }
+
+  /**
+   * The run a Time Attack game plays (its `set_*` option), null for another mode. The first
+   * run the profile has: quest 73 gives `set_ta_0` and no quest gives another, so the menu has
+   * no run to choose. No quest gives a `set_mta_*` either: the port's guess is run 0.
+   */
+  runOption(mode: string): string | null {
+    const runs = MODE_RUNS[mode];
+    if (!runs) return null;
+    if (mode === 'multitime') return runs[0];
+    return runs.find((o) => this.hasOption(o)) ?? null;
+  }
+
+  /** The best time of a Time Attack run, in milliseconds, or null. */
+  bestTime(mode: string, runId: number): number | null {
+    return this.data.times[mode]?.[runId] ?? null;
+  }
+
+  /**
+   * A Time Attack game's time against the best one. With `record` (a game the menu started),
+   * a finished run's better time becomes the best and is saved. A lost game has no time.
+   */
+  timeResult(mode: string, runId: number, time: number, record: boolean): TimeResult {
+    const best = this.bestTime(mode, runId);
+    const isNew = time < NO_TIME && (best === null || time < best);
+    if (isNew && record) {
+      const times = (this.data.times[mode] ??= []);
+      times[runId] = time;
+      this.save();
+    }
+    return { mode, runId, time, best, isNew };
+  }
+
   isChosen(oid: string): boolean {
     return this.hasOption(oid) && this.data.chosen.includes(oid);
   }
@@ -91,6 +157,8 @@ export class Profile {
   optionsParam(mode: string): string {
     const out = (MODE_OPTIONS[mode] ?? []).filter((o) => this.isChosen(o));
     if (this.hasOption(Data.OPT_BOOST)) out.push(Data.OPT_BOOST);
+    const run = this.runOption(mode);
+    if (run) out.push(run);
     return out.join(',');
   }
 
@@ -136,6 +204,12 @@ export function decodeProfile(raw: string): ProfileData | null {
   if (typeof v.tokens === 'number') p.tokens = v.tokens;
   if (typeof v.bank === 'number') p.bank = v.bank;
   if (typeof v.games === 'number') p.games = v.games;
+  if (v.times && typeof v.times === 'object' && !Array.isArray(v.times)) {
+    for (const [mode, list] of Object.entries(v.times)) {
+      if (nums(list))
+        p.times[mode] = (list as (number | null)[]).map((n) => n ?? undefined) as number[];
+    }
+  }
   return p;
 }
 
@@ -155,7 +229,7 @@ function defaultStorage(): ProfileStorage | null {
 export function resultPicks(r: GameResult): [number, number][] {
   let counts: number[] = [];
   if (r.kind === 'gameOver') {
-    counts = r.stats.item2;
+    counts = r.stats.item2 ?? [];
   } else if (r.params) {
     const codec = new PersistCodec();
     const [special, score] = (codec.decode<string>(r.params) ?? '').split(':');

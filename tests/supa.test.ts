@@ -147,7 +147,7 @@ describe('super item of a perfect clear (Adventure.onLevelClear)', () => {
     startLevel6();
     const bads = [...session.game.getBads()].sort(
       (a, b) =>
-        adventure().perfectOrder.indexOf(a.uniqId) - adventure().perfectOrder.indexOf(b.uniqId),
+        adventure().perfectOrder!.indexOf(a.uniqId) - adventure().perfectOrder!.indexOf(b.uniqId),
     );
     killAll(bads);
     const l = supas();
@@ -162,7 +162,7 @@ describe('super item of a perfect clear (Adventure.onLevelClear)', () => {
     startLevel6();
     const bads = [...session.game.getBads()].sort(
       (a, b) =>
-        adventure().perfectOrder.indexOf(b.uniqId) - adventure().perfectOrder.indexOf(a.uniqId),
+        adventure().perfectOrder!.indexOf(b.uniqId) - adventure().perfectOrder!.indexOf(a.uniqId),
     );
     killAll(bads);
     expect(supas().length).toBe(0);

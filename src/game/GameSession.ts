@@ -21,6 +21,8 @@ import { padStartText } from './gui/PadGlyphs';
 import { Log } from './Log';
 import { Adventure } from './mode/Adventure';
 import { MultiCoop } from './mode/MultiCoop';
+import { TimeAttack } from './mode/TimeAttack';
+import { TimeAttackMulti } from './mode/TimeAttackMulti';
 import { Tutorial } from './mode/Tutorial';
 import type { GameMode } from './mode/GameMode';
 
@@ -48,10 +50,13 @@ const ADVENTURE_DIMENSIONS = ['deepnight', 'hiko', 'ayame', 'hk'];
 
 /**
  * The level sets of the modes that have their own (`initWorld`), by `$mode`: the Learning mode's
- * lessons, then the demo levels it leads to (`Tutorial`, `Shareware`).
+ * lessons, then the demo levels it leads to (`Tutorial`, `Shareware`), and the Time Attack runs
+ * (`xml_time`, `xml_multitime`).
  */
 const MODE_SETS: Record<string, string[]> = {
   tutorial: ['tutorial', 'shareware'],
+  timeattack: ['timeAttack'],
+  multitime: ['multiTime'],
 };
 
 /**
@@ -94,8 +99,8 @@ export class GameSession {
   readonly musics = MUSIC_TRACKS;
   /**
    * The site's `$mode` of the current game (`GameManager.isMode`): `solo` (Adventure),
-   * `tutorial` or `multicoop`. The debug tools' games keep the mode of the game before; a set change goes back
-   * to `solo`.
+   * `tutorial`, `multicoop`, `timeattack` or `multitime`. The debug tools' games keep the mode
+   * of the game before; a set change goes back to `solo`.
    */
   mode = 'solo';
   /**
@@ -352,9 +357,10 @@ export class GameSession {
 
   /**
    * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. `solo` (`Adventure`),
-   * `tutorial` and `multicoop` are ported; any other plays the Adventure, which plays the other
-   * sets too. Deviation: the co-op starts on `firstLevel` too (level 0 in the original), for the
-   * debug tools.
+   * `tutorial`, `multicoop`, `timeattack` and `multitime` are ported; any other plays the
+   * Adventure, which plays the other sets too. Deviation: the co-op starts on `firstLevel` too
+   * (level 0 in the original), for the debug tools; the Time Attack modes start on their run's
+   * first level whatever it is, as in the original.
    */
   private createMode(firstLevel: number): GameMode {
     if (this.isTutorial()) {
@@ -362,6 +368,12 @@ export class GameSession {
     }
     if (this.isMultiCoop()) {
       return new MultiCoop(this, firstLevel);
+    }
+    if (this.isTimeAttack()) {
+      return new TimeAttack(this, firstLevel);
+    }
+    if (this.isMultiTime()) {
+      return new TimeAttackMulti(this, firstLevel);
     }
     return new Adventure(this, firstLevel);
   }
@@ -374,6 +386,25 @@ export class GameSession {
   /** `GameManager.isMultiCoop` */
   isMultiCoop(): boolean {
     return this.mode === 'multicoop';
+  }
+
+  /** `GameManager.isTimeAttack` */
+  isTimeAttack(): boolean {
+    return this.mode === 'timeattack';
+  }
+
+  /** `GameManager.isMultiTime` */
+  isMultiTime(): boolean {
+    return this.mode === 'multitime';
+  }
+
+  /**
+   * `GameManager.fatal`: a critical error stops the game (the original logs it, destroys the
+   * mode and removes the game's clip). Here it throws, which stops the game being built.
+   */
+  fatal(msg: string): never {
+    Log.trace('*** CRITICAL ERROR *** ' + msg);
+    throw new Error(msg);
   }
 
   /**

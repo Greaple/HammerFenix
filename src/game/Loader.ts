@@ -6,13 +6,17 @@ import type { SwfMovieClip } from '../engine/swf/SwfMovieClip';
 export interface ScoreStats {
   /** `$reachedLevel`: the level reached in the adventure (`dimensions[0].currentId`). */
   reachedLevel: number;
-  /** `$item2` (`GameMode.getPicks2`): pick count per item id, score items at id + 1000. */
-  item2: number[];
   /**
-   * `$data`: the game log (`manager.history`) as rebuilt by `Adventure.onGameOver`, or each
-   * player's score in the co-op mode (`MultiCoop.saveScore`: `$s0`, `$s1`).
+   * `$item2` (`GameMode.getPicks2`): pick count per item id, score items at id + 1000. Null in
+   * the Time Attack modes (`TimeAttack.saveScore`).
    */
-  data: string[] | { s0: number; s1: number };
+  item2: number[] | null;
+  /**
+   * `$data`: the game log (`manager.history`) as rebuilt by `Adventure.onGameOver`, each
+   * player's score in the co-op mode (`MultiCoop.saveScore`: `$s0`, `$s1`), or null (Time
+   * Attack).
+   */
+  data: string[] | { s0: number; s1: number } | null;
 }
 
 /**
@@ -177,10 +181,11 @@ export class Loader {
     if (cover) this.attachLoading(6);
   }
 
-  private countUniques(a: number[]): number {
+  private countUniques(a: number[] | null): number {
     let n = 0;
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] != null) {
+    // AS2 reads no `length` on null: 0
+    for (let i = 0; i < (a?.length ?? 0); i++) {
+      if (a?.[i] != null) {
         n++;
       }
     }

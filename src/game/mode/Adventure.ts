@@ -20,8 +20,11 @@ import { GameMode } from './GameMode';
  * world `xml_dev`.
  */
 export class Adventure extends GameMode {
-  /** Kill order of the level's enemies, for the super item. */
-  perfectOrder: number[] = [];
+  /**
+   * Kill order of the level's enemies, for the super item. `TimeAttack` sets it to null at the
+   * level's end, so no super item falls (AS2 reads nothing from null, hence the guards).
+   */
+  perfectOrder: number[] | null = [];
   perfectCount = 0;
 
   firstLevel: number;
@@ -113,7 +116,7 @@ export class Adventure extends GameMode {
   override attachBad(id: number, x: number, y: number): BaseEntity {
     const b = super.attachBad(id, x, y);
     if (b.isType(Data.BAD_CLEAR)) {
-      this.perfectOrder.push(b.uniqId);
+      this.perfectOrder?.push(b.uniqId);
       this.perfectCount++;
     }
     return b;
@@ -241,7 +244,7 @@ export class Adventure extends GameMode {
     super.onLevelClear();
     if (
       !this.world.isVisited() &&
-      this.perfectOrder.length === 0 &&
+      this.perfectOrder?.length === 0 &&
       (this.scriptRunner?.cycle ?? 0) >= 10
     ) {
       for (const p of this.getList(Data.PLAYER) as PlayerEntity[]) {
@@ -262,7 +265,7 @@ export class Adventure extends GameMode {
     }
 
     // Perfect order
-    if (this.badCount > 1 && b.uniqId === this.perfectOrder[0]) {
+    if (this.badCount > 1 && b.uniqId === this.perfectOrder?.[0]) {
       this.perfectOrder.splice(0, 1);
     }
   }

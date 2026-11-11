@@ -114,3 +114,18 @@ The Adventure's levels with two players. Not compared with the original running 
 | adventure 0 | The join screen, then the game with the devices chosen               | ok         | Keyboard sides and a fake controller; real controllers were not tried                         |
 | adventure 1 | A recorded game with two bots replays the same                       | ok         | `tests/replays/coop-01.json`                                                                  |
 | adventure   | A whole game for two: `$multi` level scripts, portals, game over     | needs play | Ideally beside a video of the original                                                        |
+
+## Time Attack (4.1, 4.3)
+
+The sets `timeAttack` and `multiTime`. Not compared with the original running (the Ruffle side-by-side cannot start these modes). Checked against `TimeAttack.mt` and `TimeAttackMulti.mt` in the tests, by a headless walk through every run (each level starts with its enemies, the run ends on its empty level) and in the browser.
+
+| Level                   | What to check                                                                    | Result     | Notes                                                                                                      |
+| ----------------------- | -------------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- |
+| timeAttack 0            | Countdown (nothing, 3, 2, 1), "TIME ATTACK !", the chrono bar with three lives   | ok         | Seen in the browser; no level name, no level number                                                        |
+| timeAttack 0 to 5       | Run 0: 5, 5, 6, 6, 5 and 14 enemies; leaving level 5 ends the run                | ok         | Headless walk; level 6 is the empty level                                                                  |
+| timeAttack 1            | The previous level's time slides in at the bottom left                           | ok         | Seen in the browser                                                                                        |
+| timeAttack 9 to 14      | Run 1: 6, 6, 6, 5, 6 and 7 enemies, then the end of the set                      | ok         | Headless walk; no quest gives this run (`set_ta_1`)                                                        |
+| multiTime 0             | Join screen, then the countdown; Igor and Sandy on column 10, lives at both ends | ok         | Seen in the browser; the two players start on the same spot, as the original's mirror of column 10         |
+| multiTime 0 to 5, 9-12  | Runs 0 and 1: the same enemy counts as `timeAttack`'s, other skins               | ok         | Headless walk                                                                                              |
+| timeAttack, multiTime 0 | Recorded games with bots replay the same                                         | ok         | `tests/replays/timeattack.json`, `multitime.json`                                                          |
+| timeAttack 0 to 5       | A whole run: enemies start in their fixed direction, crystals take seconds off   | needs play | Ideally beside a video of the original; the times of the site's ranking (top 6.6 s for run 0) give a scale |

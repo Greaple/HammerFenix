@@ -45,7 +45,14 @@ import { Data } from '../game/Data';
 import { padButtonOf, padGlyph, padLabel } from '../game/gui/PadGlyphs';
 import { DEFAULT_SETTINGS, type PlayerSettings, VOLUME_STEP } from '../game/GameParameters';
 import type { GameResult } from '../game/Loader';
-import { type GameRecord, MODE_OPTIONS, type Profile, resultPicks } from '../game/Profile';
+import {
+  type GameRecord,
+  MODE_OPTIONS,
+  NO_TIME,
+  type Profile,
+  resultPicks,
+  type TimeResult,
+} from '../game/Profile';
 import type { Lang } from './Language';
 
 /** The game's lang texts the screens reuse. */
@@ -101,9 +108,10 @@ const MODES: ModeEntry[] = [
   { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
   // Unlocked by quest 67 ("Sandy commence l'aventure !"); item 1221 is one of Sandy's kit
   { mode: 'multicoop', icon: { item: 1221 }, enabled: true },
-  // Item 7, the shoe that speeds Igor up (4.1); unlocked by quest 73
-  { mode: 'timeattack', icon: { item: 7 }, enabled: false },
-  { mode: 'multitime', icon: { item: 7, twice: true }, enabled: false },
+  // Item 7, the shoe that speeds Igor up; unlocked by quest 73 (4.1)
+  { mode: 'timeattack', icon: { item: 7 }, enabled: true },
+  // No quest gives it: the port's guess, with the Time Attack and the co-op (4.3)
+  { mode: 'multitime', icon: { item: 7, twice: true }, enabled: true },
   // Item 113, Tuberculoz's cape (4.5)
   { mode: 'bossrush', icon: { item: 113 }, enabled: false },
   // The soccer ball (`entity.bomb.player.SoccerBall`, 4.4)
@@ -222,6 +230,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     bossrushShort: 'L’Aventure express',
     soccerShort: 'Le football à deux',
     modeLockedBy: 'Ce mode se débloque avec la quête « {0} »',
+    modeLockedBy2: 'Ce mode se débloque avec les quêtes « {0} » et « {1} »',
+    bestTime: 'Record : {0}',
+    noTime: 'Pas encore de temps sur ce parcours',
+    newBest: 'Nouveau record !',
+    lostRun: 'Partie perdue : pas de temps',
     start: 'Commencer',
     soon: 'Bientôt',
     soonNote: 'Ce mode n’est pas encore disponible dans HammerFenix.',
@@ -334,6 +347,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     bossrushShort: 'The express Adventure',
     soccerShort: 'Football for two',
     modeLockedBy: 'This mode is unlocked by the quest “{0}”',
+    modeLockedBy2: 'This mode is unlocked by the quests “{0}” and “{1}”',
+    bestTime: 'Best time: {0}',
+    noTime: 'No time on this run yet',
+    newBest: 'New best time!',
+    lostRun: 'Game lost: no time',
     start: 'Start game',
     soon: 'Soon',
     soonNote: 'This mode is not in HammerFenix yet.',
@@ -443,6 +461,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     bossrushShort: 'La Aventura exprés',
     soccerShort: 'Fútbol a dos',
     modeLockedBy: 'Este modo se desbloquea con la exploración «{0}»',
+    modeLockedBy2: 'Este modo se desbloquea con las exploraciones «{0}» y «{1}»',
+    bestTime: 'Récord: {0}',
+    noTime: 'Aún no hay tiempo en este recorrido',
+    newBest: '¡Nuevo récord!',
+    lostRun: 'Partida perdida: sin tiempo',
     start: 'Comenzar',
     soon: 'Pronto',
     soonNote: 'Este modo aún no está en HammerFenix.',
@@ -595,6 +618,8 @@ export class Shell {
   private fadeAsked = 0;
   private result: GameResult | null = null;
   private record: GameRecord | null = null;
+  /** A Time Attack game's time against the best one, for its results page. */
+  private time: TimeResult | null = null;
   /** Index in `menuEntries()`. */
   private selected = 0;
   /**
@@ -678,10 +703,15 @@ export class Shell {
    * The page the site loaded once the game was saved: the results of `result`, and what it
    * added to the profile (`record`, for an Adventure game).
    */
-  showResult(result: GameResult, record: GameRecord | null = null): void {
+  showResult(
+    result: GameResult,
+    record: GameRecord | null = null,
+    time: TimeResult | null = null,
+  ): void {
     this.screen = 'result';
     this.result = result;
     this.record = record;
+    this.time = time;
     this.render();
   }
 
@@ -929,9 +959,15 @@ export class Shell {
     return out;
   }
 
-  /** A mode the profile does not have yet: a quest gives it. */
+  /** A mode the profile does not have yet: a quest gives it (`Profile.hasMode`). */
   private isLocked(mode: ModeEntry): boolean {
-    return !this.profile.data.modes.includes(mode.mode);
+    return !this.profile.hasMode(mode.mode);
+  }
+
+  /** The run a Time Attack mode would play (`Profile.runOption`), null for another mode. */
+  private runOf(mode: string): number | null {
+    const run = this.profile.runOption(mode);
+    return run === null ? null : Number(run.charAt(run.length - 1));
   }
 
   /** The mode's options on the menu; the Tornade boost, which applies to every game, last. */
@@ -1484,7 +1520,9 @@ export class Shell {
         ? t.soonNote
         : canStart
           ? ''
-          : fmt(t.modeLockedBy, this.questForMode(shown.mode));
+          : shown.mode === 'multitime'
+            ? fmt(t.modeLockedBy2, this.questForMode('timeattack'), this.questForMode('multicoop'))
+            : fmt(t.modeLockedBy, this.questForMode(shown.mode));
       if (note) {
         this.text(note, 'body', W / 2, desc.y + desc.height + 6, {
           width: 320,
@@ -1492,6 +1530,18 @@ export class Shell {
           italic: true,
           color: C.inkSoft,
         });
+      }
+      // The Time Attack modes: the best time of the run they play
+      const run = canStart ? this.runOf(shown.mode) : null;
+      if (run !== null) {
+        const best = this.profile.bestTime(shown.mode, run);
+        this.text(
+          best === null ? t.noTime : fmt(t.bestTime, formatRunTime(best)),
+          'label',
+          W / 2,
+          desc.y + desc.height + 10,
+          { size: best === null ? 13 : 16, color: best === null ? C.inkSoft : C.heading },
+        );
       }
     }
 
@@ -2357,6 +2407,10 @@ export class Shell {
    * to the profile: the quests it completed and the new fridge items.
    */
   private drawResult(r: GameResult): void {
+    if (this.time) {
+      this.drawTimeResult(this.time);
+      return;
+    }
     const t = this.t;
     // A game over shows its picture, which says "GAME OVER", spilling onto the panel; the end
     // of the set shows the logo and its title
@@ -2386,7 +2440,8 @@ export class Shell {
       const sector = this.texts.getSectorName(0, lvl);
       if (sector) this.text(sector, 'body', W / 2, y + 22, { color: C.inkSoft });
       const data = r.stats.data;
-      if (Array.isArray(data)) {
+      // Only the Time Attack sends no data, and it has its own page
+      if (Array.isArray(data) || data === null) {
         this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
           size: 26,
           color: C.heading,
@@ -2429,6 +2484,55 @@ export class Shell {
     y += 20;
     const bottom = lines.length > 0 ? linesTop - 6 : panelBottom - 14;
     this.drawItems(picks, y, bottom);
+
+    this.actionButton(t.continue, BUTTON_Y, () => this.showMenu());
+  }
+
+  /**
+   * The results of a Time Attack game (port's own page: the site's is unknown, and it had a
+   * ranking of all players instead of a personal best). A finished run shows its time under
+   * the mode's name, and the best time or "new best time"; a lost game shows the game over
+   * picture. These games send no items.
+   */
+  private drawTimeResult(tr: TimeResult): void {
+    const t = this.t;
+    const lost = tr.time >= NO_TIME;
+    const art = lost ? this.gameOverArt : null;
+    let y: number;
+    if (art) {
+      const top = 150;
+      this.panel(26, top, 368, H - 8 - top);
+      const s = new Sprite(art);
+      s.scale.set(250 / art.width);
+      s.anchor.set(0.5, 0);
+      s.position.set(W / 2, -4);
+      this.root.addChild(s);
+      y = top + 30;
+    } else {
+      this.drawTitle(4, 250);
+      const top = 112;
+      this.panel(26, top, 368, H - 8 - top);
+      y = top + 12;
+    }
+    this.text(t[tr.mode], 'title', W / 2, y, { color: C.heading });
+    y += 46;
+    if (lost) {
+      this.text(t.lostRun, 'label', W / 2, y, { size: 17 });
+      y += 30;
+    } else {
+      this.text(formatRunTime(tr.time), 'label', W / 2, y, { size: 34, color: C.heading });
+      y += 50;
+      if (tr.isNew) {
+        this.text(t.newBest, 'label', W / 2, y, { size: 18, color: C.done });
+        y += 30;
+      }
+    }
+    if (tr.best !== null) {
+      this.text(fmt(t.bestTime, formatRunTime(tr.best)), 'body', W / 2, y, {
+        size: 13,
+        color: C.inkSoft,
+      });
+    }
 
     this.actionButton(t.continue, BUTTON_Y, () => this.showMenu());
   }
@@ -2523,6 +2627,17 @@ function fitWidth(t: Text, w: number): void {
 
 function fmt(s: string, ...args: (string | number)[]): string {
   return s.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)]));
+}
+
+/**
+ * A Time Attack time as the site's ranking wrote it (`scores_timeattack.html`): minutes `'`,
+ * seconds `"`, milliseconds, `0' 06" 597`. The site did not pad the milliseconds (`0' 11" 34`
+ * for 11.034 s); they are padded here. The game's own chrono reads `MM" SS' mmm`.
+ */
+export function formatRunTime(ms: number): string {
+  const t = Math.max(0, Math.floor(ms));
+  const sec = Math.floor(t / 1000) % 60;
+  return `${Math.floor(t / 60000)}' ${String(sec).padStart(2, '0')}" ${String(t % 1000).padStart(3, '0')}`;
 }
 
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */

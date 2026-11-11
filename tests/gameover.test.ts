@@ -90,8 +90,8 @@ describe('game over', () => {
     step(FADE_TICKS);
     const r = results[0];
     if (r.kind !== 'gameOver') throw new Error('expected a game over');
-    expect(r.stats.item2[13]).toBe(1);
-    expect(r.stats.item2[1007]).toBe(2);
+    expect(r.stats.item2![13]).toBe(1);
+    expect(r.stats.item2![1007]).toBe(2);
     expect(r.uniqueItems).toBe(2);
   });
 

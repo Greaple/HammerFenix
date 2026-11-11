@@ -23,6 +23,11 @@ export interface ProfileData {
   bank: number;
   /** Adventure games recorded. */
   games: number;
+  /**
+   * Personal best times of the Time Attack modes, in milliseconds, by `$mode` then run id. The
+   * site kept a ranking of all players instead (port addition).
+   */
+  times: { [mode: string]: number[] };
 }
 
 /**
@@ -51,6 +56,7 @@ export function newProfile(): ProfileData {
     tokens: 0,
     bank: 0,
     games: 0,
+    times: {},
   };
 }
 

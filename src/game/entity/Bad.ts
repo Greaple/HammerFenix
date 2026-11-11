@@ -473,7 +473,12 @@ export class BadEntity extends MoverEntity {
  */
 export class WalkerBad extends BadEntity {
   speed = 2;
-  override dir: number = this.game.rand.random(2) * 2 - 1;
+  /**
+   * `Walker.init`. With `fl_static` (Time Attack) the original picks 1 when the enemy is on the
+   * left half (`x <= GAME_WIDTH * 0.5`), else -1; but `init` runs before `initBad` moves it
+   * there, while `x` is still the constructor's 0, so every walker starts to the right.
+   */
+  override dir: number = this.game.fl_static ? 1 : this.game.rand.random(2) * 2 - 1;
 
   fl_fall = false;
   fl_willFallDown = false;
@@ -998,7 +1003,8 @@ export class FlyerBad extends BadEntity {
   ySpeed: number;
   fl_fly = false;
   speed = 4;
-  override dir: number = this.game.rand.random(2) * 2 - 1;
+  /** `Flyer.init`: to the left with `fl_static` (Time Attack), else at random. */
+  override dir: number = this.game.fl_static ? -1 : this.game.rand.random(2) * 2 - 1;
 
   constructor(game: IGameContext, mc: SwfMovieClip) {
     super(game, mc);

@@ -59,6 +59,8 @@ interface Fixture {
   set?: string;
   /** A second player, with their own bot. */
   players?: 2;
+  /** The site's `$options` (the Time Attack modes need their run). */
+  options?: string;
 }
 
 const FIXTURES: Fixture[] = [
@@ -80,6 +82,26 @@ const FIXTURES: Fixture[] = [
     set: 'adventure',
     players: 2,
   },
+  // The Time Attack modes (`$mode` timeattack and multitime): run 0 of their own sets
+  {
+    name: 'timeattack',
+    level: 0,
+    seed: 1009,
+    ticks: 1600,
+    mode: 'timeattack',
+    set: 'adventure',
+    options: 'set_ta_0',
+  },
+  {
+    name: 'multitime',
+    level: 0,
+    seed: 1010,
+    ticks: 1600,
+    mode: 'multitime',
+    set: 'adventure',
+    options: 'set_mta_0',
+    players: 2,
+  },
 ];
 
 mkdirSync(OUT, { recursive: true });
@@ -90,6 +112,7 @@ for (const f of FIXTURES) {
     level: f.level,
     seed: f.seed,
     ...(f.mode ? { mode: f.mode } : {}),
+    ...(f.options ? { options: f.options } : {}),
     input: bot(f.seed, f.ticks),
     ...(f.players === 2 ? { otherInputs: [bot(f.seed + 5000, f.ticks)] } : {}),
   };

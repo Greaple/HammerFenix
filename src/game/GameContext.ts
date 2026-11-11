@@ -60,6 +60,11 @@ export interface IGameContext {
   fl_ninja: boolean;
   fl_bombExpert: boolean;
   fl_bombControl: boolean;
+  /**
+   * `GameMode.fl_static`: the enemies' first direction is fixed instead of random (only the
+   * Time Attack modes turn it on).
+   */
+  readonly fl_static: boolean;
   /** `GameMode._name`, e.g. `$adventure`, `$time`. */
   readonly _name: string;
   forcedDarkness: number | null;

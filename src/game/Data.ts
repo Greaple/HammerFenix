@@ -503,6 +503,16 @@ export const Data = {
   },
 
   /**
+   * `Data.getCrystalTime`: the seconds a crystal takes off the Time Attack chrono, by its combo
+   * index. AS2's `int()` makes a missing index 0.
+   */
+  getCrystalTime(id: number | null): number {
+    const values = [1, 3, 5, 7, 9, 10];
+    const i = Math.min(id as number, values.length - 1);
+    return values[Number.isNaN(i) ? 0 : Math.trunc(i)];
+  },
+
+  /**
    * `Data.replaceTag`: wraps every other piece of `str` split on `char` in `start` and `end`
    * (`*Sorbex*` to `<font ...>Sorbex</font>`). An odd count of `char` leaves `str` as is (the
    * original also logs a warning).
