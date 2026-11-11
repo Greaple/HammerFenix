@@ -128,7 +128,8 @@ export class Profile {
   /**
    * The runs the menu lets the player choose: the soccer's four fields. The site's soccer page
    * sent `set_soc_0` and no quest gives a field, so the port's guess is that the site's select
-   * listed them all (the game has four, and `SoccerSelector.mt` shows four).
+   * listed them all (the game has four, and `SoccerSelector.mt` shows four), kept by the
+   * maintainer (2026-11-11).
    */
   runChoices(mode: string): readonly string[] {
     return mode === 'soccer' ? MODE_RUNS.soccer : [];
