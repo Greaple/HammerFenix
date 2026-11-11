@@ -11,7 +11,7 @@ import { ACTION_BITS, InputRecorder, type InputRuns } from '../src/engine/InputR
 import { Random } from '../src/game/Random';
 
 const OUT = join(new URL('..', import.meta.url).pathname, 'tests/replays');
-const { left, right, jump, down, attack } = ACTION_BITS;
+const { left, right, jump, down, attack, pause } = ACTION_BITS;
 
 /** Held-button combos the bot picks from, with weights. */
 const MOVES: [number, number][] = [
@@ -27,10 +27,16 @@ const MOVES: [number, number][] = [
   [down, 1],
 ];
 
-function bot(seed: number, ticks: number): InputRuns {
+/** `unpauseAt`: idle until that tick, then P, for a mode that starts paused (the soccer). */
+function bot(seed: number, ticks: number, unpauseAt = 0): InputRuns {
   const rand = new Random(seed);
   const total = MOVES.reduce((n, [, w]) => n + w, 0);
   const rec = new InputRecorder();
+  if (unpauseAt > 0) {
+    while (rec.ticks < unpauseAt) rec.push([0]);
+    for (let i = 0; i < 2; i++) rec.push([pause]);
+    for (let i = 0; i < 2; i++) rec.push([0]);
+  }
   while (rec.ticks < ticks) {
     let r = rand.random(total);
     let mask = 0;
@@ -59,8 +65,10 @@ interface Fixture {
   set?: string;
   /** A second player, with their own bot. */
   players?: 2;
-  /** The site's `$options` (the Time Attack modes need their run). */
+  /** The site's `$options` (the Time Attack modes need their run, the soccer its field). */
   options?: string;
+  /** The tick player 1 presses P at (`bot`). */
+  unpauseAt?: number;
 }
 
 const FIXTURES: Fixture[] = [
@@ -102,6 +110,18 @@ const FIXTURES: Fixture[] = [
     options: 'set_mta_0',
     players: 2,
   },
+  // SoccerFest (`$mode` soccer): field 0; the game starts paused on its instructions
+  {
+    name: 'soccer',
+    level: 0,
+    seed: 1011,
+    ticks: 1600,
+    mode: 'soccer',
+    set: 'adventure',
+    options: 'set_soc_0',
+    players: 2,
+    unpauseAt: 60,
+  },
 ];
 
 mkdirSync(OUT, { recursive: true });
@@ -113,7 +133,7 @@ for (const f of FIXTURES) {
     seed: f.seed,
     ...(f.mode ? { mode: f.mode } : {}),
     ...(f.options ? { options: f.options } : {}),
-    input: bot(f.seed, f.ticks),
+    input: bot(f.seed, f.ticks, f.unpauseAt),
     ...(f.players === 2 ? { otherInputs: [bot(f.seed + 5000, f.ticks)] } : {}),
   };
   writeFileSync(join(OUT, `${f.name}.json`), JSON.stringify(replay) + '\n');

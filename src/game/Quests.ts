@@ -38,8 +38,11 @@ export interface ProfileData {
  */
 export const START_FAMILIES: readonly number[] = [0, 7, 18, 1000, 1020, 1024, 1028];
 
-/** The modes every player has (site guide, section 3): Adventure and the free Learning mode. */
-export const START_MODES: readonly string[] = ['solo', 'tutorial'];
+/**
+ * The modes every player has: Adventure and the free Learning mode (site guide, section 3), and
+ * the free SoccerFest (its public page `soccer.html`; the Loader calls it free and unlimited).
+ */
+export const START_MODES: readonly string[] = ['solo', 'tutorial', 'soccer'];
 
 /** Finds an item needs to enter the fridge when its `unlock` is not set (site guide, section 4). */
 export const FRIDGE_UNLOCK = 10;

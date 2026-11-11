@@ -14,9 +14,10 @@ import { padGlyph } from './PadGlyphs';
  * and A in the co-op mode) or a button of a controller. The same screen comes back for a player
  * whose controller is unplugged during the game, until it is back or they press another device.
  *
- * It is drawn on the original's two-player pause screen (`hammer_interf_instructions` frame 3,
- * `MultiCoop.onPause`): each player's row shows their keys, or their controller's buttons, and
- * the tip line says who is asked. The game is paused under it (`GameMode.startJoin`).
+ * It is drawn on the mode's two-player pause screen (`hammer_interf_instructions` frame 3 for
+ * `MultiCoop.onPause`, frame 2 for `Soccer.onPause`): each player's row shows their keys, or their
+ * controller's buttons, and the tip line says who is asked. The game is paused under it
+ * (`GameMode.startJoin`).
  */
 export class JoinScreen {
   readonly mc: SwfMovieClip;
@@ -35,6 +36,7 @@ export class JoinScreen {
     pids: readonly number[],
     sides: readonly PlayerKeys[],
     fl_lost: boolean,
+    screen: JoinFrame = COOP_SCREEN,
   ) {
     this.sides = sides;
     this.fl_lost = fl_lost;
@@ -45,15 +47,16 @@ export class JoinScreen {
 
     const mc = game.depthMan.attach('hammer_interf_instructions', Data.DP_INTERF);
     this.mc = mc;
-    mc.gotoAndStop('3');
+    mc.gotoAndStop(screen.frame);
     mc._x = Data.GAME_WIDTH * 0.5;
     mc._y = Data.GAME_HEIGHT * 0.5;
     const setText = (name: string, text: string) => {
       const field = mc.getText(name);
       if (field) field.text = text;
     };
-    setText('move', `${game.dataStore.getLangText(29)}`);
-    setText('attack', `${game.dataStore.getLangText(42)}`);
+    for (const [name, id] of Object.entries(screen.texts)) {
+      setText(name, `${game.dataStore.getLangText(id)}`);
+    }
     setText('click', '');
 
     // What is held now (the press that started the game) is not a choice
@@ -111,6 +114,18 @@ export class JoinScreen {
   }
 }
 
+/**
+ * A mode's two-player pause screen: its frame of `hammer_interf_instructions` and the `Lang` texts
+ * of its column titles.
+ */
+export interface JoinFrame {
+  frame: string;
+  texts: Readonly<Record<string, number>>;
+}
+
+/** `MultiCoop.onPause`'s screen: move, bomb, and each player's name. */
+export const COOP_SCREEN: JoinFrame = { frame: '3', texts: { move: 29, attack: 42 } };
+
 const TEXT: Record<'fr' | 'en' | 'es', { join: string; lost: string }> = {
   fr: {
     join: '<b>{0} :</b> appuyez sur une touche de votre côté du clavier, ou sur un bouton de votre manette.',
@@ -131,30 +146,41 @@ function sameDevice(a: PlayerDevice, b: PlayerDevice): boolean {
   return b.kind === 'pad' && a.index === b.index && a.id === b.id;
 }
 
-// ------------------------------------------------- The rows of frame 3
+// ------------------------------------------- The rows of frames 2 and 3
 
 /** Distance between player 1's row and player 2's, and the center of each row and column. */
 const ROW_PITCH = 55;
 const ROW_Y = [-63, -8];
 const MOVE_X = -75;
 const ATTACK_X = 2;
+/** Frame 2's third column, the up kick (`Soccer.onPause`). */
+const UPKICK_X = 90;
 
-/** The parts of frame 3 that belong to a player's row. */
+/** The parts of the frame that belong to a player's row. */
 interface Rows {
+  /** The frame they were read on. */
+  frame: number;
   /** The key pictures of each keyboard side (row 1's arrows and Enter, row 2's letters). */
   keys: { node: Container; y: number }[][];
-  /** The row's number and the player's name. */
+  /** The row's number, and on frame 3 the player's name. */
   labels: Container[][];
   pads: Container | null;
 }
 
 const rowsOf = new WeakMap<SwfMovieClip, Rows>();
 
-/** Sorts the children of frame 3 by where they are drawn: the timeline gives them no name. */
+/**
+ * Sorts the children of frame 3 (or 2) by where they are drawn: the timeline gives them no name.
+ * Frame 3's columns are the moves, the bomb and the player's name; frame 2's the moves, the kick
+ * and the up kick, so its keys go further right.
+ */
 function readRows(mc: SwfMovieClip): Rows {
+  const frame = mc._currentframe;
   let rows = rowsOf.get(mc);
-  if (rows) return rows;
-  rows = { keys: [[], []], labels: [[], []], pads: null };
+  if (rows?.frame === frame) return rows;
+  rows?.pads?.destroy({ children: true });
+  rows = { frame, keys: [[], []], labels: [[], []], pads: null };
+  const keysRight = frame === 2 ? 120 : 30;
   for (const node of mc.children) {
     if (node instanceof SwfTextField) continue;
     const b = node.getBounds();
@@ -162,17 +188,17 @@ function readRows(mc: SwfMovieClip): Rows {
     const p1 = mc.toLocal({ x: b.maxX, y: b.maxY });
     if (p1.x - p0.x > 100 || p1.y - p0.y > 70) continue; // the paper, the grid lines
     const row = (p0.y + p1.y) / 2 < -36 ? 0 : 1;
-    if (p0.x >= -125 && p1.x <= 30) rows.keys[row].push({ node, y: node.y });
-    else if (p1.x <= -105 || p0.x >= 69) rows.labels[row].push(node);
+    if (p0.x >= -125 && p1.x <= keysRight) rows.keys[row].push({ node, y: node.y });
+    else if (p1.x <= -105 || (frame !== 2 && p0.x >= 69)) rows.labels[row].push(node);
   }
   rowsOf.set(mc, rows);
   return rows;
 }
 
 /**
- * Shows on the two-player pause screen (frame 3 of `hammer_interf_instructions`) what each
- * player plays with: the keys of their keyboard side on their row, their controller's buttons,
- * or nothing for a player who has not chosen yet.
+ * Shows on a two-player pause screen (frame 3 of `hammer_interf_instructions`, or the soccer's
+ * frame 2) what each player plays with: the keys of their keyboard side on their row, their
+ * controller's buttons, or nothing for a player who has not chosen yet.
  */
 export function showPlayerDevices(
   game: IGameContext,
@@ -201,6 +227,11 @@ export function showPlayerDevices(
     const attack = padGlyph('b', layout, 24);
     attack.position.set(ATTACK_X, ROW_Y[pid]);
     layer.addChild(...move, attack);
+    if (rows.frame === 2) {
+      const up = padGlyph('dpadDown', layout, 24);
+      up.position.set(UPKICK_X, ROW_Y[pid]);
+      layer.addChild(up);
+    }
   });
   layer.zIndex = 1000; // above the clip's timeline depths
   mc.addChild(layer);

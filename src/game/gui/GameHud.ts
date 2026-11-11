@@ -7,6 +7,26 @@ import type { IGameContext } from '../GameContext';
 const MAX_LIVES = 8;
 
 /**
+ * What the game calls on its interface (`GameMode.gi`): `GameHud`, or `SoccerHud` in the soccer
+ * mode. The original casts the soccer interface to `GameInterface` (`Std.cast`), and AS2 ignores a
+ * call to a method it lacks; here the soccer interface has those methods, empty.
+ */
+export interface GameInterface {
+  readonly mc: SwfMovieClip;
+  setScore(pid: number, v: number): void;
+  setLives(pid: number, v: number): void;
+  setLevel(id: number): void;
+  hideLevel(): void;
+  lightMode(): void;
+  print(pid: number, s: string): void;
+  cls(): void;
+  getExtend(pid: number, id: number): void;
+  clearExtends(pid: number): void;
+  update(): void;
+  destroy(): void;
+}
+
+/**
  * Port of `gui.GameInterface` (`class/hammer/gui/GameInterface.mt`): the bottom 20 px HUD bar
  * (`hammer_interf_game`) with each player's rolling score, life icons (`hammer_interf_life`)
  * and C-R-Y-S-T-A-L extend letters, and the level number. `initSingle` is frame 1; `initMulti`
@@ -14,7 +34,7 @@ const MAX_LIVES = 8;
  * `initTime` (the Time Attack modes, `$time` and `$timeMulti`) is frame 3: the chrono in the
  * middle (`print`), the lives at the edges, no score, no level and no extend letters.
  */
-export class GameHud {
+export class GameHud implements GameInterface {
   static readonly GLOW_COLOR = 0x70658d;
 
   readonly game: IGameContext;

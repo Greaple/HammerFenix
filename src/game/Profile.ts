@@ -1,7 +1,7 @@
 import { PersistCodec, type PersistValue } from '../engine/codec/PersistCodec';
 import { Data } from './Data';
 import type { GameResult } from './Loader';
-import { newProfile, type ProfileData, type QuestEngine } from './Quests';
+import { newProfile, type ProfileData, type QuestEngine, START_MODES } from './Quests';
 
 /** `localStorage` key of the profile; a new format gets a new key. */
 export const PROFILE_KEY = 'hammerfenix_profile_v1';
@@ -16,21 +16,24 @@ export interface GameRecord {
 
 /**
  * The options each mode offers on the menu, in the menu's order. The quest texts say which mode
- * each is for (quests 63, 64, 72, 74, and 68 to 70 for the co-op mode); the other modes' come
- * with them (Phase 4).
+ * each is for (quests 63, 64, 72, 74, 68 to 70 for the co-op mode, 66 for the soccer); the other
+ * modes' come with them (Phase 4). `bombcontrol` and `soccerbomb` are given by no quest.
  */
 export const MODE_OPTIONS: Record<string, readonly string[]> = {
   solo: [Data.OPT_MIRROR, Data.OPT_NIGHTMARE, Data.OPT_NINJA, Data.OPT_BOMB_EXPERT],
   multicoop: [Data.OPT_MIRROR_MULTI, Data.OPT_NIGHTMARE_MULTI, Data.OPT_LIFE_SHARING],
+  soccer: [Data.OPT_KICK_CONTROL],
 };
 
 /**
  * The level set choices (`$options`) of the Time Attack modes, one per run (`set_ta_N`,
- * `set_mta_N`). The site's mode menu had a select for them (`.slc`).
+ * `set_mta_N`), and of the soccer, one per field (`set_soc_N`). The site's mode menu had a select
+ * for them (`.slc`).
  */
 export const MODE_RUNS: Record<string, readonly string[]> = {
   timeattack: [Data.OPT_SET_TA_0, Data.OPT_SET_TA_1, Data.OPT_SET_TA_2],
   multitime: [Data.OPT_SET_MTA_0, Data.OPT_SET_MTA_1, Data.OPT_SET_MTA_2],
+  soccer: [Data.OPT_SET_SOC_0, Data.OPT_SET_SOC_1, Data.OPT_SET_SOC_2, Data.OPT_SET_SOC_3],
 };
 
 /** `TimeAttack.INFINITY`: the time a lost Time Attack game sends. */
@@ -97,24 +100,49 @@ export class Profile {
   }
 
   /**
-   * The profile can play `mode`. Quests give `timeattack` (73) and `multicoop` (67); no quest
-   * gives `multitime`, so the port's guess: a player who has both has it.
+   * The profile can play `mode`. Every player has the modes of `START_MODES`, also with a profile
+   * saved before the soccer joined them. Quests give `timeattack` (73) and `multicoop` (67); no
+   * quest gives `multitime`, so the port's guess: a player who has both has it.
    */
   hasMode(mode: string): boolean {
+    if (START_MODES.includes(mode)) return true;
     if (mode === 'multitime') return this.hasMode('timeattack') && this.hasMode('multicoop');
     return this.data.modes.includes(mode);
   }
 
   /**
-   * The run a Time Attack game plays (its `set_*` option), null for another mode. The first
-   * run the profile has: quest 73 gives `set_ta_0` and no quest gives another, so the menu has
-   * no run to choose. No quest gives a `set_mta_*` either: the port's guess is run 0.
+   * The run a Time Attack game plays, or the soccer's field (its `set_*` option), null for
+   * another mode. For the Time Attack, the first run the profile has: quest 73 gives `set_ta_0`
+   * and no quest gives another, so the menu has no run to choose. No quest gives a `set_mta_*`
+   * either: the port's guess is run 0. The soccer's field is the one chosen on the menu
+   * (`runChoices`), the first by default.
    */
   runOption(mode: string): string | null {
     const runs = MODE_RUNS[mode];
     if (!runs) return null;
     if (mode === 'multitime') return runs[0];
+    if (mode === 'soccer') return runs.find((o) => this.data.chosen.includes(o)) ?? runs[0];
     return runs.find((o) => this.hasOption(o)) ?? null;
+  }
+
+  /**
+   * The runs the menu lets the player choose: the soccer's four fields. The site's soccer page
+   * sent `set_soc_0` and no quest gives a field, so the port's guess is that the site's select
+   * listed them all (the game has four, and `SoccerSelector.mt` shows four).
+   */
+  runChoices(mode: string): readonly string[] {
+    return mode === 'soccer' ? MODE_RUNS.soccer : [];
+  }
+
+  /** Chooses the run of `mode` on the menu (`runChoices`), and saves. */
+  chooseRun(mode: string, oid: string): void {
+    if (!this.runChoices(mode).includes(oid)) return;
+    const c = this.data.chosen;
+    for (const o of MODE_RUNS[mode]) {
+      if (c.includes(o)) c.splice(c.indexOf(o), 1);
+    }
+    c.push(oid);
+    this.save();
   }
 
   /** The best time of a Time Attack run, in milliseconds, or null. */

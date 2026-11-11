@@ -6,7 +6,7 @@ import type { GameDataStore } from './Data';
 import type { FxManager } from './FxManager';
 import type { GameParameters } from './GameParameters';
 import type { BaseEntity } from './entity/Entity';
-import type { GameHud } from './gui/GameHud';
+import type { GameInterface } from './gui/GameHud';
 import type { LevelView } from './levels/LevelView';
 import type { LevelWorld } from './levels/LevelWorld';
 import type { ScriptRunner } from './levels/ScriptRunner';
@@ -26,7 +26,7 @@ export interface IGameContext {
   readonly world: LevelWorld;
   readonly view: LevelView;
   readonly fxMan: FxManager;
-  readonly hud: GameHud;
+  readonly hud: GameInterface;
   readonly rand: Random;
   readonly randMan: RandomManager;
   readonly statsMan: StatsManager;

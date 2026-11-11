@@ -129,3 +129,16 @@ The sets `timeAttack` and `multiTime`. Not compared with the original running (t
 | multiTime 0 to 5, 9-12  | Runs 0 and 1: the same enemy counts as `timeAttack`'s, other skins               | ok         | Headless walk                                                                                              |
 | timeAttack, multiTime 0 | Recorded games with bots replay the same                                         | ok         | `tests/replays/timeattack.json`, `multitime.json`                                                          |
 | timeAttack 0 to 5       | A whole run: enemies start in their fixed direction, crystals take seconds off   | needs play | Ideally beside a video of the original; the times of the site's ranking (top 6.6 s for run 0) give a scale |
+
+## SoccerFest (4.4)
+
+The set `soccer`: levels 0 to 3 are the four fields (`set_soc_0` to `set_soc_3`); 4 to 7 are not reached by the game. Not compared with the original running (the Ruffle side-by-side cannot start this mode). Checked against `Soccer.mt` in the tests and in the browser.
+
+| Level         | What to check                                                                                      | Result     | Notes                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| soccer 0 to 3 | Each field starts paused on the soccer instructions; Igor and Sandy face each other in their kits  | ok         | Seen in the browser; no level name, the soccer bar (0, time, 0) and "Appuyez sur P pour l'aide"         |
+| soccer 0 to 3 | The ball drops on a special slot three seconds after the instructions                              | ok         | Every field, in the browser and the tests                                                               |
+| soccer 0      | A goal in each goal, an own goal, a ball no one kicked; then the end, the winner and back to menu  | ok         | Tests, and a goal and the end seen in the browser (with the clock moved on)                             |
+| soccer 2      | VolleyFest: its message, and both players take the volleyball helmet at the start                  | ok         | Seen in the browser; the helmet's name shows as they take it                                            |
+| soccer 0      | Recorded game with bots replays the same                                                           | ok         | `tests/replays/soccer.json`                                                                             |
+| soccer 0 to 3 | A whole match by two people: kicks, up kicks, kick control, the speed boost, the last minute blink | needs play | Ideally beside a video of the original; also with two real controllers (the join screen's third column) |

@@ -114,8 +114,8 @@ const MODES: ModeEntry[] = [
   { mode: 'multitime', icon: { item: 7, twice: true }, enabled: true },
   // Item 113, Tuberculoz's cape (4.5)
   { mode: 'bossrush', icon: { item: 113 }, enabled: false },
-  // The soccer ball (`entity.bomb.player.SoccerBall`, 4.4)
-  { mode: 'soccer', icon: { clip: 'hammer_bomb_soccer' }, enabled: false },
+  // The soccer ball (`entity.bomb.player.SoccerBall`, 4.4); free for everyone
+  { mode: 'soccer', icon: { clip: 'hammer_bomb_soccer' }, enabled: true },
   // Item 107, "Livre des étoiles"
   { mode: 'tutorial', icon: { item: 107 }, enabled: true },
 ];
@@ -143,6 +143,8 @@ const TABS: TabEntry[] = [
 type MenuEntry =
   | { kind: 'mode'; mode: ModeEntry }
   | { kind: 'option'; mode: ModeEntry; oid: string }
+  /** A level set the mode can play (`Profile.runChoices`: the soccer's fields). */
+  | { kind: 'run'; mode: ModeEntry; oid: string }
   | { kind: 'tab'; tab: TabEntry }
   | { kind: 'settings' };
 
@@ -282,6 +284,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Explosifs instables',
     boost: 'Tornade',
+    kickcontrol: 'Contrôle du ballon',
+    field: 'Terrain',
+    fieldOn: 'Le terrain de vos prochains matchs',
+    fieldOff: 'Choisissez ce terrain pour vos prochains matchs',
     settings: 'Options de jeu',
     settingsNote: 'Les réglages s’appliquent à la prochaine partie.',
     soundNote: 'Les détails et les vibrations se règlent depuis le menu, entre deux parties.',
@@ -399,6 +405,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Unstable explosives',
     boost: 'Tornado',
+    kickcontrol: 'Advanced Ball Control',
+    field: 'Field',
+    fieldOn: 'The field of your next matches',
+    fieldOff: 'Choose this field for your next matches',
     settings: 'Game options',
     settingsNote: 'The settings apply to the next game.',
     soundNote: 'Details and vibrations are set from the menu, between games.',
@@ -513,6 +523,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     ninja: 'Ninjutsu',
     bombexpert: 'Explosivos inestables',
     boost: 'Tornado',
+    kickcontrol: 'Control avanzado del balón',
+    field: 'Terreno',
+    fieldOn: 'El terreno de tus próximos partidos',
+    fieldOff: 'Elige este terreno para tus próximos partidos',
     settings: 'Opciones de juego',
     settingsNote: 'Los ajustes se aplican a la próxima partida.',
     soundNote: 'Los detalles y las vibraciones se ajustan desde el menú, entre partidas.',
@@ -953,6 +967,7 @@ export class Shell {
       out.push({ kind: 'mode', mode });
       if (!mode.enabled || this.isLocked(mode)) continue;
       for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
+      for (const oid of this.profile.runChoices(mode.mode)) out.push({ kind: 'run', mode, oid });
     }
     for (const tab of TABS) out.push({ kind: 'tab', tab });
     out.push({ kind: 'settings' });
@@ -995,6 +1010,9 @@ export class Shell {
       if (e.oid === Data.OPT_BOOST) return; // no box to untick (quest 62)
       this.profile.toggleOption(e.oid);
       this.render();
+    } else if (e.kind === 'run') {
+      this.profile.chooseRun(e.mode.mode, e.oid);
+      this.render();
     } else if (e.mode.mode !== this.chosen) {
       this.chosen = e.mode.mode;
       this.render();
@@ -1004,8 +1022,8 @@ export class Shell {
   }
 
   /**
-   * A click on menu entry `i`: tabs open and options tick at once; a mode is chosen, and
-   * started when it already was.
+   * A click on menu entry `i`: tabs open, options tick and fields are chosen at once; a mode is
+   * chosen, and started when it already was.
    */
   private clickEntry(i: number): void {
     this.selected = i;
@@ -1748,7 +1766,51 @@ export class Shell {
         else hint = ticked ? t.optionOn : t.optionOff;
       }
     });
+
+    // The fields to choose from (the site's select): a numbered button each, in the right column
+    const runs = this.profile.runChoices(mode.mode);
+    if (runs.length > 0) {
+      const x = 222;
+      this.text(t.field, 'label', x, y0 + 19, { align: 'left', size: 13, color: C.ink });
+      const chosen = this.profile.runOption(mode.mode);
+      runs.forEach((oid, k) => {
+        const rect: [number, number, number, number] = [x - 8 + k * 41, y0 + 38, 36, 20];
+        const n = entries.findIndex((e) => e.kind === 'run' && e.oid === oid);
+        const sel = n === this.selected;
+        const on = oid === chosen;
+        const btn = this.button(rect, () => this.clickEntry(n), sel, 5);
+        this.navRects.set(n, rect);
+        if (!sel) {
+          const b = on ? 2 : 1;
+          btn.addChildAt(
+            new Graphics()
+              .roundRect(rect[0] + b / 2, rect[1] + b / 2, rect[2] - b, rect[3] - b, 5)
+              .fill({ color: C.wood, alpha: on ? 0.14 : 0.05 })
+              .stroke({ color: C.wood, width: b, alpha: on ? 0.9 : 0.35 }),
+            1,
+          );
+        }
+        this.text(String(k + 1), 'label', rect[0] + rect[2] / 2, rect[1] + 2, {
+          size: 13,
+          color: sel ? C.gold : on ? C.ink : C.inkSoft,
+          parent: btn,
+        });
+        if (sel) hint = this.fieldHint(k, on);
+      });
+    }
+
     if (hint) this.text(hint, 'body', W / 2, y0 + 80, { size: 10, italic: true, color: C.inkSoft });
+  }
+
+  /**
+   * What a soccer field button says: whether it is the field of the next match; for the third,
+   * the text its level script shows instead (`Lang` 130, "dedicated to VolleyFest", without its
+   * `*` marks).
+   */
+  private fieldHint(k: number, chosen: boolean): string {
+    const volley = k === 2 ? this.texts.getStatic(130).replace(/\*/g, '') : '';
+    if (volley) return volley;
+    return chosen ? this.t.fieldOn : this.t.fieldOff;
   }
 
   /** The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). */

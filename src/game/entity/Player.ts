@@ -142,8 +142,16 @@ export class PlayerEntity extends PhysicsEntity {
   knockTimer = 0;
   lockTimer = 0;
 
-  /** Down-kick of bombs: a quest reward in the original (family 101). */
+  /**
+   * `PlayerController.fl_upKick`: down kicks the bomb up (family 101, a quest reward; on for
+   * everyone in the soccer mode). The port keeps the controller's flags on the player.
+   */
   fl_upKick = false;
+  /**
+   * `PlayerController.fl_powerControl`: a kick on the ground is as strong as the player runs
+   * (the soccer mode's `kickcontrol` option, quest 66). It only changes the soccer ball.
+   */
+  fl_powerControl = false;
   private walkTimer = 0;
   private waterJump = 0;
   private edgeTimer = 0;
@@ -965,7 +973,7 @@ export class PlayerEntity extends PhysicsEntity {
     }
   }
 
-  private onWakeUp(): void {
+  onWakeUp(): void {
     this.fl_knock = false;
     if (this.fl_stable) {
       this.dx = 0;
@@ -1186,7 +1194,13 @@ export class PlayerEntity extends PhysicsEntity {
           }
         }
       } else {
-        this.kickBomb(bombList, 1.0);
+        // Bomb kick
+        if (this.fl_powerControl && this.fl_stable) {
+          const power = Math.min(1.2, 0.5 + Math.abs(this.dx) / 4);
+          this.kickBomb(bombList, power);
+        } else {
+          this.kickBomb(bombList, 1.0);
+        }
       }
     } else if (input.keyIsDown('down', pid) && this.fl_upKick) {
       let dist = this.fl_stable ? Data.KICK_DISTANCE : Data.AIR_KICK_DISTANCE;

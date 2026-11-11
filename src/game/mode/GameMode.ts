@@ -20,8 +20,8 @@ import type { GameParameters } from '../GameParameters';
 import { RandomManager } from '../RandomManager';
 import { StatsManager } from '../StatsManager';
 import { Chrono } from '../Chrono';
-import { GameHud } from '../gui/GameHud';
-import { JoinScreen } from '../gui/JoinScreen';
+import { GameHud, type GameInterface } from '../gui/GameHud';
+import { COOP_SCREEN, type JoinFrame, JoinScreen } from '../gui/JoinScreen';
 import { type PadButton, padGlyph } from '../gui/PadGlyphs';
 import type { IGameContext } from '../GameContext';
 import type { GameSession } from '../GameSession';
@@ -84,7 +84,7 @@ export abstract class GameMode implements IGameContext {
   view!: LevelView;
   fxMan: FxManager;
   /** `GameMode.gi`, made by `initInterface` once the players are there. */
-  hud!: GameHud;
+  hud!: GameInterface;
   scriptRunner: ScriptRunner | null = null;
   /** The first player (pid 0), set by `insertPlayer`. */
   player: PlayerEntity | null = null;
@@ -234,6 +234,11 @@ export abstract class GameMode implements IGameContext {
   protected pointerMC: SwfMovieClip | null = null;
   protected itemNameMC: SwfMovieClip | null = null;
   protected pauseMC: SwfMovieClip | null = null;
+  /**
+   * `pauseMC.onRelease`: what a click on the pause screen does (only the soccer mode sets it).
+   * Flash dropped it with the clip; here `onUnpause` clears it.
+   */
+  protected pauseRelease: (() => void) | null = null;
   /** What the pause screen's key pictures show: `keys`, or `pad:` and the layout. */
   protected pausePrompts = 'keys';
   protected pausePadLayer: Container | null = null;
@@ -249,6 +254,8 @@ export abstract class GameMode implements IGameContext {
   protected joinLocked = false;
   /** The keys the mode gave each player, by pid: the keyboard sides a player can choose. */
   protected joinSides: PlayerKeys[] = [];
+  /** The two-player pause screen the join screen is drawn on (the co-op's, or the soccer's). */
+  protected joinScreen: JoinFrame = COOP_SCREEN;
   protected darknessMC: SwfMovieClip | null = null;
   /** `darknessMC.holes`: the players' light spots (`hole1`, `hole2`), then the extra ones. */
   protected darknessHoles: SwfMovieClip[] = [];
@@ -1703,7 +1710,7 @@ export abstract class GameMode implements IGameContext {
     this.joinLocked = this.fl_lock;
     this.lock();
     this.world.lock();
-    this.join = new JoinScreen(this, pids, this.joinSides, fl_lost);
+    this.join = new JoinScreen(this, pids, this.joinSides, fl_lost, this.joinScreen);
   }
 
   /**
@@ -1992,9 +1999,18 @@ export abstract class GameMode implements IGameContext {
     this.world.unlock();
     this.pauseMC?.removeMovieClip();
     this.pauseMC = null;
+    this.pauseRelease = null;
     this.removeMap();
     if (!this.fl_mute) this.setMusicVolume(1);
     this.manager.onStateChange?.({ isOver: this.fl_gameOver, isPaused: false });
+  }
+
+  /**
+   * A click on the game (`GameSession.clickStart`): the pause screen's `onRelease`, if it has
+   * one. Deviation: Flash only took a click on the clip; here a click anywhere on the game.
+   */
+  onRelease(): void {
+    if (this.pauseMC && this.pauseRelease && !this.join) this.pauseRelease();
   }
 
   /**

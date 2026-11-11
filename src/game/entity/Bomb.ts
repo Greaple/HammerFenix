@@ -962,7 +962,7 @@ export class SoccerBall extends PlayerBomb {
         fx.mc._xscale = 100 * ratio;
         fx.mc._yscale = fx.mc._xscale;
       }
-      this.burnTimer -= 1;
+      this.burnTimer -= Timer.tmod;
     }
     super.update();
   }
