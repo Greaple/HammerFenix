@@ -11,6 +11,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `npm install --legacy-peer-deps`
 - `npm run dev`: Vite dev server (`.claude/launch.json` config "vite")
 - `npm run build`, then launch config "preview": the production build, with the offline service worker (5.3). The dev server never registers it. To test offline, stop the server and reload.
+- Published at https://greaple.github.io/HammerFenix/: the `deploy` job of `.github/workflows/ci.yml` builds and deploys to GitHub Pages after the tests pass on every push to `main`. Launch config "pages" serves the build under `/HammerFenix/` as Pages does (after `npm run build`). A service worker left by an older local build on the same port can serve stale files: unregister it in the page if the build looks broken.
 - `npm test`, `npm run typecheck`, `npm run format:check` (CI runs all three plus `npm run assets` and the build)
 - `npm run assets`: rebuild `public/data`, `public/gfx`, `public/fonts` (the SWF's fonts) and `public/images` from `assets-src/original`
 - `npm run orig`: write a greppable copy of the original source to `.cache/original/` (gitignored)

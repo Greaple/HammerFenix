@@ -5,6 +5,8 @@
 [![CI](https://github.com/Greaple/HammerFenix/actions/workflows/ci.yml/badge.svg)](https://github.com/Greaple/HammerFenix/actions/workflows/ci.yml)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
+**▶️ Play it in your browser: [greaple.github.io/HammerFenix](https://greaple.github.io/HammerFenix/)** (desktop, phone or controller; works offline once loaded)
+
 ---
 
 ## 🌟 Overview

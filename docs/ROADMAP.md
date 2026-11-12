@@ -24,6 +24,7 @@ Phases 1, 2, 2B, 2C, 3, 4 and 5 (except 5.4 and 5.5) and the UI batches are done
 16. 3.5 added (2026-11-12): the intro of the hammerfest.fr site (`intro.swf`), with the evidence found in the site archive. It can be done at any time, outside the Phase 4 order.
 17. 4.5 is done (2026-11-12): the boss rush ("Tubercourse") starts from the menu once the profile has Tuberculoz's cape (quest 48), and counts for the quests like the Adventure; its results page is the Adventure's (the maintainer's calls). Every mode is ported: Phase 4 is done. Next: 3.5 (the site's intro), 5.4 and 5.5. Needs play: a whole boss rush, ideally beside a video of the original.
 18. 3.5 is done (2026-11-12): the site's intro plays from an "Intro" card on the menu and once on the first launch, its own frame scripts run by `Avm1.ts`. Two calls confirmed by the maintainer (2026-11-12): after the intro, the menu shows with the Learning mode chosen (the movie led to the free trial); and Enter during the first scene sends Tuberculoz back to his walk, as in the original (`Key.isDown(13)`), since only the confirm and back keys skip. Phase 3 is done. Next: 5.4 and 5.5.
+19. Published (2026-11-12): https://greaple.github.io/HammerFenix/, deployed by the `deploy` job in `.github/workflows/ci.yml` after the tests pass on `main`. Next: play it (the "needs play" rows of LEVELS.md, a real phone for 5.4, controllers) and log what is found in "Bugs (found in play)".
 
 Working notes:
 
