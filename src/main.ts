@@ -126,14 +126,14 @@ async function main(): Promise<void> {
   const input = new InputController();
   input.attach();
 
-  // Unlock audio on first user gesture
-  const unlockAudio = () => {
-    audio.unlock();
-    window.removeEventListener('pointerdown', unlockAudio);
-    window.removeEventListener('keydown', unlockAudio);
-  };
-  window.addEventListener('pointerdown', unlockAudio);
-  window.addEventListener('keydown', unlockAudio);
+  // Unlock audio on user gestures. Not only the first: a browser starts the audio on a gesture
+  // it counts as an activation, which a touch is when the finger lifts (`pointerup`,
+  // `touchend`), not when it lands, and iOS interrupts the audio when the page leaves the
+  // screen. `unlock` does nothing once the audio runs.
+  const unlockAudio = () => audio.unlock();
+  for (const type of ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown']) {
+    window.addEventListener(type, unlockAudio, { capture: true, passive: true });
+  }
 
   // 4. Initialize Dialogs & Symbol Browser
   const aboutDialog = document.getElementById('about-dialog') as HTMLDialogElement;
@@ -496,70 +496,92 @@ async function main(): Promise<void> {
     el.addEventListener('pointerdown', start);
     el.addEventListener('pointerup', end);
     el.addEventListener('pointercancel', end);
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
+    noLongPress(el);
   };
 
-  bindDpad(input, {
-    'touch-left': 'left',
-    'touch-right': 'right',
-    'touch-down': 'down',
-  });
-  bindTouch('touch-jump', 'jump');
+  bindPad(input);
   bindTouch('touch-bomb', 'attack');
+  bindTouch('touch-jump', 'jump');
+  bindTouch('touch-pause', 'pause');
 }
 
 /**
- * The D-pad follows the finger: sliding from one arrow to another switches the key without
- * lifting, as on a game pad (a touch otherwise stays on the button it started on). A thumb that
- * drifts off the arrows (or over a gap) keeps its key until it lifts or reaches another arrow.
+ * A finger held on a control is no long press: without this, a phone vibrates and opens its
+ * context menu or text selection after half a second of walking. Cancelling `touchstart` is the
+ * only thing that stops the gesture on Android (the pointer events still come).
  */
-function bindDpad(input: InputController, buttons: Record<string, ControlAction>): void {
-  const els = new Map<HTMLElement, ControlAction>();
-  for (const [id, action] of Object.entries(buttons)) {
-    const el = document.getElementById(id);
-    if (el) els.set(el, action);
-  }
-  /** The button each finger is on. */
-  const held = new Map<number, HTMLElement | null>();
-  const buttonAt = (x: number, y: number): HTMLElement | null => {
-    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>('.dpad-btn') ?? null;
-    return el && els.has(el) ? el : null;
+function noLongPress(el: HTMLElement): void {
+  el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+}
+
+/** How far past the pad's middle (px) the thumb goes before the direction turns. */
+const PAD_DEAD = 5;
+
+/**
+ * The direction pad is one zone under the thumb, not three buttons: where the thumb is decides
+ * the key, wherever it first landed. Left of the middle of the left/right piece walks left,
+ * right of it walks right, so turning around is a slide of a few pixels with nothing to lift
+ * or cross; on the strip below, it is the down key. A thumb that drifts off the pad keeps
+ * steering the same way (sideways by its side of the middle, down below the strip's top).
+ */
+function bindPad(input: InputController): void {
+  const pad = document.getElementById('touch-pad');
+  const lr = pad?.querySelector<HTMLElement>('.pad-lr');
+  const keys = {
+    left: document.getElementById('touch-left'),
+    right: document.getElementById('touch-right'),
+    down: document.getElementById('touch-down'),
   };
-  const isHeld = (el: HTMLElement) => [...held.values()].includes(el);
-  const moveTo = (id: number, el: HTMLElement | null) => {
-    const prev = held.get(id) ?? null;
-    if (prev === el) return;
-    held.set(id, el);
-    if (prev && !isHeld(prev)) {
-      prev.classList.remove('active');
-      input.setTouch(els.get(prev)!, false);
+  if (!pad || !lr) return;
+  type PadKey = keyof typeof keys;
+  /** The key each finger holds. */
+  const held = new Map<number, PadKey>();
+  const refresh = () => {
+    const on = new Set(held.values());
+    for (const k of ['left', 'right', 'down'] as const) {
+      const active = on.has(k);
+      if (keys[k]?.classList.contains('active') === active) continue;
+      keys[k]?.classList.toggle('active', active);
+      input.setTouch(k, active);
     }
-    if (el) {
-      el.classList.add('active');
-      input.setTouch(els.get(el)!, true);
+  };
+  const keyAt = (e: PointerEvent): PadKey => {
+    const r = lr.getBoundingClientRect();
+    if (e.clientY > r.bottom) return 'down';
+    const prev = held.get(e.pointerId);
+    const dx = e.clientX - (r.left + r.width / 2);
+    if (prev === 'left' || prev === 'right') {
+      if (Math.abs(dx) <= PAD_DEAD) return prev;
     }
+    return dx < 0 ? 'left' : 'right';
+  };
+  const move = (e: PointerEvent) => {
+    const k = keyAt(e);
+    if (held.get(e.pointerId) === k) return;
+    held.set(e.pointerId, k);
+    refresh();
   };
   const end = (e: PointerEvent) => {
-    if (!held.has(e.pointerId)) return;
-    moveTo(e.pointerId, null);
-    held.delete(e.pointerId);
+    if (held.delete(e.pointerId)) refresh();
   };
-  for (const el of els.keys()) {
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      // Touch pointers are captured by the button they start on: free them to follow the finger
-      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-      moveTo(e.pointerId, el);
-    });
-    el.addEventListener('contextmenu', (e) => e.preventDefault());
-  }
-  window.addEventListener('pointermove', (e) => {
-    if (!held.has(e.pointerId)) return;
-    const el = buttonAt(e.clientX, e.clientY);
-    if (el) moveTo(e.pointerId, el);
+  pad.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    // Moves and the lift come to the pad wherever the finger goes
+    try {
+      pad.setPointerCapture(e.pointerId);
+    } catch {
+      // No such pointer (a scripted event): its moves still reach the pad while over it
+    }
+    move(e);
   });
-  window.addEventListener('pointerup', end);
-  window.addEventListener('pointercancel', end);
+  pad.addEventListener('pointermove', (e) => {
+    if (held.has(e.pointerId)) move(e);
+  });
+  pad.addEventListener('pointerup', end);
+  pad.addEventListener('pointercancel', end);
+  pad.addEventListener('lostpointercapture', end);
+  noLongPress(pad);
 }
 
 /**

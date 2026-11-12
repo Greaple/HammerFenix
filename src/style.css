@@ -550,27 +550,123 @@ body:not(.dev) .dev-only {
    ======================================================== */
 
 .touch-controls {
+  /* Sizes of the pad and the buttons: smaller on short screens and sideways (below) */
+  --pad-key-w: 74px;
+  --pad-key-h: 78px;
+  --pad-down-h: 42px;
+  --btn-bomb: 76px;
+  --btn-jump: 86px;
   display: none;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   width: 100%;
   max-width: 480px;
-  padding: 0 4px;
-  gap: 16px;
+  padding: 0 2px;
+  gap: 12px;
 }
 
 /* `html.touch` is set by main.ts on touch screens, or once the screen is touched */
 html.touch {
-  --below-frame: 92px;
+  --below-frame: 146px;
 }
 
 html.touch .touch-controls {
   display: flex;
 }
 
+/* The pause button of the top bar: touch screens have no P key */
+.touch-only {
+  display: none;
+}
+
+html.touch .touch-only {
+  display: inline-flex;
+}
+
+html[data-input='gamepad'] .touch-only {
+  display: none;
+}
+
 /* A controller is in use: its buttons replace the touch ones (they keep their room) */
 html[data-input='gamepad'] .touch-controls {
   visibility: hidden;
+}
+
+.touch-controls,
+.touch-controls *,
+.touch-only {
+  user-select: none;
+  -webkit-user-select: none;
+  /* A thumb that moves while it holds a button must not scroll, zoom or pull to refresh: the
+     browser would cancel the press (pointercancel) and drop the key mid-move */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The direction pad: left and right are the two halves of one piece, down a strip below */
+.touch-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  cursor: pointer;
+}
+
+.pad-lr {
+  display: flex;
+}
+
+.pad-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--pad-key-w);
+  height: var(--pad-key-h);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12));
+  border: 1.5px solid var(--glass-border);
+  box-shadow:
+    0 4px 12px rgba(10, 40, 90, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background-color 0.06s ease;
+}
+
+.pad-left {
+  border-radius: 22px 0 0 22px;
+  border-right-width: 0.75px;
+}
+
+.pad-right {
+  border-radius: 0 22px 22px 0;
+  border-left-width: 0.75px;
+}
+
+/* Down only kicks a bomb upward (a quest power): smaller */
+.pad-down {
+  width: calc(var(--pad-key-w) * 2);
+  height: var(--pad-down-h);
+  border-radius: 12px 12px 22px 22px;
+}
+
+.pad-icon {
+  width: 30px;
+  height: 30px;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 2px rgba(10, 40, 90, 0.45));
+}
+
+.pad-down .pad-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.pad-key.active {
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow:
+    0 2px 6px rgba(10, 40, 90, 0.28),
+    inset 0 2px 6px rgba(10, 40, 90, 0.25);
 }
 
 .touch-btn {
@@ -580,72 +676,82 @@ html[data-input='gamepad'] .touch-controls {
   color: #fff;
   font-family: var(--font-display);
   font-weight: 800;
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: 14px;
-  box-shadow: 0 3px 10px rgba(10, 40, 90, 0.25);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  /* A thumb that moves while it holds a button must not scroll, zoom or pull to refresh: the
-     browser would cancel the press (pointercancel) and drop the key mid-move */
-  touch-action: none;
-  -webkit-touch-callout: none;
-  transition:
-    background-color 0.1s ease,
-    transform 0.1s ease;
+  transition: transform 0.06s ease;
 }
 
-.touch-btn:active,
-.touch-btn.active {
-  background: var(--glass-hover);
-  transform: scale(0.95);
-}
-
-.touch-dpad {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.dpad-btn {
-  width: 56px;
-  height: 56px;
-  font-size: 1.1rem;
-}
-
-/* Down only kicks a bomb upward (a quest power): smaller */
-.dpad-down {
-  width: 44px;
-  height: 44px;
-  align-self: flex-end;
-}
-
+/* Bomb on the left and higher, jump at the corner under the thumb's rest */
 .touch-actions {
   display: flex;
-  gap: 14px;
+  align-items: flex-end;
+  gap: 12px;
 }
 
 .action-btn {
-  width: 72px;
-  height: 72px;
+  flex-direction: column;
+  gap: 1px;
+  width: var(--size);
+  height: var(--size);
+  border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 50%;
-  border-width: 2px;
-  font-size: 0.85rem;
-  letter-spacing: 0.04em;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 5px 0 var(--btn-edge),
+    0 9px 14px rgba(10, 40, 90, 0.35),
+    inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+
+.action-icon {
+  width: 42%;
+  height: 42%;
+  fill: currentColor;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35));
+}
+
+.action-icon .stroke {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
 }
 
 .btn-bomb {
-  background: rgba(214, 56, 44, 0.85);
-  border-color: rgba(255, 220, 210, 0.85);
+  --size: var(--btn-bomb);
+  --btn-edge: #8f1f17;
+  margin-bottom: calc(var(--btn-jump) * 0.42);
+  background: radial-gradient(circle at 35% 28%, #ff8a70, #e0402f 55%, #b92a1e);
 }
 
 .btn-jump {
-  background: rgba(36, 132, 214, 0.85);
-  border-color: rgba(210, 236, 255, 0.85);
+  --size: var(--btn-jump);
+  --btn-edge: #17548f;
+  margin-bottom: 5px;
+  background: radial-gradient(circle at 35% 28%, #7cc8ff, #2c8de0 55%, #1c69b8);
+}
+
+.action-btn.active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 var(--btn-edge),
+    0 3px 6px rgba(10, 40, 90, 0.35),
+    inset 0 2px 6px rgba(0, 0, 0, 0.25);
+  filter: brightness(0.92);
+}
+
+/* Short screens: smaller controls, so the frame keeps its room */
+@media (orientation: portrait) and (max-height: 640px) {
+  html.touch {
+    --below-frame: 112px;
+  }
+
+  .touch-controls {
+    --pad-key-h: 60px;
+    --pad-down-h: 32px;
+    --btn-bomb: 64px;
+    --btn-jump: 72px;
+  }
 }
 
 /* Phone held sideways: the controls go on each side of the frame */
@@ -695,14 +801,21 @@ html[data-input='gamepad'] .touch-controls {
     align-self: center;
   }
 
-  html.touch .touch-dpad {
+  .touch-controls {
+    --pad-key-w: 68px;
+    --pad-key-h: 72px;
+    --pad-down-h: 38px;
+    --btn-bomb: 66px;
+    --btn-jump: 76px;
+  }
+
+  html.touch .touch-pad {
     order: -1;
     justify-self: start;
     margin-bottom: 12px;
   }
 
   html.touch .touch-actions {
-    flex-direction: column-reverse;
     justify-self: end;
     margin-bottom: 12px;
   }

@@ -32,6 +32,8 @@ export class AudioEngine {
   private currentMusicName: string | null = null;
 
   private muted = false;
+  /** `unlock` started decoding the files. */
+  private decoding = false;
   /** `SoundManagerChannel.vol`: 100 until `setVolume`. */
   private readonly channelVolumes = new Map<number, number>();
   /** The music `Sound`'s volume (`Sound.setVolume`). */
@@ -79,7 +81,7 @@ export class AudioEngine {
   setSuspended(on: boolean): void {
     if (!this.ctx) return;
     if (on && this.ctx.state === 'running') void this.ctx.suspend();
-    else if (!on && this.ctx.state === 'suspended') void this.ctx.resume();
+    else if (!on && this.ctx.state !== 'running') this.resume();
   }
 
   /** Fetches every sound file, so they play on time once decoded. */
@@ -87,17 +89,32 @@ export class AudioEngine {
     for (const name of this.urls.keys()) void this.fetchFile(name);
   }
 
-  /** Unlocks the Web Audio context after a user gesture, and decodes the sounds. */
+  /**
+   * Unlocks the Web Audio context on a user gesture, and decodes the sounds. Called on every
+   * gesture: the browser may refuse the first ones (a touch only counts once the finger
+   * lifts), and stops the audio again by itself (iOS, when the page leaves the screen).
+   */
   unlock(): void {
     const ctx = this.ensureContext();
     if (!ctx) return;
-    for (const name of this.urls.keys()) void this.loadBuffer(name);
-    if (ctx.state === 'suspended') {
-      void ctx.resume().then(() => {
-        if (this.currentMusicName && !this.musicSource) {
-          this.playMusic(this.currentMusicName);
-        }
-      });
+    if (!this.decoding) {
+      this.decoding = true;
+      for (const name of this.urls.keys()) void this.loadBuffer(name);
+    }
+    if (ctx.state !== 'running') this.resume();
+  }
+
+  private resume(): void {
+    void this.ctx?.resume().catch(() => {});
+  }
+
+  /**
+   * The music asked for while the audio was locked starts once it runs (`statechange`),
+   * whichever gesture or return to the page unlocked it.
+   */
+  private onStateChange(): void {
+    if (this.ctx?.state === 'running' && this.currentMusicName && !this.musicSource) {
+      this.playMusic(this.currentMusicName);
     }
   }
 
@@ -159,6 +176,7 @@ export class AudioEngine {
     if (typeof window === 'undefined' || typeof AudioContext === 'undefined') return null;
 
     this.ctx = new AudioContext();
+    this.ctx.addEventListener?.('statechange', () => this.onStateChange());
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = this.muted ? 0 : 1;
     this.masterGain.connect(this.ctx.destination);

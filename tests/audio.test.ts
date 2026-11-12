@@ -37,8 +37,15 @@ class FakeContext {
   currentTime = 0;
   destination = new FakeNode();
   sources: FakeSource[] = [];
+  /** A browser's context before a gesture it accepts: `resume` does nothing. */
+  static locked = false;
+  private listeners: (() => void)[] = [];
   constructor() {
     FakeContext.last = this;
+    if (FakeContext.locked) this.state = 'suspended';
+  }
+  addEventListener(_type: string, fn: () => void): void {
+    this.listeners.push(fn);
   }
   createGain(): FakeNode {
     return new FakeNode();
@@ -52,7 +59,9 @@ class FakeContext {
     return { name: new TextDecoder().decode(buf) };
   }
   async resume(): Promise<void> {
+    if (FakeContext.locked) return;
     this.state = 'running';
+    for (const fn of this.listeners) fn();
   }
   async suspend(): Promise<void> {
     this.state = 'suspended';
@@ -133,6 +142,42 @@ describe('AudioEngine (SoundManager.mt)', () => {
     expect(music).toHaveLength(2);
     expect(music[0].stopped).toBe(true);
     expect(music[1].stopped).toBe(false);
+  });
+});
+
+describe('unlocking on a touch screen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', globalThis);
+    vi.stubGlobal('AudioContext', FakeContext);
+    vi.stubGlobal('fetch', async (url: string) => ({
+      ok: true,
+      arrayBuffer: async () => new TextEncoder().encode(url).buffer,
+    }));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts the music asked for before a gesture the browser accepts', async () => {
+    FakeContext.locked = true;
+    try {
+      const audio = new AudioEngine(SOUNDS);
+      audio.preload();
+      // The finger lands: no activation yet, the context stays suspended
+      audio.unlock();
+      audio.playMusic('music_ingame');
+      await new Promise((r) => setTimeout(r, 0));
+      const ctx = FakeContext.last;
+      expect(playing(ctx)).toHaveLength(0);
+      // The finger lifts: the same context now starts, and the music with it
+      FakeContext.locked = false;
+      audio.unlock();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(FakeContext.last).toBe(ctx);
+      expect(playing(ctx).map((s) => s.loop)).toEqual([true]);
+    } finally {
+      FakeContext.locked = false;
+    }
   });
 });
 

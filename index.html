@@ -60,6 +60,16 @@
         </div>
 
         <nav class="top-actions">
+          <button
+            id="touch-pause"
+            class="round-btn touch-only"
+            type="button"
+            data-i18n-label="pauseKey"
+          >
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+            </svg>
+          </button>
           <button id="btn-mute" class="round-btn" type="button" data-i18n-label="soundOn">
             <svg class="icon icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M4 9v6h4l5 4V5L8 9H4z" />
@@ -108,41 +118,44 @@
             </div>
           </div>
 
-          <!-- On-screen touch controls for phones and tablets -->
+          <!-- On-screen touch controls for phones and tablets (main.ts `bindPad`, `bindTouch`) -->
           <div id="touch-controls" class="touch-controls">
-            <div class="touch-dpad">
-              <button
-                type="button"
-                id="touch-left"
-                class="touch-btn dpad-btn"
-                data-i18n-label="left"
-              >
-                ◀
-              </button>
-              <button
-                type="button"
-                id="touch-down"
-                class="touch-btn dpad-btn dpad-down"
-                data-i18n-label="down"
-              >
-                ▼
-              </button>
-              <button
-                type="button"
-                id="touch-right"
-                class="touch-btn dpad-btn"
-                data-i18n-label="right"
-              >
-                ▶
-              </button>
+            <!-- One zone under the left thumb: the side of its middle the thumb is on walks left
+                 or right, with no gap to cross; the strip below is the down key -->
+            <div id="touch-pad" class="touch-pad">
+              <div class="pad-lr">
+                <div id="touch-left" class="pad-key pad-left" data-i18n-label="left">
+                  <svg class="pad-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M15.5 4.5 7 12l8.5 7.5z" />
+                  </svg>
+                </div>
+                <div id="touch-right" class="pad-key pad-right" data-i18n-label="right">
+                  <svg class="pad-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8.5 4.5 17 12l-8.5 7.5z" />
+                  </svg>
+                </div>
+              </div>
+              <div id="touch-down" class="pad-key pad-down" data-i18n-label="down">
+                <svg class="pad-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4.5 8.5 12 17l7.5-8.5z" />
+                </svg>
+              </div>
             </div>
 
             <div class="touch-actions">
-              <button type="button" id="touch-jump" class="touch-btn action-btn btn-jump">
-                <span data-i18n="jumpShort">JUMP</span>
-              </button>
               <button type="button" id="touch-bomb" class="touch-btn action-btn btn-bomb">
+                <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="10.5" cy="14.5" r="7" />
+                  <path class="stroke" d="M15 9.5l2.2-2.2c1-1 2.2-1 3.3 0" />
+                  <path class="stroke" d="M20.5 2.6v1.4M23 5.2h-1.4M22.4 3.300l-.9.9" />
+                </svg>
                 <span data-i18n="bombShort">BOMB</span>
+              </button>
+              <button type="button" id="touch-jump" class="touch-btn action-btn btn-jump">
+                <svg class="action-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3 4.5 11.5h4.7V20h5.6v-8.5h4.7z" />
+                </svg>
+                <span data-i18n="jumpShort">JUMP</span>
               </button>
             </div>
           </div>
