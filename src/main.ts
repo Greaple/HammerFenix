@@ -242,8 +242,13 @@ async function main(): Promise<void> {
       return;
     }
     // Only Adventure games started from the menu count for the profile (site guide, section 4).
-    // The co-op mode is the Adventure for two and sends its items too (`MultiCoop.saveScore`)
-    const counts = session.siteMode === 'solo' || session.siteMode === 'multicoop';
+    // The co-op mode is the Adventure for two and sends its items too (`MultiCoop.saveScore`),
+    // and the boss rush sends the Adventure's (`BossRush` keeps `Adventure.saveScore`; counting
+    // them is the maintainer's call, 2026-11-12)
+    const counts =
+      session.siteMode === 'solo' ||
+      session.siteMode === 'multicoop' ||
+      session.siteMode === 'bossrush';
     const record = counts ? profile.recordGame(result) : null;
     // A Time Attack game sends a time and its run (`TimeAttack.saveScore`); one the menu
     // started may set the best time

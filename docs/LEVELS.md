@@ -115,6 +115,18 @@ The Adventure's levels with two players. Not compared with the original running 
 | adventure 1 | A recorded game with two bots replays the same                       | ok         | `tests/replays/coop-01.json`                                                                  |
 | adventure   | A whole game for two: `$multi` level scripts, portals, game over     | needs play | Ideally beside a video of the original                                                        |
 
+## Boss rush (4.5)
+
+The adventure and its dimensions, as in the Adventure. Not compared with the original running (the Ruffle side-by-side cannot start this mode). Checked against `BossRush.mt` in the tests and in the browser.
+
+| Level          | What to check                                                                    | Result     | Notes                                                  |
+| -------------- | -------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
+| adventure 0, 1 | Started from the menu; on level 1 "Temps: +00\" 08" slides in at the bottom left | ok         | Seen in the browser; speed 1.5, two bombs, the up kick |
+| adventure 1    | Pause: "Tubercourse", the time and the average level time (frame 4)              | ok         | Seen in the browser                                    |
+| adventure 10   | Leaving it puts a clock and the time on the world map                            | ok         | Seen in the browser                                    |
+| adventure 1    | A recorded game with a bot replays the same                                      | ok         | `tests/replays/bossrush.json`                          |
+| adventure      | A whole run: the faster Igor through the levels, the bosses, the times shown     | needs play | Ideally beside a video of the original                 |
+
 ## Time Attack (4.1, 4.3)
 
 The sets `timeAttack` and `multiTime`. Not compared with the original running (the Ruffle side-by-side cannot start these modes). Checked against `TimeAttack.mt` and `TimeAttackMulti.mt` in the tests, by a headless walk through every run (each level starts with its enemies, the run ends on its empty level) and in the browser.

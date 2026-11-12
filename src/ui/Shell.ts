@@ -46,6 +46,7 @@ import { padButtonOf, padGlyph, padLabel } from '../game/gui/PadGlyphs';
 import { DEFAULT_SETTINGS, type PlayerSettings, VOLUME_STEP } from '../game/GameParameters';
 import type { GameResult } from '../game/Loader';
 import {
+  BOSS_RUSH_FAMILY,
   type GameRecord,
   MODE_OPTIONS,
   NO_TIME,
@@ -112,8 +113,8 @@ const MODES: ModeEntry[] = [
   { mode: 'timeattack', icon: { item: 7 }, enabled: true },
   // No quest gives it: the port's guess, with the Time Attack and the co-op (4.3)
   { mode: 'multitime', icon: { item: 7, twice: true }, enabled: true },
-  // Item 113, Tuberculoz's cape (4.5)
-  { mode: 'bossrush', icon: { item: 113 }, enabled: false },
+  // Item 113, Tuberculoz's cape; no quest gives the mode: unlocked with the cape (quest 48, 4.5)
+  { mode: 'bossrush', icon: { item: 113 }, enabled: true },
   // The soccer ball (`entity.bomb.player.SoccerBall`, 4.4); free for everyone
   { mode: 'soccer', icon: { clip: 'hammer_bomb_soccer' }, enabled: true },
   // Item 107, "Livre des étoiles"
@@ -1813,10 +1814,19 @@ export class Shell {
     return chosen ? this.t.fieldOn : this.t.fieldOff;
   }
 
-  /** The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). */
+  /**
+   * The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). The boss rush
+   * comes with Tuberculoz's cape (`BOSS_RUSH_FAMILY`), so the quest that gives that family.
+   */
   private questForMode(mode: string): string {
     const q = this.profile.quests.quests.find((x) =>
-      x.actions.some((a) => a.type === 'give' && a.attrs.mode === mode),
+      x.actions.some((a) =>
+        a.type !== 'give'
+          ? false
+          : mode === 'bossrush'
+            ? a.attrs.family === String(BOSS_RUSH_FAMILY)
+            : a.attrs.mode === mode,
+      ),
     );
     return q ? this.texts.getQuestName(q.id) : '?';
   }

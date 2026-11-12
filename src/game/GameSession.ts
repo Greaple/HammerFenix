@@ -20,6 +20,7 @@ import { realTimer } from './Chrono';
 import { padStartText } from './gui/PadGlyphs';
 import { Log } from './Log';
 import { Adventure } from './mode/Adventure';
+import { BossRush } from './mode/BossRush';
 import { MultiCoop } from './mode/MultiCoop';
 import { Soccer } from './mode/Soccer';
 import { TimeAttack } from './mode/TimeAttack';
@@ -101,7 +102,7 @@ export class GameSession {
   readonly musics = MUSIC_TRACKS;
   /**
    * The site's `$mode` of the current game (`GameManager.isMode`): `solo` (Adventure),
-   * `tutorial`, `multicoop`, `timeattack`, `multitime` or `soccer`. The debug tools' games keep
+   * `tutorial`, `multicoop`, `timeattack`, `multitime`, `soccer` or `bossrush`. The debug tools' games keep
    * the mode of the game before; a set change goes back to `solo`.
    */
   mode = 'solo';
@@ -360,10 +361,10 @@ export class GameSession {
 
   /**
    * `GameManager.startDefaultGame`: the mode the site's `$mode` asks for. `solo` (`Adventure`),
-   * `tutorial`, `multicoop`, `timeattack`, `multitime` and `soccer` are ported; any other plays
-   * the Adventure, which plays the other sets too. Deviation: the co-op starts on `firstLevel` too
-   * (level 0 in the original), for the debug tools; the Time Attack modes start on their run's
-   * first level whatever it is, as in the original.
+   * `tutorial`, `multicoop`, `timeattack`, `multitime`, `soccer` and `bossrush` are ported; any
+   * other plays the Adventure, which plays the other sets too. Deviation: the co-op and the boss
+   * rush start on `firstLevel` too (level 0 in the original), for the debug tools; the Time Attack
+   * modes start on their run's first level whatever it is, as in the original.
    */
   private createMode(firstLevel: number): GameMode {
     if (this.isTutorial()) {
@@ -380,6 +381,9 @@ export class GameSession {
     }
     if (this.isMultiTime()) {
       return new TimeAttackMulti(this, firstLevel);
+    }
+    if (this.isBossRush()) {
+      return new BossRush(this, firstLevel);
     }
     return new Adventure(this, firstLevel);
   }
@@ -407,6 +411,11 @@ export class GameSession {
   /** `GameManager.isMultiTime` */
   isMultiTime(): boolean {
     return this.mode === 'multitime';
+  }
+
+  /** `GameManager.isBossRush` */
+  isBossRush(): boolean {
+    return this.mode === 'bossrush';
   }
 
   /**

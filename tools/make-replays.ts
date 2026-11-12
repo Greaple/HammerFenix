@@ -122,6 +122,15 @@ const FIXTURES: Fixture[] = [
     players: 2,
     unpauseAt: 60,
   },
+  // The boss rush (`$mode` bossrush): the adventure, faster, with two bombs and the up kick
+  {
+    name: 'bossrush',
+    level: 1,
+    seed: 1012,
+    ticks: 1600,
+    mode: 'bossrush',
+    set: 'adventure',
+  },
 ];
 
 mkdirSync(OUT, { recursive: true });

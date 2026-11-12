@@ -26,6 +26,12 @@ export const MODE_OPTIONS: Record<string, readonly string[]> = {
 };
 
 /**
+ * The family that opens the boss rush (the "Tubercourse"): Tuberculoz's cape (item 113), which
+ * quest 48 gives once the cape is found (`hasMode`).
+ */
+export const BOSS_RUSH_FAMILY = 113;
+
+/**
  * The level set choices (`$options`) of the Time Attack modes, one per run (`set_ta_N`,
  * `set_mta_N`), and of the soccer, one per field (`set_soc_N`). The site's mode menu had a select
  * for them (`.slc`).
@@ -102,11 +108,14 @@ export class Profile {
   /**
    * The profile can play `mode`. Every player has the modes of `START_MODES`, also with a profile
    * saved before the soccer joined them. Quests give `timeattack` (73) and `multicoop` (67); no
-   * quest gives `multitime`, so the port's guess: a player who has both has it.
+   * quest gives `multitime`, so the port's guess: a player who has both has it. No quest gives
+   * `bossrush` either: the maintainer's call (2026-11-12) is Tuberculoz's cape, the family quest
+   * 48 gives (`BOSS_RUSH_FAMILY`).
    */
   hasMode(mode: string): boolean {
     if (START_MODES.includes(mode)) return true;
     if (mode === 'multitime') return this.hasMode('timeattack') && this.hasMode('multicoop');
+    if (mode === 'bossrush') return this.data.families.includes(BOSS_RUSH_FAMILY);
     return this.data.modes.includes(mode);
   }
 
