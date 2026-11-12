@@ -8,7 +8,28 @@
  * call them from later frames: the particle emitters of the accessories and the sphinx
  * (`init`, `main`, with `duplicateMovieClip`) and the ghosts of item 86's background
  * (`newGhost`). `tools/lib/swfShapes.ts` only ships scripts whose opcodes are all handled here.
+ *
+ * The site's intro (`intro.swf`, roadmap 3.5) is all frame scripts: two scenes driven by a
+ * `main()` called every frame, `attachMovie`, `Key.isDown`, arrays and objects of texts, and
+ * `getURL` at its end. What it reaches outside its clips (`Key`, `getURL`) goes through
+ * `setAvm1Host`.
  */
+
+/** What scripts reach outside their clips. Set by the page that plays them (`ui/Intro.ts`). */
+export interface Avm1Host {
+  /** `Key.isDown(code)`: whether the key with Flash key code `code` is held. */
+  keyDown(code: number): boolean;
+  /** `getURL(url, target)`. */
+  getURL(url: string, target: string): void;
+}
+
+const NO_HOST: Avm1Host = { keyDown: () => false, getURL: () => {} };
+let host: Avm1Host = NO_HOST;
+
+/** Sets what `Key` and `getURL` reach; null puts back the default (no key held, no page). */
+export function setAvm1Host(h: Avm1Host | null): void {
+  host = h ?? NO_HOST;
+}
 
 /** What a script can do to the clip it runs on. Implemented by `SwfMovieClip`. */
 export interface Avm1Clip {
@@ -65,6 +86,8 @@ function isClip(v: unknown): v is Avm1Clip {
 /** Original's `Timer.tmod` / `_global.tmod`: 1 at full speed. */
 const GLOBAL: Record<string, unknown> = { tmod: 1 };
 const TIMER = { tmod: 1 };
+/** Flash's `Key`: only `isDown` is used (the intro's). */
+const KEY = { isDown: (code: unknown) => host.keyDown(toNumber(code)) };
 
 const decoded = new Map<string, Uint8Array>();
 
@@ -79,11 +102,19 @@ function decode(code: string): Uint8Array {
   return bytes;
 }
 
+const utf8 = new TextDecoder();
+
+/** A string of the bytecode: UTF-8 from SWF 6 on, and every SWF of the game is 7 or 8. */
 function readString(b: Uint8Array, at: number): [string, number] {
   let end = at;
-  while (end < b.length && b[end] !== 0) end++;
+  let ascii = true;
+  while (end < b.length && b[end] !== 0) {
+    if (b[end] >= 0x80) ascii = false;
+    end++;
+  }
   let s = '';
-  for (let i = at; i < end; i++) s += String.fromCharCode(b[i]);
+  if (ascii) for (let i = at; i < end; i++) s += String.fromCharCode(b[i]);
+  else s = utf8.decode(b.subarray(at, end));
   return [s, end + 1];
 }
 
@@ -121,8 +152,8 @@ export function runAvm1(code: string, clip: Avm1Clip): void {
 
 /**
  * Calls a script function. `DefineFunction2`'s flags preload registers from 1, in this order:
- * `this`, `arguments`, `super`, `_root`, `_parent`, `_global` (`super` and `_root` stay
- * undefined: no script reads them).
+ * `this`, `arguments`, `super`, `_root`, `_parent`, `_global` (`super` stays undefined: no
+ * script reads it).
  */
 function callFunction(d: FunctionDef, thisObj: unknown, args: unknown[]): unknown {
   const self = thisObj ?? d.parent.thisObj;
@@ -133,7 +164,7 @@ function callFunction(d: FunctionDef, thisObj: unknown, args: unknown[]): unknow
   if (fl & 0x01) regs[r++] = self;
   if (fl & 0x04) regs[r++] = args;
   if (fl & 0x10) r++;
-  if (fl & 0x40) r++;
+  if (fl & 0x40) regs[r++] = d.parent.clip.avmGet('_root');
   if (fl & 0x80) regs[r++] = d.parent.clip.avmGet('_parent');
   if (fl & 0x100) regs[r++] = GLOBAL;
   if (!(fl & 0x08)) locals.set('arguments', args);
@@ -163,6 +194,8 @@ function exec(a: Activation, start: number, end: number): unknown {
         return Math;
       case 'Timer':
         return TIMER;
+      case 'Key':
+        return KEY;
     }
     const v = clip.avmGet(name);
     return v !== undefined ? v : GLOBAL[name];
@@ -286,12 +319,13 @@ function exec(a: Activation, start: number, end: number): unknown {
         stack.push(Math.floor(clip.avmRandom() * toNumber(pop())));
         break;
       case 0x3d: {
-        // CallFunction
+        // CallFunction. A name that is no variable is a method of the timeline, as
+        // `attachMovie(...)` in a frame script
         const name = String(pop());
         const n = toNumber(pop());
         const args = Array.from({ length: n }, () => pop());
         const fn = getVariable(name);
-        stack.push(typeof fn === 'function' ? fn.apply(clip, args) : undefined);
+        stack.push(typeof fn === 'function' ? fn.apply(clip, args) : clip.avmCall(name, args));
         break;
       }
       case 0x3e: // Return
@@ -319,6 +353,23 @@ function exec(a: Activation, start: number, end: number): unknown {
         const y = pop();
         const x = pop();
         stack.push(x == y);
+        break;
+      }
+      case 0x42: {
+        // InitArray: the first element is on top
+        const n = toNumber(pop());
+        stack.push(Array.from({ length: n }, () => pop()));
+        break;
+      }
+      case 0x43: {
+        // InitObject: value then name, for each property
+        const n = toNumber(pop());
+        const obj: Record<string, unknown> = {};
+        for (let k = 0; k < n; k++) {
+          const value = pop();
+          obj[String(pop())] = value;
+        }
+        stack.push(obj);
         break;
       }
       case 0x4c: // PushDuplicate
@@ -492,6 +543,12 @@ function exec(a: Activation, start: number, end: number): unknown {
       case 0x9d: // If
         if (pop()) pc += view.getInt16(p, true);
         break;
+      case 0x9a: {
+        // GetURL2 (a GET or POST of variables is not used)
+        const target = String(pop());
+        host.getURL(String(pop()), target);
+        break;
+      }
       case 0x9f: {
         // GotoFrame2
         const flags = b[p];

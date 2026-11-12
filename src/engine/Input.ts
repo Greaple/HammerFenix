@@ -619,6 +619,14 @@ export class InputController {
     return this.codesSampled.has(code);
   }
 
+  /**
+   * Whether the key with Flash key code `code` is held now, whatever `devKeys` says: `Key.isDown`
+   * for the frame scripts of the site's intro.
+   */
+  keyHeld(code: number): boolean {
+    return this.codesHeld.has(code);
+  }
+
   /** Records every tick's sample from the next `poll()` on. */
   startRecording(recorder: InputRecorder): void {
     this.recorder = recorder;

@@ -77,10 +77,15 @@ export class SwfLibrary {
 
   /**
    * Loads the library and its bitmaps. `onProgress` gets the share done, from 0 to 1: the
-   * download of `library.json` (9 MB) is most of it, then the bitmaps.
+   * download of `library.json` (9 MB) is most of it, then the bitmaps. `file` is another
+   * library built by `tools/build-swf.ts` (the site's intro, `gfx/intro.json`).
    */
-  static async load(baseUrl = './', onProgress?: (done: number) => void): Promise<SwfLibrary> {
-    const res = await fetch(`${baseUrl}gfx/library.json`);
+  static async load(
+    baseUrl = './',
+    onProgress?: (done: number) => void,
+    file = 'gfx/library.json',
+  ): Promise<SwfLibrary> {
+    const res = await fetch(`${baseUrl}${file}`);
     if (!res.ok) throw new Error(`Failed to load SWF library (${res.status})`);
     const data = JSON.parse(
       await readText(res, (f) => onProgress?.(f * DOWNLOAD_SHARE)),

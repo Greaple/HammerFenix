@@ -54,6 +54,7 @@ import {
   resultPicks,
   type TimeResult,
 } from '../game/Profile';
+import { INTRO_FPS, INTRO_H, INTRO_W, IntroMovie } from './Intro';
 import type { Lang } from './Language';
 
 /** The game's lang texts the screens reuse. */
@@ -82,7 +83,7 @@ export const TITLE_FILE = 'images/mainTitle.webp';
  */
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
-type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound' | 'controls';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound' | 'controls' | 'intro';
 
 /**
  * An item clip used as an icon: special items below 1000, score items from 1000; `twice` draws
@@ -147,7 +148,19 @@ type MenuEntry =
   /** A level set the mode can play (`Profile.runChoices`: the soccer's fields). */
   | { kind: 'run'; mode: ModeEntry; oid: string }
   | { kind: 'tab'; tab: TabEntry }
+  /** The site's intro (3.5): the last card of the grid. */
+  | { kind: 'intro' }
   | { kind: 'settings' };
+
+/**
+ * The intro's card, in the grid's free slot after the modes: Tuberculoz, whose plan it tells.
+ * The site's home page had an "Intro" button for visitors, beside "Essayer" (the free trial).
+ */
+const INTRO_ICON: Icon = { clip: 'hammer_boss_human' };
+/** Top of the intro's movie in the frame: centered above the skip button. */
+const INTRO_Y = 66;
+/** Most movie frames played in one display frame, after the page was slow or hidden. */
+const INTRO_CATCH_UP = 4;
 
 /**
  * The rows of the settings page, in the guide's order, then the controls page (G.4) and the
@@ -232,6 +245,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multitimeShort: 'La course à deux',
     bossrushShort: 'L’Aventure express',
     soccerShort: 'Le football à deux',
+    // The site's home button and the guide's link to the intro ("terrible plan que fomentait le
+    // sorcier"); the page's link was "Passer l'intro et essayer le jeu"
+    intro: 'Intro',
+    introShort: 'Le plan du sorcier',
+    introSkip: 'Passer l’intro',
     modeLockedBy: 'Ce mode se débloque avec la quête « {0} »',
     modeLockedBy2: 'Ce mode se débloque avec les quêtes « {0} » et « {1} »',
     bestTime: 'Record : {0}',
@@ -353,6 +371,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multitimeShort: 'A race for two',
     bossrushShort: 'The express Adventure',
     soccerShort: 'Football for two',
+    // hfest.net's home button was "See Intro"; its guide, "the evil sorcerer's plan"
+    intro: 'Intro',
+    introShort: 'The evil sorcerer’s plan',
+    introSkip: 'Skip the intro',
     modeLockedBy: 'This mode is unlocked by the quest “{0}”',
     modeLockedBy2: 'This mode is unlocked by the quests “{0}” and “{1}”',
     bestTime: 'Best time: {0}',
@@ -471,6 +493,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     multitimeShort: 'Una carrera a dos',
     bossrushShort: 'La Aventura exprés',
     soccerShort: 'Fútbol a dos',
+    // The Spanish site's home button was "Ver la Intro"; its guide, "el malvado plan del
+    // hechicero"
+    intro: 'Intro',
+    introShort: 'El plan del hechicero',
+    introSkip: 'Saltar la intro',
     modeLockedBy: 'Este modo se desbloquea con la exploración «{0}»',
     modeLockedBy2: 'Este modo se desbloquea con las exploraciones «{0}» y «{1}»',
     bestTime: 'Récord: {0}',
@@ -660,6 +687,15 @@ export class Shell {
   private capture: Capture | null = null;
   /** A key or button changed on the controls page. */
   onBindings?: (b: Bindings) => void;
+  private baseUrl = './';
+  /** The intro's library (`gfx/intro.json`), loaded the first time it plays. */
+  private introLib: Promise<SwfLibrary | null> | null = null;
+  /** The intro playing, once its library is loaded. */
+  private intro: IntroMovie | null = null;
+  /** Holds the intro's movie, kept when the screen is drawn again. */
+  private readonly introLayer = new Container();
+  /** `performance.now()` of the intro's last frame. */
+  private introClock = 0;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
@@ -687,10 +723,21 @@ export class Shell {
     this.root.eventMode = 'static';
     this.root.hitArea = new Rectangle(0, 0, W, H);
     this.root.on('wheel', (e: FederatedWheelEvent) => this.onWheel(e.deltaY));
+    // The intro's movie, masked to its stage. A press on it is its button's (`IntroMovie.click`);
+    // Flash showed the hand over a button
+    this.introLayer.position.set(0, INTRO_Y);
+    this.introLayer.mask = this.introLayer.addChild(
+      new Graphics().rect(0, 0, INTRO_W, INTRO_H).fill(0xffffff),
+    );
+    this.introLayer.eventMode = 'static';
+    this.introLayer.cursor = 'pointer';
+    this.introLayer.hitArea = new Rectangle(0, 0, INTRO_W, INTRO_H);
+    this.introLayer.on('pointerdown', () => this.intro?.click());
   }
 
   /** Loads the title logo and the game over picture. */
   async load(baseUrl: string): Promise<void> {
+    this.baseUrl = baseUrl;
     [this.title, this.gameOverArt] = await Promise.all([
       loadTexture(`${baseUrl}${TITLE_FILE}`),
       loadTexture(`${baseUrl}${GAME_OVER_FILE}`),
@@ -769,7 +816,49 @@ export class Shell {
     this.render();
   }
 
+  /**
+   * The site's intro (3.5), from the menu's card or on the first launch. It plays in the game
+   * frame and ends at its end, on a click, or with the confirm or back key; the menu then shows
+   * with the Learning mode chosen, the free trial the movie led to (`INTRO_URL`).
+   */
+  showIntro(): void {
+    this.screen = 'intro';
+    this.dropIntro();
+    this.render();
+    this.introLib ??= IntroMovie.load(this.baseUrl).catch(() => null);
+    void this.introLib.then((lib) => {
+      if (this.screen !== 'intro' || this.intro) return;
+      if (!lib) {
+        this.introLib = null; // try again next time (offline before it was cached)
+        this.endIntro();
+        return;
+      }
+      this.intro = new IntroMovie(lib, this.lang, (code) => this.input.keyHeld(code));
+      this.introLayer.addChildAt(this.intro.root, 0);
+      this.introClock = performance.now();
+    });
+  }
+
+  /** The intro is over: back to the menu, the Learning mode chosen. */
+  private endIntro(): void {
+    this.dropIntro();
+    const tutorial = MODES.find((m) => m.mode === 'tutorial')!;
+    this.chosen = tutorial.mode;
+    this.selected = Math.max(
+      0,
+      this.menuEntries().findIndex((e) => e.kind === 'mode' && e.mode === tutorial),
+    );
+    this.showMenu();
+  }
+
+  private dropIntro(): void {
+    if (!this.intro) return;
+    this.intro.root.destroy({ children: true });
+    this.intro = null;
+  }
+
   hide(): void {
+    this.dropIntro();
     this.endCapture();
     this.screen = null;
     this.fadeFrom = null;
@@ -905,6 +994,10 @@ export class Shell {
     const ok = inp.consumeMenu('ok');
     const esc = inp.consumeMenu('back');
     switch (this.screen) {
+      case 'intro':
+        if (ok || esc) this.endIntro();
+        else this.stepIntro();
+        break;
       case 'menu':
         if (up) this.navigate(0, -1);
         if (down) this.navigate(0, 1);
@@ -949,6 +1042,22 @@ export class Shell {
     }
   }
 
+  /** The intro's frames due since the last display frame, at its 40 fps. */
+  private stepIntro(): void {
+    const movie = this.intro;
+    if (!movie) return;
+    const now = performance.now();
+    const frame = 1000 / INTRO_FPS;
+    let n = Math.floor((now - this.introClock) / frame);
+    if (n > INTRO_CATCH_UP) {
+      n = INTRO_CATCH_UP;
+      this.introClock = now - frame * n;
+    }
+    for (let i = 0; i < n && !movie.ended; i++) movie.step();
+    this.introClock += n * frame;
+    if (movie.ended) this.endIntro();
+  }
+
   private onWheel(dy: number): void {
     if (dy === 0) return;
     const d = Math.sign(dy);
@@ -970,6 +1079,7 @@ export class Shell {
       for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
       for (const oid of this.profile.runChoices(mode.mode)) out.push({ kind: 'run', mode, oid });
     }
+    out.push({ kind: 'intro' });
     for (const tab of TABS) out.push({ kind: 'tab', tab });
     out.push({ kind: 'settings' });
     return out;
@@ -1004,6 +1114,8 @@ export class Shell {
     const e = this.menuEntries()[this.selected];
     if (e.kind === 'settings') {
       this.showSettings();
+    } else if (e.kind === 'intro') {
+      this.showIntro();
     } else if (e.kind === 'tab') {
       if (e.tab.screen === 'quests') this.showQuests();
       else this.showFridge();
@@ -1202,7 +1314,9 @@ export class Shell {
   }
 
   private clear(): void {
-    for (const c of this.root.removeChildren()) c.destroy({ children: true });
+    for (const c of this.root.removeChildren()) {
+      if (c !== this.introLayer) c.destroy({ children: true });
+    }
   }
 
   private render(): void {
@@ -1216,6 +1330,9 @@ export class Shell {
     if (this.screen === 'sound') {
       // Over the paused game
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.45 }));
+    } else if (this.screen === 'intro') {
+      // The movie's background color
+      this.root.addChild(new Graphics().rect(0, 0, W, H).fill(0x000000));
     } else {
       this.drawBackground(
         this.screen === 'quests' ||
@@ -1224,7 +1341,8 @@ export class Shell {
           this.screen === 'controls',
       );
     }
-    if (this.screen === 'menu') this.drawMenu();
+    if (this.screen === 'intro') this.drawIntro();
+    else if (this.screen === 'menu') this.drawMenu();
     else if (this.screen === 'settings' || this.screen === 'sound') this.drawSettings();
     else if (this.screen === 'controls') this.drawControls();
     else if (this.screen === 'quests') this.drawQuests();
@@ -1524,6 +1642,7 @@ export class Shell {
     this.panel(26, top, 368, H - 8 - top);
 
     MODES.forEach((m, i) => this.drawModeCard(m, i, entries));
+    this.drawIntroCard(MODES.length, entries);
 
     // Under the cards: the options of the chosen mode, else its description
     const shown = MODES.find((m) => m.mode === this.chosen) ?? MODES[0];
@@ -1600,6 +1719,7 @@ export class Shell {
     this.drawGear(entries);
 
     if (cur.kind === 'tab') this.actionButton(t[cur.tab.screen], BUTTON_Y, () => this.confirm());
+    else if (cur.kind === 'intro') this.actionButton(t.intro, BUTTON_Y, () => this.confirm());
     else if (cur.kind === 'settings') this.actionButton(t.settings, BUTTON_Y, () => this.confirm());
     else if (canStart) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
     else this.actionButton(t.start, BUTTON_Y, null);
@@ -1652,6 +1772,49 @@ export class Shell {
       parent: card,
     });
     fitWidth(line, room);
+  }
+
+  /** The intro's card, slot `i` of the grid: it plays the intro at once, as a tab opens. */
+  private drawIntroCard(i: number, entries: MenuEntry[]): void {
+    const t = this.t;
+    const x = CARD.x[i % 2];
+    const y = CARD.y + Math.floor(i / 2) * (CARD.h + CARD.gap);
+    const n = entries.findIndex((e) => e.kind === 'intro');
+    const sel = n === this.selected;
+    const card = this.button([x, y, CARD.w, CARD.h], () => this.clickEntry(n), sel, 8);
+    this.navRects.set(n, [x, y, CARD.w, CARD.h]);
+    if (!sel) {
+      card.addChildAt(
+        new Graphics()
+          .roundRect(x + 0.5, y + 0.5, CARD.w - 1, CARD.h - 1, 8)
+          .fill({ color: C.wood, alpha: 0.05 })
+          .stroke({ color: C.wood, width: 1, alpha: 0.35 }),
+        1,
+      );
+    }
+    this.icon(INTRO_ICON, x + 20, y + CARD.h / 2, 26, card);
+    const textX = x + 38;
+    const room = x + CARD.w - 6 - textX;
+    const name = this.text(t.intro, 'label', textX, y + 4, {
+      align: 'left',
+      size: 14,
+      color: sel ? C.gold : C.ink,
+      parent: card,
+    });
+    fitWidth(name, room);
+    const line = this.text(t.introShort, 'body', textX, y + 21, {
+      align: 'left',
+      size: 10,
+      color: sel ? C.gold : C.inkSoft,
+      parent: card,
+    });
+    fitWidth(line, room);
+  }
+
+  /** The intro's screen: the movie on black, and the site page's link to skip it, as a button. */
+  private drawIntro(): void {
+    this.root.addChild(this.introLayer);
+    this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
   }
 
   /**

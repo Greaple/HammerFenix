@@ -13,6 +13,7 @@ import { DebugToolkit } from './ui/DebugToolkit';
 import { OriginalCompareDialog } from './ui/OriginalCompareDialog';
 import { Profile } from './game/Profile';
 import { QuestEngine } from './game/Quests';
+import { introOnLaunch } from './ui/Intro';
 import { Shell } from './ui/Shell';
 import { pickLang } from './ui/Language';
 import { applyPageText, pageText } from './ui/PageText';
@@ -152,6 +153,8 @@ async function main(): Promise<void> {
   app.stage.addChild(shell.root, shell.pauseLayer);
   session.gameRoot.visible = false;
   shell.showMenu();
+  // A new player sees the site's intro first (3.5), as its home page offered visitors
+  if (introOnLaunch(profile.saved)) shell.showIntro();
   loading.done();
   // Offline play (roadmap 5.3): the build's service worker caches the game once it has loaded
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {

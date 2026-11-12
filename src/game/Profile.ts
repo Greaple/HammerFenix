@@ -69,6 +69,8 @@ export type ProfileStorage = Pick<Storage, 'getItem' | 'setItem'>;
 export class Profile {
   data: ProfileData;
   readonly quests: QuestEngine;
+  /** A profile was read from the storage: the player has played before (or saved since). */
+  saved = false;
   private readonly storage: ProfileStorage | null;
 
   constructor(quests: QuestEngine, storage: ProfileStorage | null = defaultStorage()) {
@@ -81,7 +83,10 @@ export class Profile {
   load(): ProfileData {
     try {
       const raw = this.storage?.getItem(PROFILE_KEY);
-      if (raw) return decodeProfile(raw) ?? newProfile();
+      if (raw) {
+        this.saved = true;
+        return decodeProfile(raw) ?? newProfile();
+      }
     } catch {
       // storage blocked: start a new profile
     }
@@ -89,6 +94,7 @@ export class Profile {
   }
 
   save(): void {
+    this.saved = true;
     try {
       this.storage?.setItem(PROFILE_KEY, encodeProfile(this.data));
     } catch {

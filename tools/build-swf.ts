@@ -6,12 +6,14 @@
  *   - `public/sfx/*.mp3`          (21 extracted sound effects + 3 music tracks)
  *   - `public/gfx/bitmaps/*`      (all 199 embedded bitmaps decoded to PNG/JPG)
  *   - `public/gfx/library.json`   (vector shapes, texts, and MovieClip timelines)
+ *   - `public/gfx/intro.json`     (the site's intro, `intro.swf`, with its root timeline)
  */
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { parseSwf } from 'swf-parser';
 import { FilterType, TagType } from 'swf-types';
+import { INTRO_ROOT } from '../src/engine/swf/types';
 import type {
   BitmapDef,
   CharacterDef,
@@ -368,6 +370,74 @@ function buildSounds(): Record<string, string> {
   return sounds;
 }
 
+interface BundleCounts {
+  bitmaps: number;
+  shapes: number;
+  sprites: number;
+}
+
+/**
+ * Compiles the characters and exports of SWF `file` into `characters` and `exports`, its ids
+ * moved up by `offset`. Returns the parsed SWF.
+ */
+function compileBundle(
+  file: string,
+  offset: number,
+  characters: Record<number, CharacterDef>,
+  exports: Record<string, number>,
+  counts: BundleCounts,
+): ReturnType<typeof parseSwf> {
+  const swf = parseSwf(readFileSync(join(SWF_DIR, file)));
+  let jpegTables: Uint8Array | undefined;
+  const fonts = new Map<number, any>();
+
+  for (const t of swf.tags as any[]) {
+    switch (t.type as TagType) {
+      case TagType.DefineJpegTables:
+        jpegTables = t.data;
+        break;
+      case TagType.DefineFont:
+        fonts.set(t.id, t);
+        break;
+      case TagType.DefineBitmap:
+        characters[t.id + offset] = extractBitmap(t, t.id + offset, jpegTables);
+        counts.bitmaps++;
+        break;
+      case TagType.DefineShape:
+      case TagType.DefineMorphShape:
+        characters[t.id + offset] = compileSwfShape(t, offset);
+        counts.shapes++;
+        break;
+      case TagType.DefineText:
+        characters[t.id + offset] = compileStaticText(t, fonts);
+        counts.shapes++;
+        break;
+      case TagType.DefineDynamicText:
+        characters[t.id + offset] = compileDynamicText(t, fonts);
+        break;
+      case TagType.DefineButton:
+        characters[t.id + offset] = compileButton(t, offset);
+        counts.sprites++;
+        break;
+      case TagType.DefineSprite:
+        characters[t.id + offset] = compileSprite(t, offset);
+        counts.sprites++;
+        break;
+      case TagType.ExportAssets:
+        for (const a of t.assets ?? []) {
+          exports[a.name] = a.id + offset;
+          // Also register without leading `$` so de-obfuscated lookups match seamlessly.
+          if (a.name.startsWith('$')) {
+            exports[a.name.slice(1)] = a.id + offset;
+          }
+        }
+        break;
+    }
+  }
+  console.log(`  parsed ${file} (offset +${offset})`);
+  return swf;
+}
+
 function buildSwfLibrary(): void {
   mkdirSync(BMP_OUT, { recursive: true });
   const sounds = buildSounds();
@@ -385,60 +455,8 @@ function buildSwfLibrary(): void {
     ['_loader.swf', 40000],
   ];
 
-  let bmpCount = 0;
-  let shapeCount = 0;
-  let spriteCount = 0;
-
-  for (const [file, offset] of bundles) {
-    const swf = parseSwf(readFileSync(join(SWF_DIR, file)));
-    let jpegTables: Uint8Array | undefined;
-    const fonts = new Map<number, any>();
-
-    for (const t of swf.tags as any[]) {
-      switch (t.type as TagType) {
-        case TagType.DefineJpegTables:
-          jpegTables = t.data;
-          break;
-        case TagType.DefineFont:
-          fonts.set(t.id, t);
-          break;
-        case TagType.DefineBitmap:
-          characters[t.id + offset] = extractBitmap(t, t.id + offset, jpegTables);
-          bmpCount++;
-          break;
-        case TagType.DefineShape:
-        case TagType.DefineMorphShape:
-          characters[t.id + offset] = compileSwfShape(t, offset);
-          shapeCount++;
-          break;
-        case TagType.DefineText:
-          characters[t.id + offset] = compileStaticText(t, fonts);
-          shapeCount++;
-          break;
-        case TagType.DefineDynamicText:
-          characters[t.id + offset] = compileDynamicText(t, fonts);
-          break;
-        case TagType.DefineButton:
-          characters[t.id + offset] = compileButton(t, offset);
-          spriteCount++;
-          break;
-        case TagType.DefineSprite:
-          characters[t.id + offset] = compileSprite(t, offset);
-          spriteCount++;
-          break;
-        case TagType.ExportAssets:
-          for (const a of t.assets ?? []) {
-            exports[a.name] = a.id + offset;
-            // Also register without leading `$` so de-obfuscated lookups match seamlessly.
-            if (a.name.startsWith('$')) {
-              exports[a.name.slice(1)] = a.id + offset;
-            }
-          }
-          break;
-      }
-    }
-    console.log(`  parsed ${file} (offset +${offset})`);
-  }
+  const counts: BundleCounts = { bitmaps: 0, shapes: 0, sprites: 0 };
+  for (const [file, offset] of bundles) compileBundle(file, offset, characters, exports, counts);
 
   const lib: SwfLibraryData = {
     version: 1,
@@ -448,10 +466,37 @@ function buildSwfLibrary(): void {
   };
   writeFileSync(join(GFX_OUT, 'library.json'), JSON.stringify(lib));
   console.log(
-    `  gfx/library.json  (${bmpCount} bitmaps, ${shapeCount} shapes, ${spriteCount} sprites, ${Object.keys(exports).length} exports)`,
+    `  gfx/library.json  (${counts.bitmaps} bitmaps, ${counts.shapes} shapes, ${counts.sprites} sprites, ${Object.keys(exports).length} exports)`,
+  );
+}
+
+/** Ids of `intro.swf` start here, so its bitmaps do not overwrite the game's in `bitmaps/`. */
+const INTRO_OFFSET = 50000;
+
+/**
+ * The intro of the hammerfest.fr site (`swf/intro.swf`, roadmap 3.5), in a library of its own
+ * (`gfx/intro.json`), loaded only when it plays: its linkage names (`bFade`, `itemOut`, the dunes)
+ * would replace the game's. Its root timeline is the sprite `INTRO_ROOT` (`ui/Intro.ts`).
+ */
+function buildIntroLibrary(): void {
+  const characters: Record<number, CharacterDef> = {};
+  const exports: Record<string, number> = {};
+  const counts: BundleCounts = { bitmaps: 0, shapes: 0, sprites: 0 };
+  const swf = compileBundle('intro.swf', INTRO_OFFSET, characters, exports, counts);
+  // The root timeline (id 0): its two frames place the two scenes and the skip button
+  characters[INTRO_OFFSET] = compileSprite(
+    { tags: swf.tags, frameCount: swf.header.frameCount },
+    INTRO_OFFSET,
+  );
+  exports[INTRO_ROOT] = INTRO_OFFSET;
+  const lib: SwfLibraryData = { version: 1, characters, exports, sounds: {} };
+  writeFileSync(join(GFX_OUT, 'intro.json'), JSON.stringify(lib));
+  console.log(
+    `  gfx/intro.json  (${counts.bitmaps} bitmaps, ${counts.shapes} shapes, ${counts.sprites} sprites)`,
   );
 }
 
 console.log('Building SWF graphics & audio → public/gfx, public/sfx');
 buildSwfLibrary();
+buildIntroLibrary();
 console.log('Done.');

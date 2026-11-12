@@ -496,6 +496,13 @@ export class SwfMovieClip extends Container implements Avm1Clip {
   mcName = '';
   /** Placed by a script (`duplicateMovieClip`), not by the timeline. */
   private dynamicDepth = false;
+  /**
+   * A frame script moved, scaled, turned or faded this clip: from then on, its parent's timeline
+   * no longer places it (its matrix, color, blend and filters), as in Flash (Ruffle's
+   * `transformed_by_script`). Only set by `Avm1.ts` scripts; the port's own code sets fields
+   * directly. The intro's Tuberculoz walks this way while his scene loops on two frames.
+   */
+  private scriptMoved = false;
 
   /** Allow dynamic child references (`(mc as any).sub`) matching AS2 semantics. */
   [key: string]: any;
@@ -759,6 +766,32 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     parent.registerName(name, copy);
     if (parent.live) copy.goLive();
     return copy;
+  }
+
+  /**
+   * Flash `attachMovie`, from a script: a new instance of the symbol exported as `linkage`, named
+   * `name`, at AS depth `depth` (above the timeline's children, as `duplicateMovieClip`'s). It
+   * replaces the clip a script put at that depth. Undefined, and nothing attached, when no
+   * symbol has that name (the intro's `textBox`).
+   */
+  attachMovie(linkage: string, name: string, depth: number): SwfMovieClip | undefined {
+    if (!this.lib.hasSymbol(linkage) || !Number.isFinite(depth)) return undefined;
+    const d = depth + 16384;
+    for (const c of this.children) {
+      if (c instanceof SwfMovieClip && c.dynamicDepth && c.mcDepth === d) {
+        c.removeMovieClip();
+        break;
+      }
+    }
+    const mc = this.lib.attach(linkage);
+    mc.zIndex = d;
+    mc.mcDepth = d;
+    mc.mcName = name;
+    mc.dynamicDepth = true;
+    this.addChild(mc);
+    this.registerName(name, mc);
+    if (this.live) mc.goLive();
+    return mc;
   }
 
   /** Typed lookup for a named child MovieClip (`sub`, `skin`, `maskTile`, etc.). */
@@ -1047,8 +1080,10 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         this.applyPlace({ op: 'place', d: depth, ...rec });
         continue;
       }
-      this.applyMatrix(slot.node, rec.m ?? IDENTITY_MATRIX);
-      this.applyLook(slot, rec.cx ?? IDENTITY_CXFORM, rec.blend ?? 0, rec.f ?? []);
+      if (!(slot.node instanceof SwfMovieClip && slot.node.scriptMoved)) {
+        this.applyMatrix(slot.node, rec.m ?? IDENTITY_MATRIX);
+        this.applyLook(slot, rec.cx ?? IDENTITY_CXFORM, rec.blend ?? 0, rec.f ?? []);
+      }
       if (rec.visible !== undefined) slot.node.visible = rec.visible;
       if (rec.n !== slot.name) {
         if (slot.name) this.unregisterName(slot.name, slot.node);
@@ -1062,6 +1097,11 @@ export class SwfMovieClip extends Container implements Avm1Clip {
 
   avmGet(name: string): unknown {
     if (name === '_parent') return this.parent instanceof SwfMovieClip ? this.parent : undefined;
+    if (name === '_root') {
+      let root: SwfMovieClip = this;
+      while (root.parent instanceof SwfMovieClip) root = root.parent;
+      return root;
+    }
     const index = PROP_INDEX[name];
     if (index !== undefined) return this.avmGetProp(index);
     const child = this.namedChildren.get(name);
@@ -1159,8 +1199,11 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         return this._width;
       case 9:
         return this._height;
-      case 10:
-        return this.rotationDeg;
+      case 10: {
+        // Flash reads `_rotation` back between -180 and 180
+        const r = this.rotationDeg % 360;
+        return r > 180 ? r - 360 : r <= -180 ? r + 360 : r;
+      }
       case 13:
         return this._name;
       default:
@@ -1170,6 +1213,9 @@ export class SwfMovieClip extends Container implements Avm1Clip {
 
   avmSetProp(index: number, value: unknown): void {
     const n = Number(value);
+    if (index <= 3 || index === 6 || index === 8 || index === 9 || index === 10) {
+      this.scriptMoved = true;
+    }
     switch (index) {
       case 0:
         if (Number.isFinite(n)) this._x = n;
@@ -1227,6 +1273,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
       case 'removeMovieClip':
         this.removeMovieClip();
         return undefined;
+      case 'attachMovie':
+        return this.attachMovie(String(args[0]), String(args[1]), Number(args[2]));
     }
     const host = this.scriptHost;
     if (host && typeof host[name] === 'function') return host[name](...args);
@@ -1282,8 +1330,9 @@ export class SwfMovieClip extends Container implements Avm1Clip {
 
     // Update existing display object at depth
     if (cmd.u && existing && (cmd.id === undefined || cmd.id === existing.charId)) {
-      if (cmd.m) this.applyMatrix(existing.node, cmd.m);
-      if (cmd.cx || cmd.blend !== undefined || cmd.f !== undefined) {
+      const moved = existing.node instanceof SwfMovieClip && existing.node.scriptMoved;
+      if (cmd.m && !moved) this.applyMatrix(existing.node, cmd.m);
+      if (!moved && (cmd.cx || cmd.blend !== undefined || cmd.f !== undefined)) {
         this.applyLook(existing, cmd.cx, cmd.blend, cmd.f);
       }
       if (cmd.visible !== undefined) existing.node.visible = cmd.visible;

@@ -35,7 +35,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
 - `src/game/Data.ts`: port of `Data.mt`. Values must match the original exactly.
 - `src/game/Quests.ts`, `Profile.ts`: the hammerfest.fr server's quests and the player profile (not a port; rules and guesses in PORT_STATUS.md "Quests and profile")
-- `src/ui/`: debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
+- `src/ui/`: the site screens (`Shell.ts`: menu, results, quests, fridge, settings) and the site's intro (`Intro.ts`, `public/gfx/intro.json`), debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
 
 ## Conventions
 

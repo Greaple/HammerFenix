@@ -137,6 +137,12 @@ export interface SpriteDef {
 
 export type CharacterDef = BitmapDef | ShapeDef | DynamicTextDef | SpriteDef;
 
+/**
+ * Linkage name of the root timeline of `gfx/intro.json` (the site's `intro.swf`, roadmap 3.5). A
+ * SWF's root has no linkage name of its own; the build gives it this one.
+ */
+export const INTRO_ROOT = '__root';
+
 export interface SwfLibraryData {
   version: number;
   characters: Record<number, CharacterDef>;
