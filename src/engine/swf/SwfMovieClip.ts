@@ -446,6 +446,32 @@ function makeTimelineFilters(list: TimelineFilter[]): Filter[] {
  */
 const queuedActions: { clip: SwfMovieClip; frame: number }[] = [];
 
+/** A frame whose scripts wait for the end of a `stepAnimation` (see `stepMovie`). */
+export interface FrameActions {
+  clip: SwfMovieClip;
+  frame: number;
+}
+
+/** Counts the clips made, so `stepMovie` can run the newest first. */
+let instances = 0;
+
+/**
+ * One frame of a whole Flash movie, as Flash (Ruffle's AVM1 `run_frame`) plays it: every clip
+ * advances, then the scripts of the frames reached run, the newest clip's first (Ruffle keeps
+ * its clips in an execution list, each new one at its head), so a child's frame script runs
+ * before its parent's. A clip removed meanwhile does not run its scripts. Used by the site's
+ * intro (its bananas' frame 28 reads the step its parent's script sets on the same frame); the
+ * game's clips still run their scripts as they advance, parents first.
+ */
+export function stepMovie(root: SwfMovieClip): void {
+  const reached: FrameActions[] = [];
+  root.stepAnimation(0, reached);
+  reached.sort((a, b) => b.clip.instance - a.clip.instance);
+  for (const { clip, frame } of reached) {
+    if (clip === root || clip.parent) clip.runQueuedActions(frame);
+  }
+}
+
 /** Runs the queued frame scripts. Call it after each piece of game code (a tick, a step). */
 export function runQueuedFrameActions(): void {
   // A script can queue more; the cap stops two frames that send the clip to each other
@@ -504,8 +530,29 @@ export class SwfMovieClip extends Container implements Avm1Clip {
    */
   private scriptMoved = false;
 
+  /**
+   * Flash's view of this clip's matrix for frame scripts (Ruffle's `cache_scale_rotation`): its
+   * `_xscale`, `_yscale`, `_rotation` and skew, read from the matrix (`a b c d`, kept to tell
+   * when something else changed it) and kept as a script set them. A timeline flip
+   * (`a < 0`) reads as a positive `_xscale` and a `_rotation` of 180, and a script's negative
+   * `_xscale` stays negative. The intro's bananas are flipped this way.
+   */
+  private flashTf?: {
+    a: number;
+    b: number;
+    c: number;
+    d: number;
+    rot: number;
+    sx: number;
+    sy: number;
+    skew: number;
+  };
+
   /** Allow dynamic child references (`(mc as any).sub`) matching AS2 semantics. */
   [key: string]: any;
+
+  /** The order this clip was made in (`stepMovie` runs the newest clips' scripts first). */
+  readonly instance = instances++;
 
   constructor(lib: SwfLibrary, def?: SpriteDef) {
     super();
@@ -923,19 +970,23 @@ export class SwfMovieClip extends Container implements Avm1Clip {
     this.filters = l;
   }
 
-  /** Advances this clip and all playing descendant MovieClips by one timeline frame. */
-  stepAnimation(guardDepth = 0): void {
+  /**
+   * Advances this clip and all playing descendant MovieClips by one timeline frame. With
+   * `reached`, the scripts of the frames reached do not run but are added to it (`stepMovie`).
+   */
+  stepAnimation(guardDepth = 0, reached?: FrameActions[]): void {
     this.goLive();
     if (!this.visible || guardDepth > 32) return;
 
     if (this.playing && this.def.frameCount > 1) {
       const next = this.curFrame >= this.def.frameCount ? 1 : this.curFrame + 1;
-      this.seekToFrame(next, true);
+      this.seekToFrame(next, !reached);
+      if (reached && this.def.frames[next - 1]?.actions) reached.push({ clip: this, frame: next });
     }
 
     for (const child of this.children) {
       if (child instanceof SwfMovieClip) {
-        child.stepAnimation(guardDepth + 1);
+        child.stepAnimation(guardDepth + 1, reached);
       }
     }
   }
@@ -1184,9 +1235,9 @@ export class SwfMovieClip extends Container implements Avm1Clip {
       case 1:
         return this._y;
       case 2:
-        return this._xscale;
+        return this.flashTransform().sx * 100;
       case 3:
-        return this._yscale;
+        return this.flashTransform().sy * 100;
       case 4:
         return this._currentframe;
       case 5:
@@ -1199,11 +1250,8 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         return this._width;
       case 9:
         return this._height;
-      case 10: {
-        // Flash reads `_rotation` back between -180 and 180
-        const r = this.rotationDeg % 360;
-        return r > 180 ? r - 360 : r <= -180 ? r + 360 : r;
-      }
+      case 10:
+        return this.flashTransform().rot;
       case 13:
         return this._name;
       default:
@@ -1224,10 +1272,10 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         if (Number.isFinite(n)) this._y = n;
         break;
       case 2:
-        if (Number.isFinite(n)) this._xscale = n;
+        if (Number.isFinite(n)) this.setFlashTransform({ sx: n / 100 });
         break;
       case 3:
-        if (Number.isFinite(n)) this._yscale = n;
+        if (Number.isFinite(n)) this.setFlashTransform({ sy: n / 100 });
         break;
       case 6:
         if (Number.isFinite(n)) this._alpha = n;
@@ -1242,12 +1290,69 @@ export class SwfMovieClip extends Container implements Avm1Clip {
         if (Number.isFinite(n)) this._height = n;
         break;
       case 10:
-        if (Number.isFinite(n)) this.rotationDeg = n;
+        if (Number.isFinite(n)) {
+          // Flash keeps `_rotation` between -180 and 180
+          const r = n % 360;
+          this.setFlashTransform({ rot: r > 180 ? r - 360 : r < -180 ? r + 360 : r });
+        }
         break;
       case 13:
         this._name = String(value);
         break;
     }
+  }
+
+  /**
+   * This clip's matrix (`a b c d`) from its Pixi transform, as Pixi composes it, with the trig's
+   * leftovers (1e-17) made 0, as in the SWF's matrix: a flip then reads 180, not -180.
+   */
+  private matrixAbcd(): [number, number, number, number] {
+    const { rotation, skew, scale } = this;
+    const v = (n: number) => (Math.abs(n) < 1e-12 ? 0 : n);
+    return [
+      v(Math.cos(rotation + skew.y) * scale.x),
+      v(Math.sin(rotation + skew.y) * scale.x),
+      v(-Math.sin(rotation - skew.x) * scale.y),
+      v(Math.cos(rotation - skew.x) * scale.y),
+    ];
+  }
+
+  /** See `flashTf`: read again from the matrix when something other than a script changed it. */
+  private flashTransform(): NonNullable<SwfMovieClip['flashTf']> {
+    const [a, b, c, d] = this.matrixAbcd();
+    const t = this.flashTf;
+    if (t && t.a === a && t.b === b && t.c === c && t.d === d) return t;
+    const rx = Math.atan2(b, a);
+    return (this.flashTf = {
+      a,
+      b,
+      c,
+      d,
+      rot: (rx * 180) / Math.PI,
+      sx: Math.hypot(a, b),
+      sy: Math.hypot(c, d),
+      skew: Math.atan2(-c, d) - rx,
+    });
+  }
+
+  /** A script sets `_xscale`, `_yscale` or `_rotation`: the matrix is made again from them. */
+  private setFlashTransform(v: { sx?: number; sy?: number; rot?: number }): void {
+    const t = this.flashTransform();
+    if (v.sx !== undefined) t.sx = v.sx;
+    if (v.sy !== undefined) t.sy = v.sy;
+    if (v.rot !== undefined) t.rot = v.rot;
+    const rx = (t.rot * Math.PI) / 180;
+    const ry = rx + t.skew;
+    TMP_MAT.set(
+      t.sx * Math.cos(rx),
+      t.sx * Math.sin(rx),
+      t.sy * -Math.sin(ry),
+      t.sy * Math.cos(ry),
+      this.x,
+      this.y,
+    );
+    this.setFromMatrix(TMP_MAT);
+    [t.a, t.b, t.c, t.d] = this.matrixAbcd();
   }
 
   avmCall(name: string, args: unknown[]): unknown {

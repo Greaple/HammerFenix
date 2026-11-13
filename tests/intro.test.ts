@@ -58,14 +58,37 @@ describe("the site's intro (intro.swf, roadmap 3.5)", () => {
       -1, -2, -3, -4, -5, -6, -7, -8, -9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
       17, 18, 19, 20,
     ]);
-    expect(frames).toBe(1797);
+    expect(frames).toBe(1437);
     // The desert: Bouli walks, the dunes scroll, the screen fades out
     const desert = scene2(m)!;
     const dune6 = desert.avmGet('dune6') as SwfMovieClip;
     const x0 = dune6._x;
-    expect(playUntil(m, () => m.ended)).toBe(549);
+    expect(playUntil(m, () => m.ended)).toBe(550);
     expect(dune6._x).toBeLessThan(x0);
     expect(desert.avmGet('fadeOut')).toBe(true);
+  });
+
+  it("the bananas fight once more before the knockout (a child's frame script runs first)", () => {
+    const m = movie();
+    // The bananas' frame 28 sends them to "assom" if the step is -2, which `main()` sets on that
+    // very frame (81): Flash runs the child's script first, so they loop once more
+    playUntil(m, () => scene1(m)!.avmGet('step') === -2);
+    const bananas = scene1(m)!.avmGet('bananePlay') as SwfMovieClip;
+    expect(bananas._currentframe).toBe(1);
+    expect(bananas.avmGet('ban2')).toBeDefined();
+    playUntil(m, () => bananas._currentframe === 29);
+    expect(bananas.avmGet('ban2')).toBeUndefined(); // knocked out
+  });
+
+  it('the flipped banana tilts back a little, not round (Flash reads its `_rotation` as 180)', () => {
+    const m = movie();
+    playUntil(m, () => scene1(m)!.avmGet('step') === -5);
+    const ban2 = (scene1(m)!.avmGet('bananePlay') as SwfMovieClip).avmGet('ban2') as SwfMovieClip;
+    // Placed with `_xscale` -84.6 by its timeline: Flash reads it as 84.6, turned 180
+    expect(ban2.avmGetProp(2)).toBeCloseTo(84.6, 1);
+    expect(ban2.avmGetProp(10)).toBeCloseTo(-170); // 180 + 10
+    const frames = playUntil(m, () => scene1(m)!.avmGet('step') === -6);
+    expect(frames).toBe(74); // 15 frames, then 0.5 degree a frame from -170 to 160
   });
 
   it('shows no text: its texts are attached as a symbol it does not have', () => {
@@ -171,6 +194,31 @@ describe('clips moved by frame scripts (Flash semantics the intro needs)', () =>
     expect(c._x).toBe(50);
     p.gotoAndStop(1);
     expect(c._x).toBe(50);
+  });
+
+  it('a flipped clip reads as turned 180, and a script keeps its own negative `_xscale`', () => {
+    const lib = SwfLibrary.headless({
+      version: 1,
+      sounds: {},
+      exports: { p: 2 },
+      characters: {
+        1: { kind: 'sprite', frameCount: 1, frames: [{ cmds: [] }] },
+        2: {
+          kind: 'sprite',
+          frameCount: 1,
+          frames: [{ cmds: [{ op: 'place', d: 1, id: 1, n: 'c', m: [-0.5, 0, 0, 0.5, 0, 0] }] }],
+        },
+      },
+    });
+    const c = lib.attach('p').getClip('c')!;
+    expect(c.avmGetProp(2)).toBeCloseTo(50);
+    expect(c.avmGetProp(3)).toBeCloseTo(50);
+    expect(c.avmGetProp(10)).toBeCloseTo(180);
+    c.avmSetProp(10, 0); // keeps the flip (its skew): now upside down
+    expect(c.scale.x * Math.cos(c.rotation + c.skew.y)).toBeCloseTo(0.5);
+    c.avmSetProp(2, -50);
+    expect(c.avmGetProp(2)).toBeCloseTo(-50);
+    expect(c.avmGetProp(10)).toBeCloseTo(0);
   });
 
   it('`_rotation` reads back between -180 and 180', () => {

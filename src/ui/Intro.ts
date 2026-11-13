@@ -1,6 +1,6 @@
 import { setAvm1Host, type Avm1Host } from '../engine/swf/Avm1';
 import { SwfLibrary } from '../engine/swf/SwfLibrary';
-import { runQueuedFrameActions, type SwfMovieClip } from '../engine/swf/SwfMovieClip';
+import { runQueuedFrameActions, stepMovie, type SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { INTRO_ROOT } from '../engine/swf/types';
 
 /** The movie's stage: `intro.swf` is 420 x 325 (and the site's page showed it at that size). */
@@ -80,7 +80,7 @@ export class IntroMovie {
   /** One frame of the movie: the clips step, then the scripts of the frames reached run. */
   step(): void {
     if (this.ended) return;
-    this.run(() => this.root.stepAnimation());
+    this.run(() => stepMovie(this.root));
   }
 
   /**
