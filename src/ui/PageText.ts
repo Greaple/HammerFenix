@@ -59,6 +59,8 @@ const TEXT: Record<Lang, PageTexts> = {
     linkPort: 'Code source de HammerFenix',
     linkLicense: 'Licence CC BY-NC-SA 4.0',
     padIcons: 'Icônes de manettes, de Figma Community (CC BY 4.0) :',
+    hdBitmaps:
+      'Images agrandies pour les grands écrans avec un modèle de Philip Hofmann (CC BY 4.0) :',
     devKeysTitle: 'Touches de développement',
     devKeysNote:
       'Celles du jeu original en mode développeur. Les chiffres sont ceux du pavé numérique ou de la rangée du haut. Elles ne marchent pas pendant un enregistrement ou un replay, et les lettres gardent leur usage normal (W saute aussi).',
@@ -123,6 +125,7 @@ const TEXT: Record<Lang, PageTexts> = {
     linkPort: 'HammerFenix source code',
     linkLicense: 'CC BY-NC-SA 4.0 license',
     padIcons: 'Controller icons, from Figma Community (CC BY 4.0):',
+    hdBitmaps: 'Bitmaps for big screens upscaled with a model by Philip Hofmann (CC BY 4.0):',
     devKeysTitle: 'Developer keys',
     devKeysNote:
       'The original game’s own dev mode keys. Digits are the numpad’s or the top row’s. They are off while recording or replaying, and letters keep their game use (W also jumps).',
@@ -187,6 +190,8 @@ const TEXT: Record<Lang, PageTexts> = {
     linkPort: 'Código fuente de HammerFenix',
     linkLicense: 'Licencia CC BY-NC-SA 4.0',
     padIcons: 'Iconos de mandos, de Figma Community (CC BY 4.0):',
+    hdBitmaps:
+      'Imágenes ampliadas para pantallas grandes con un modelo de Philip Hofmann (CC BY 4.0):',
     devKeysTitle: 'Teclas de desarrollo',
     devKeysNote:
       'Las del modo desarrollador del juego original. Las cifras son las del teclado numérico o de la fila de arriba. No funcionan durante una grabación o una repetición, y las letras siguen con su uso normal (W también salta).',

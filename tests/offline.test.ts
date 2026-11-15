@@ -29,6 +29,17 @@ describe('offline play (5.3)', () => {
     expect(src).toContain('ignoreVary: true');
   });
 
+  it('keeps the HD bitmaps for their first fetch, not the install', () => {
+    const src = serviceWorker('0123456789ab', ['gfx/bitmaps/b4.jpg', 'gfx/bitmaps-x4/b4.jpg']);
+    expect(() => new Function(src)).not.toThrow();
+    expect(src).toContain('["./","gfx/bitmaps/b4.jpg"]');
+    const onDemand = /(\/.*\/)\.test\(new URL\(req\.url\)\.pathname\)/.exec(src)![1];
+    const re = new RegExp(onDemand.slice(1, -1));
+    expect(re.test('/HammerFenix/gfx/bitmaps-x4/b4.jpg')).toBe(true);
+    expect(re.test('/gfx/bitmaps-x2/b4.a.png')).toBe(true);
+    expect(re.test('/gfx/bitmaps/b4.jpg')).toBe(false);
+  });
+
   it('declares the manifest and icons the page links to', () => {
     const root = join(__dirname, '..');
     const html = readFileSync(join(root, 'index.html'), 'utf-8');

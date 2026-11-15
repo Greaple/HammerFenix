@@ -1,4 +1,5 @@
 import { setAvm1Host, type Avm1Host } from '../engine/swf/Avm1';
+import { pickBitmapScale } from '../engine/swf/BitmapDetail';
 import { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { runQueuedFrameActions, stepMovie, type SwfMovieClip } from '../engine/swf/SwfMovieClip';
 import { INTRO_ROOT } from '../engine/swf/types';
@@ -74,7 +75,7 @@ export class IntroMovie {
 
   /** The movie's library, `gfx/intro.json` (built by `tools/build-swf.ts`). */
   static load(baseUrl: string): Promise<SwfLibrary> {
-    return SwfLibrary.load(baseUrl, undefined, 'gfx/intro.json');
+    return SwfLibrary.load(baseUrl, undefined, 'gfx/intro.json', pickBitmapScale());
   }
 
   /** One frame of the movie: the clips step, then the scripts of the frames reached run. */

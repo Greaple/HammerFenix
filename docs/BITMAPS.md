@@ -4,6 +4,15 @@ Every bitmap the game draws, from `public/gfx/library.json` (and `intro.json`), 
 
 200 bitmaps, 698 KB in `public/gfx/bitmaps/`. A JPEG with transparency has a mask beside it (`bNNN.a.png`, 36 files), which an upscale must follow too.
 
+## HD sets (big screens)
+
+Done 2026-11-15 (5.6): every file is upscaled 4x and 2x (`assets-src/upscaled/bitmaps-x4/`, 11 MB, and `-x2/`, 3.9 MB, made by `tools/upscale-bitmaps/`, whose README has the model and the steps), copied to `public/gfx/bitmaps-x4/` and `-x2/` by `tools/build-site.ts`.
+
+- `src/engine/swf/BitmapDetail.ts` picks a set from the screen in full screen: 4x from 3.5 device pixels per stage pixel (a 4K TV), 2x from 1.5 (a 1080p screen, a Retina laptop), else the SWF's own. Touch-only devices get at most 2x (the 4x set is about 190 MB decoded). `?hd=1`, `?hd=2` or `?hd=4` forces a set and keeps it, `?hd=auto` goes back.
+- `SwfLibrary` loads the set (falling back to the SWF's bitmap for a file that fails or has the wrong size) and keeps each bitmap's scale: a bitmap sprite's texture has that resolution, so it keeps its size on stage, and a bitmap fill's matrix is divided by it (`ShapeRasterizer.pattern`, smoothed). Shapes are drawn into textures at least at the set's scale (4 on a TV, whose device pixel ratio is 1), up to 4096 px a side.
+- `library.json` is unchanged: bounds, the headless runs and the replays do not see the sets.
+- The offline cache keeps a set's files when the game first fetches them, not at install (a screen loads one set at most).
+
 | Group                 | Count | Largest | Over 200 px |
 | --------------------- | ----- | ------- | ----------- |
 | level background      | 28    | 256×256 | 4           |

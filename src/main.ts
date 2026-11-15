@@ -5,6 +5,7 @@ import { InputController, type ControlAction } from './engine/Input';
 import { bindingKeys, loadBindings, saveBindings } from './engine/Bindings';
 import { showHelpKeys } from './ui/HelpKeys';
 import { SwfLibrary } from './engine/swf/SwfLibrary';
+import { pickBitmapScale } from './engine/swf/BitmapDetail';
 import { runQueuedFrameActions } from './engine/swf/SwfMovieClip';
 import { GameDataStore } from './game/Data';
 import { GameSession } from './game/GameSession';
@@ -115,7 +116,7 @@ async function main(): Promise<void> {
   // 2. Load game data and assets in parallel
   const [dataStore, lib] = await Promise.all([
     GameDataStore.load(baseUrl, startLang),
-    SwfLibrary.load(baseUrl, (f) => loading.progress(f)),
+    SwfLibrary.load(baseUrl, (f) => loading.progress(f), undefined, pickBitmapScale()),
     loadGameFonts(baseUrl),
     loadPadIcons(),
   ]);

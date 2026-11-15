@@ -4,7 +4,7 @@ Goal: near-perfect clone of Hammerfest. Each task is sized for about one convers
 
 ## Next up
 
-Phases 1, 2, 2B, 2C, 3, 4 and 5 (except 5.4 and 5.5) and the UI batches are done. Order so far (updated 2026-11-11):
+Phases 1, 2, 2B, 2C, 3, 4 and 5 (except 5.4 and 5.5) and the UI batches are done. Order so far (updated 2026-11-15):
 
 1. 2B.0 to 2B.3 are done: the Ruffle side-by-side can jump to a level (Flash button, level field). Hiko can't be checked in Ruffle: no portal leads there and the jump stays in the current dimension.
 2. 2C.1 and 2C.2 are done: the port has the original's dev keys (help dialog, dev switch on), so both games jump levels and give keys the same way, and the audit deviations that changed play are fixed.
@@ -25,6 +25,7 @@ Phases 1, 2, 2B, 2C, 3, 4 and 5 (except 5.4 and 5.5) and the UI batches are done
 17. 4.5 is done (2026-11-12): the boss rush ("Tubercourse") starts from the menu once the profile has Tuberculoz's cape (quest 48), and counts for the quests like the Adventure; its results page is the Adventure's (the maintainer's calls). Every mode is ported: Phase 4 is done. Next: 3.5 (the site's intro), 5.4 and 5.5. Needs play: a whole boss rush, ideally beside a video of the original.
 18. 3.5 is done (2026-11-12): the site's intro plays from an "Intro" card on the menu and once on the first launch, its own frame scripts run by `Avm1.ts`. Two calls confirmed by the maintainer (2026-11-12): after the intro, the menu shows with the Learning mode chosen (the movie led to the free trial); and Enter during the first scene sends Tuberculoz back to his walk, as in the original (`Key.isDown(13)`), since only the confirm and back keys skip. Phase 3 is done. Next: 5.4 and 5.5.
 19. Published (2026-11-12): https://greaple.github.io/HammerFenix/, deployed by the `deploy` job in `.github/workflows/ci.yml` after the tests pass on `main`. Next: play it (the "needs play" rows of LEVELS.md, a real phone for 5.4, controllers) and log what is found in "Bugs (found in play)".
+20. 5.6 is done (2026-11-15): HD bitmaps for big screens. Next: try it on a TV (4x set), then as in 19.
 
 Working notes:
 
@@ -209,6 +210,7 @@ The page around the game frame and the site screens, from an audit of every scre
   - Pause: a button in the top bar on touch screens (the `pause` action, so it is also "back" in the menus).
   - No music: the audio was only unlocked on the first `pointerdown`, which a browser does not count as a gesture for a touch (it counts the lift). It is now unlocked on every gesture until it runs, and the music asked for meanwhile starts with it (`AudioEngine.unlock`, `onStateChange`; `tests/audio.test.ts`). Not confirmed as the cause on the phone. The Learning mode has no music, as in the original (`Tutorial.mt` never plays any).
 - [ ] 5.5 English and Spanish versions of the title logo (left from U.2; it says "Les Cavernes de"). Needs artwork from the maintainer.
+- [x] 5.6 Big screens (port addition, the maintainer's call, 2026-11-15): the game's bitmaps (level backgrounds, platform textures, decor, the map; everything else is vector) upscaled 4x and 2x with a RealPLKSR model through Spandrel (`tools/upscale-bitmaps/`), loaded by screen size (`BitmapDetail.ts`, `?hd=` to force one). See [BITMAPS.md](BITMAPS.md) "HD sets". Checked in the browser: level 3 has the same layout with each set, only sharper; no snapshot diff; the build plays offline with the 2x set. Not tried on a real TV, nor the memory of the 4x set over a long game. Compare with the original in Ruffle with `?hd=1`.
 
 ## Out of scope
 

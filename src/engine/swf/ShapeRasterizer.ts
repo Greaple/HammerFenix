@@ -58,13 +58,34 @@ export class ShapeRasterizer {
   private readonly cache = new Map<number, RasterizedShape>();
   private readonly bitmaps: ReadonlyMap<number, HTMLCanvasElement | HTMLImageElement>;
   private readonly baseResolution: number;
+  /** Bitmaps loaded bigger than their SWF size (an HD set), by id: how many times. */
+  private readonly bitmapScales: ReadonlyMap<number, number>;
 
   constructor(
     bitmaps: ReadonlyMap<number, HTMLCanvasElement | HTMLImageElement>,
     baseResolution = 2,
+    bitmapScales: ReadonlyMap<number, number> = new Map(),
   ) {
     this.bitmaps = bitmaps;
     this.baseResolution = baseResolution;
+    this.bitmapScales = bitmapScales;
+  }
+
+  /**
+   * A bitmap fill's pattern: the SWF's matrix maps the bitmap's own pixels, so an HD bitmap
+   * (`k` times bigger) is first scaled down by `k`. Smoothed then, as it was made to be.
+   */
+  private pattern(
+    ctx: CanvasRenderingContext2D,
+    fill: { id: number; m: Matrix6; repeat: boolean },
+  ): { pattern: CanvasPattern; hd: boolean } | null {
+    const img = this.bitmaps.get(fill.id);
+    const pat = img ? ctx.createPattern(img, fill.repeat ? 'repeat' : 'no-repeat') : null;
+    if (!pat) return null;
+    const k = this.bitmapScales.get(fill.id) ?? 1;
+    const [a, b, c, d, tx, ty] = fill.m;
+    pat.setTransform(new DOMMatrix(k === 1 ? fill.m : [a / k, b / k, c / k, d / k, tx, ty]));
+    return { pattern: pat, hd: k > 1 };
   }
 
   get(id: number, def: ShapeDef): RasterizedShape {
@@ -88,10 +109,13 @@ export class ShapeRasterizer {
     const wPx = Math.max(1, Math.ceil((x1 - x0) / 20));
     const hPx = Math.max(1, Math.ceil((y1 - y0) / 20));
 
+    // Canvas size cap: 2048, or 4096 at resolution 4 (an HD set on a big screen, where a
+    // level background, 420 x 500, needs 1680 x 2000)
     const maxDim = Math.max(wPx, hPx);
+    const cap = this.baseResolution >= 4 ? 4096 : 2048;
     const res =
-      maxDim * this.baseResolution > 2048
-        ? Math.max(1, Math.floor(2048 / maxDim))
+      maxDim * this.baseResolution > cap
+        ? Math.max(1, Math.floor(cap / maxDim))
         : this.baseResolution;
 
     const canvas = document.createElement('canvas');
@@ -119,11 +143,9 @@ export class ShapeRasterizer {
             ctx.strokeStyle = sf.c;
             ctx.stroke(path);
           } else if (sf.t === 'bitmap') {
-            const img = this.bitmaps.get(sf.id);
-            const pat = img ? ctx.createPattern(img, sf.repeat ? 'repeat' : 'no-repeat') : null;
+            const pat = this.pattern(ctx, sf);
             if (pat) {
-              pat.setTransform(new DOMMatrix(sf.m));
-              ctx.strokeStyle = pat;
+              ctx.strokeStyle = pat.pattern;
               ctx.stroke(path);
             }
           } else {
@@ -172,14 +194,11 @@ export class ShapeRasterizer {
     }
 
     if (fill.t === 'bitmap') {
-      const img = this.bitmaps.get(fill.id);
-      if (!img) return;
-      const pat = ctx.createPattern(img, fill.repeat ? 'repeat' : 'no-repeat');
+      const pat = this.pattern(ctx, fill);
       if (!pat) return;
       ctx.save();
-      ctx.imageSmoothingEnabled = fill.smooth;
-      pat.setTransform(new DOMMatrix(fill.m));
-      ctx.fillStyle = pat;
+      ctx.imageSmoothingEnabled = fill.smooth || pat.hd;
+      ctx.fillStyle = pat.pattern;
       ctx.fill(path, rule);
       ctx.restore();
       return;

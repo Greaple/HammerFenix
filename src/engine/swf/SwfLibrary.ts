@@ -10,6 +10,7 @@ import {
 } from 'pixi.js';
 import { ShapeRasterizer } from './ShapeRasterizer';
 import { SwfMovieClip, SwfTextField } from './SwfMovieClip';
+import type { BitmapScale } from './BitmapDetail';
 import type { BitmapDef, CharacterDef, Matrix6, SwfLibraryData } from './types';
 
 function loadImage(url: string): Promise<HTMLImageElement> {
@@ -22,20 +23,44 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   });
 }
 
+/**
+ * Bitmap `def`, alpha merged, from the set at `scale` (`BitmapDetail`): exactly `scale` times
+ * its size. An upscale that fails to load falls back to the SWF's own bitmap.
+ */
 async function decodeBitmapAsset(
   baseUrl: string,
   def: BitmapDef,
+  scale: BitmapScale,
+): Promise<HTMLCanvasElement | HTMLImageElement> {
+  const dir = scale > 1 ? `gfx/bitmaps-x${scale}/` : 'gfx/bitmaps/';
+  try {
+    const surface = await decodeBitmapFiles(`${baseUrl}${dir}`, def);
+    const [w, h] = surfaceSize(surface);
+    if (w === def.w * scale && h === def.h * scale) return surface;
+  } catch (e) {
+    if (scale === 1) throw e;
+  }
+  return decodeBitmapFiles(`${baseUrl}gfx/bitmaps/`, def);
+}
+
+function surfaceSize(s: HTMLCanvasElement | HTMLImageElement): [number, number] {
+  return s instanceof HTMLImageElement ? [s.naturalWidth, s.naturalHeight] : [s.width, s.height];
+}
+
+async function decodeBitmapFiles(
+  dir: string,
+  def: BitmapDef,
 ): Promise<HTMLCanvasElement | HTMLImageElement> {
   if (!def.alphaFile) {
-    return loadImage(`${baseUrl}gfx/bitmaps/${def.file}`);
+    return loadImage(`${dir}${def.file}`);
   }
   const [rgb, alpha] = await Promise.all([
-    loadImage(`${baseUrl}gfx/bitmaps/${def.file}`),
-    loadImage(`${baseUrl}gfx/bitmaps/${def.alphaFile}`),
+    loadImage(`${dir}${def.file}`),
+    loadImage(`${dir}${def.alphaFile}`),
   ]);
   const canvas = document.createElement('canvas');
-  canvas.width = def.w;
-  canvas.height = def.h;
+  canvas.width = rgb.naturalWidth;
+  canvas.height = rgb.naturalHeight;
   const ctx = canvas.getContext('2d')!;
   ctx.drawImage(rgb, 0, 0);
   ctx.globalCompositeOperation = 'destination-in';
@@ -58,6 +83,8 @@ export class SwfLibrary {
   /** Random source of frame scripts (`random(n)`). The game session seeds it. */
   random: () => number = Math.random;
   private readonly bitmaps: Map<number, HTMLCanvasElement | HTMLImageElement>;
+  /** How many times bigger than its SWF size each bitmap was loaded (1, or the HD set's 2 or 4). */
+  private readonly bitmapScales = new Map<number, number>();
   private readonly bitmapTextures = new Map<number, Texture>();
   private readonly rasterizer: ShapeRasterizer;
   private readonly boundsCache = new Map<number, [number, number, number, number]>();
@@ -71,19 +98,35 @@ export class SwfLibrary {
     this.data = data;
     this.bitmaps = bitmaps;
     this.headless = headless;
+    let maxScale = 1;
+    for (const [id, surface] of bitmaps) {
+      const def = data.characters[id];
+      if (def?.kind !== 'bitmap') continue;
+      const k = surfaceSize(surface)[0] / def.w;
+      this.bitmapScales.set(id, k);
+      maxScale = Math.max(maxScale, k);
+    }
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    this.rasterizer = new ShapeRasterizer(bitmaps, Math.min(3, Math.max(2, Math.ceil(dpr))));
+    // Shapes are drawn into textures at this resolution: with an HD set, at least its scale, or
+    // the bitmaps they fill with would not show it (a TV has a device pixel ratio of 1).
+    this.rasterizer = new ShapeRasterizer(
+      bitmaps,
+      Math.max(maxScale, Math.min(3, Math.max(2, Math.ceil(dpr)))),
+      this.bitmapScales,
+    );
   }
 
   /**
    * Loads the library and its bitmaps. `onProgress` gets the share done, from 0 to 1: the
    * download of `library.json` (9 MB) is most of it, then the bitmaps. `file` is another
-   * library built by `tools/build-swf.ts` (the site's intro, `gfx/intro.json`).
+   * library built by `tools/build-swf.ts` (the site's intro, `gfx/intro.json`). `bitmapScale`
+   * picks the bitmap set (`BitmapDetail`).
    */
   static async load(
     baseUrl = './',
     onProgress?: (done: number) => void,
     file = 'gfx/library.json',
+    bitmapScale: BitmapScale = 1,
   ): Promise<SwfLibrary> {
     const res = await fetch(`${baseUrl}${file}`);
     if (!res.ok) throw new Error(`Failed to load SWF library (${res.status})`);
@@ -109,7 +152,7 @@ export class SwfLibrary {
       const slice = bmpEntries.slice(i, i + batchSize);
       await Promise.all(
         slice.map(async ([id, def]) => {
-          const surface = await decodeBitmapAsset(baseUrl, def);
+          const surface = await decodeBitmapAsset(baseUrl, def, bitmapScale);
           bitmaps.set(id, surface);
           done++;
           report();
@@ -320,12 +363,15 @@ export class SwfLibrary {
     if (existing) return existing;
     const surface = this.bitmaps.get(id);
     if (!surface) return null;
+    // An HD bitmap keeps its SWF size on stage: its source's resolution is its scale
+    const resolution = this.bitmapScales.get(id) ?? 1;
     const source =
       surface instanceof HTMLCanvasElement
-        ? new CanvasSource({ resource: surface })
-        : new ImageSource({ resource: surface });
-    void def;
+        ? new CanvasSource({ resource: surface, resolution })
+        : new ImageSource({ resource: surface, resolution });
     const tex = new Texture({ source });
+    if (Math.abs(tex.width - def.w) > 0.01)
+      console.warn(`Bitmap ${id}: ${tex.width} wide, not ${def.w}`);
     this.bitmapTextures.set(id, tex);
     return tex;
   }
