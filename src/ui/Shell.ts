@@ -40,6 +40,13 @@ import {
 } from '../engine/Bindings';
 import { PAD } from '../engine/Gamepad';
 import { type InputController, Key, type PlayerAction } from '../engine/Input';
+import {
+  type BitmapChoice,
+  bitmapScaleOf,
+  loadedBitmapScale,
+  saveBitmapChoice,
+  savedBitmapChoice,
+} from '../engine/swf/BitmapDetail';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
 import { padButtonOf, padGlyph, padLabel } from '../game/gui/PadGlyphs';
@@ -163,11 +170,23 @@ const INTRO_Y = 66;
 const INTRO_CATCH_UP = 4;
 
 /**
- * The rows of the settings page, in the guide's order, then the controls page (G.4) and the
- * back button.
+ * The rows of the settings page, in the guide's order, then the HD pictures (5.6), the controls
+ * page (G.4) and the back button.
  */
-const SETTING_ROWS = ['detail', 'shake', 'sound', 'music', 'volume', 'controls', 'back'] as const;
+const SETTING_ROWS = [
+  'detail',
+  'shake',
+  'sound',
+  'music',
+  'volume',
+  'hd',
+  'controls',
+  'back',
+] as const;
 type SettingRow = (typeof SETTING_ROWS)[number];
+
+/** The HD pictures row's values, in the order Space and the arrows go through them. */
+const HD_CHOICES: readonly BitmapChoice[] = ['auto', 1, 2, 4];
 
 /**
  * The controls page (G.4): the moves in the order of the SWF's key setup screen (`#910`:
@@ -323,6 +342,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Cochez cette case pour écouter la musique du jeu pendant votre aventure.',
     volume: 'Volume sonore',
     volumeHint: 'Réglez l’intensité du volume sonore avec cette option.',
+    hd: 'Images HD',
+    hdHint:
+      'Les décors agrandis pour les grands écrans (télé). Auto : selon votre écran. Le jeu se recharge en sortant.',
+    hdAuto: 'Auto',
+    hdOff: 'Non',
     controls: 'Touches et manette',
     controlsHint: 'Choisissez les touches et les boutons de vos déplacements.',
     controlsTitle: 'Commandes',
@@ -446,6 +470,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Enable this box to listen to the music of the game during your adventure.',
     volume: 'Volume',
     volumeHint: 'Turn up or down the volume with this option.',
+    hd: 'HD pictures',
+    hdHint:
+      'The scenery upscaled for big screens (TV). Auto: from your screen. The game reloads as you leave.',
+    hdAuto: 'Auto',
+    hdOff: 'Off',
     controls: 'Keys and controller',
     controlsHint: 'Choose the keys and buttons you move with.',
     controlsTitle: 'Controls',
@@ -571,6 +600,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     musicHint: 'Activa esta casilla para escuchar la música del juego durante tu aventura.',
     volume: 'Volumen del sonido',
     volumeHint: 'Puedes cambiar el volumen del sonido con esta opción.',
+    hd: 'Imágenes HD',
+    hdHint:
+      'Los decorados ampliados para pantallas grandes (tele). Auto: según tu pantalla. El juego se recarga al salir.',
+    hdAuto: 'Auto',
+    hdOff: 'No',
     controls: 'Teclas y mando',
     controlsHint: 'Elige las teclas y los botones con los que te mueves.',
     controlsTitle: 'Controles',
@@ -1028,6 +1062,10 @@ export class Shell {
           if (left) this.setVolume(this.settings.volume - VOLUME_STEP);
           if (right) this.setVolume(this.settings.volume + VOLUME_STEP);
         }
+        if (this.settingRows[this.settingSel] === 'hd') {
+          if (left) this.stepHd(-1);
+          if (right) this.stepHd(1);
+        }
         if (ok) this.confirmSetting();
         if (esc) this.leaveSettings();
         break;
@@ -1182,7 +1220,19 @@ export class Shell {
       this.setVolume(v >= 100 ? 0 : v + VOLUME_STEP);
       return;
     }
+    if (row === 'hd') {
+      this.stepHd(1);
+      return;
+    }
     this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
+  }
+
+  /** The next (`1`) or previous (`-1`) HD pictures choice, wrapping; kept at once. */
+  private stepHd(dir: number): void {
+    const i = HD_CHOICES.indexOf(savedBitmapChoice());
+    const n = HD_CHOICES.length;
+    saveBitmapChoice(HD_CHOICES[(i + dir + n) % n]);
+    this.render();
   }
 
   /**
@@ -1195,6 +1245,14 @@ export class Shell {
       this.onSoundClose = null;
       this.hide();
       close?.();
+      return;
+    }
+    // The library holds one bitmap set: a new one needs the page loaded again (without a
+    // `?hd=` that would override the choice)
+    if (bitmapScaleOf(savedBitmapChoice()) !== loadedBitmapScale()) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('hd');
+      window.location.replace(url.toString());
       return;
     }
     this.selected = 0;
@@ -2021,7 +2079,7 @@ export class Shell {
     this.gearAt(W / 2, y0 + 62);
 
     const top = y0 + 98;
-    const rowH = inGame ? 46 : 42;
+    const rowH = inGame ? 46 : 38;
     const count = rows.length - 1;
     rows.forEach((row, i) => {
       if (row === 'back') return;
@@ -2048,6 +2106,34 @@ export class Shell {
       if (row === 'volume') {
         btn.addChild(speaker(56, cy, st.volume > 0, sel ? C.gold : C.wood));
         this.volumeGauge(btn, cy, sel, label.x + label.width);
+        return;
+      }
+      if (row === 'hd') {
+        // A screen, and the choice on the right (auto says which set it gives here)
+        const color = sel ? C.gold : C.wood;
+        btn.addChild(
+          new Graphics()
+            .roundRect(56, cy - 7, 15, 10, 1.5)
+            .stroke({ color, width: 1.6 })
+            .moveTo(63.5, cy + 3)
+            .lineTo(63.5, cy + 6)
+            .moveTo(59.5, cy + 7)
+            .lineTo(67.5, cy + 7)
+            .stroke({ color, width: 1.6 }),
+        );
+        const choice = savedBitmapChoice();
+        const value =
+          choice === 'auto'
+            ? `${t.hdAuto} (${bitmapScaleOf('auto')}×)`
+            : choice === 1
+              ? t.hdOff
+              : `${choice}×`;
+        this.text(value, 'label', 372, cy - 8, {
+          align: 'right',
+          size: 13,
+          color: sel ? C.gold : C.inkSoft,
+          parent: btn,
+        });
         return;
       }
       if (row === 'controls') {
