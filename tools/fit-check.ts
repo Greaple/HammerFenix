@@ -175,6 +175,9 @@ export function inspect(): string[] {
 
   // The frame: whole, and not under the touch controls
   const frame = document.querySelector('.game-canvas-container');
+  if (document.body.dataset.page === 'playing' && (!frame || !visible(frame))) {
+    out.push('no frame while playing');
+  }
   if (frame && visible(frame) && document.body.dataset.page !== 'page') {
     const fr = rectOf(frame);
     if (fr.left < -1 || fr.right > W + 1 || fr.top < -1 || fr.bottom > H + 1) {
@@ -381,6 +384,14 @@ export async function check(
     const real = status0.call(q, p, id);
     return real === 'none' ? 'progress' : real;
   };
+  // Items found, in memory only: a new profile would show none of the counts and names
+  const data = s.profile.data;
+  const items0 = data.items;
+  const items = Array.isArray(items0) ? [...items0] : { ...items0 };
+  for (const id of q.itemIds as number[]) {
+    if (!items[id] && id % 3 !== 0) items[id] = 1 + (id % 12);
+  }
+  data.items = items;
   const failures: Failure[] = [];
   try {
     for (const lang of opts.langs ?? ['fr', 'en', 'es']) {
@@ -395,6 +406,7 @@ export async function check(
     }
   } finally {
     q.status = status0;
+    data.items = items0;
     await setLang(lang0);
     s.chosen = chosen0;
     s.focusKey = `mode:${chosen0}`;

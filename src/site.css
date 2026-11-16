@@ -3010,11 +3010,14 @@ html.touch .pager .btn-round {
   body[data-page='home'] .app-main {
     flex: none;
     display: block;
+    /* As tall as its content, so the room left for Start is under the board */
+    container-type: inline-size;
     padding-top: 30px;
     padding-bottom: calc(160px + env(safe-area-inset-bottom));
   }
 
-  body[data-page='home'] .game-wrapper,
+  /* (Once the shell has drawn the home page: the frame shows the loading screen before) */
+  body[data-page='home'][data-layout='phone'] .game-wrapper,
   body[data-page='home'] .site-below,
   body[data-page='home'] .site-right {
     display: none;

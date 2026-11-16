@@ -719,7 +719,7 @@ const PHONE_QUERY = '(max-width: 599px)';
 /** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
 const MIN_FIT = 0.82;
 /** `Shell.fitPage`'s zoom steps, once the board is at its densest. */
-const ZOOM_STEPS = [0.94, 0.88];
+const ZOOM_STEPS = [0.94];
 
 /** The narrowest board of the three columns (`site.css`): narrower, it would need too much scaling. */
 const WIDE_BOARD = 360;
@@ -1386,12 +1386,15 @@ export class Shell {
     const page = this.dom?.page;
     const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
     const before = find()?.getBoundingClientRect().top;
+    // (`render` scrolls a focus moved by the keys into view: done again after the shift below)
+    const moved = this.navMoved;
     this.render();
     const el = find();
     const after = el?.getBoundingClientRect().top;
     // The area that scrolls: the page's list, or the page itself on a phone
     const area = el?.closest('[data-scroll]') ?? page;
     if (area && before !== undefined && after !== undefined) area.scrollTop += after - before;
+    if (moved) el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   /** The hint of the focused option, under the options of the chosen mode. */
