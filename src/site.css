@@ -585,77 +585,18 @@ kbd.cap.pad img {
   pointer-events: auto;
 }
 
-/* --- Home: the modes and the notebook beside the frame --- */
+/* --- Home: the modes and the notebook beside the frame ---
 
-/* The frame takes the window's height, up to what leaves each board 420 px (`Shell.homeLayout`
-   picks this layout while the frame keeps 420 px too); the boards share the width it leaves,
-   up to 460 px each (a wider board is a shorter one). The keys strip shows under the frame when
-   the window has the height for it; otherwise the help dialog ("?") has the keys. */
-body[data-page='home'] .app-main {
-  --strip: 0px;
-  align-items: flex-start;
-  justify-content: center;
-  gap: var(--side-gap);
-  padding-top: 24px;
-}
-
-body[data-page='home'] .site-side {
-  display: block;
-  flex: 1 1 0;
-  /* The column's height is the window's; room above the board for its title plank and around
-     it for its shadow, outside its width */
-  min-width: calc(420px + 20px);
-  max-width: calc(460px + 20px);
-  height: calc(100% + 26px);
-  overflow: hidden;
-  padding: 26px 10px 14px;
-  margin: -26px -10px 0;
-}
-
-/* A board taller than its column is scaled down to fit (`Shell.fitBoards`), from its top;
-   one that would get too small scrolls instead */
-body[data-page='home'] .site-side > .board {
-  transform-origin: top center;
-}
-
-body[data-page='home'] .site-side.is-scrolling {
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
-
-body[data-page='home'] .game-wrapper {
-  width: auto;
-  flex: 0 0 auto;
-  --below-frame: var(--strip);
-}
-
-body[data-page='home'] .game-canvas-container {
-  width: min(
-    680px,
-    max(240px, (100cqh - var(--strip)) * 420 / 520),
-    100cqw - 2 * (420px + var(--side-gap))
-  );
-}
-
-body[data-page='home'] .site-below {
-  display: none;
-}
-
-/* As many option columns as the board's width allows */
-body[data-page='home'][data-layout='wide'] .board-modes .opt-grid {
-  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
-}
-
-@media (min-height: 860px) {
-  body[data-page='home'] .app-main {
-    --strip: 52px;
-  }
-
-  body[data-page='home'] .site-below:not(:empty) {
-    display: flex;
-  }
-}
+   Four layouts, picked by `Shell.homeLayout` and named in `body[data-layout]`; each one's rules
+   are its own, so a change to one cannot move another:
+   - wide: three columns. The frame takes the window's height, giving way so each board keeps
+     360 px; the boards share the rest (up to 460 px) and are scaled to fit their column's
+     height if needed (`Shell.fitBoards`).
+   - short: a lying window too narrow for that: the frame as tall as the window, the modes
+     beside it, the notebook folded into buttons under them.
+   - tall: an upright window: the frame at its own size beside the notebook, the modes across
+     under them; the page scrolls.
+   - phone: under 600 px (the phone section below). */
 
 body[data-page='home'] .touch-controls,
 body[data-page='page'] .touch-controls,
@@ -668,60 +609,222 @@ body[data-page='home'] .logo {
   display: none;
 }
 
-/* Between the phone and three columns (`body[data-layout]`, set by `Shell.homeLayout`, after the
-   canvas's in-between boards): no keys strip (the help dialog has them); the
-   boards in a grid, laid out by orientation below. Three columns need 1280 x 840 px, so a
-   laptop's window takes the lying layout */
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .app-main {
-  display: grid;
-  gap: 20px 24px;
-  justify-content: stretch;
+/* A board taller than its column is scaled down from its top to fit it; one that would get too
+   small scrolls instead (`Shell.fitBoards`) */
+body[data-page='home'] .site-side > .board {
+  transform-origin: top center;
 }
 
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-side {
-  flex: none;
-  margin: 0;
-  padding: 0;
-  max-height: none;
-  overflow: visible;
+body[data-page='home'] .site-side.is-scrolling {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-right {
+/* Wide: three columns */
+body[data-page='home'][data-layout='wide'] .app-main {
+  --strip: 0px;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--side-gap);
+  padding-top: 24px;
+}
+
+body[data-page='home'][data-layout='wide'] .site-side {
   display: block;
+  flex: 1 1 0;
+  /* As tall as the window; room above the board for its title plank and around it for its
+     shadow, outside its width */
+  min-width: calc(360px + 20px);
+  max-width: calc(460px + 20px);
+  height: calc(100% + 26px);
+  overflow: hidden;
+  padding: 26px 10px 14px;
+  margin: -26px -10px 0;
 }
 
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .game-wrapper {
-  width: 100%;
+body[data-page='home'][data-layout='wide'] .game-wrapper {
+  width: auto;
+  flex: 0 0 auto;
+  --below-frame: var(--strip);
 }
 
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-below,
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) /* Upright (a tablet): the frame at its own size beside the notebook, the modes across below,
-   the page scrolls */
+body[data-page='home'][data-layout='wide'] .game-canvas-container {
+  width: min(
+    680px,
+    max(240px, (100cqh - var(--strip)) * 420 / 520),
+    100cqw - 2 * (360px + var(--side-gap))
+  );
+}
+
+body[data-page='home'][data-layout='wide'] .site-below {
+  display: none;
+}
+
+/* As many option columns as the board's width allows */
+body[data-page='home'][data-layout='wide'] .board-modes .opt-grid {
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+}
+
+body[data-page='home'][data-layout='wide'] .site-side {
+  container-type: inline-size;
+}
+
+/* On a short window or a narrow board, the cards keep their name only (the chosen mode's text
+   is under them), so the board needs no more than a light scaling to fit */
+@container (max-width: 459px) {
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-short {
+    display: none;
+  }
+}
+
+@media (max-height: 720px) {
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-short,
+  body[data-page='home'][data-layout='short'] .board-modes .mode-short {
+    display: none;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-card,
+  body[data-page='home'][data-layout='short'] .board-modes .mode-card {
+    min-height: 40px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-name,
+  body[data-page='home'][data-layout='short'] .board-modes .mode-name {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-icon,
+  body[data-page='home'][data-layout='short'] .board-modes .mode-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes,
+  body[data-page='home'][data-layout='short'] .board-modes {
+    gap: 10px;
+    padding-top: 30px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .mode-detail,
+  body[data-page='home'][data-layout='short'] .board-modes .mode-detail {
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .opt,
+  body[data-page='home'][data-layout='short'] .board-modes .opt {
+    min-height: 30px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .board-modes .btn-start,
+  body[data-page='home'][data-layout='short'] .board-modes .btn-start {
+    height: 46px;
+    font-size: 20px;
+  }
+}
+
+/* The keys strip under the frame when the window has the height for it; otherwise the help
+   dialog ("?") has the keys */
+@media (min-height: 860px) {
+  body[data-page='home'][data-layout='wide'] .app-main {
+    --strip: 52px;
+  }
+
+  body[data-page='home'][data-layout='wide'] .site-below:not(:empty) {
+    display: flex;
+  }
+}
+
+/* Short: the frame as tall as the window, the modes beside it, the notebook folded below them */
+body[data-page='home'][data-layout='short'] .app-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'frame modes'
+    'frame book';
+  gap: 14px 24px;
+  align-items: stretch;
+  padding-top: 12px;
+}
+
+body[data-page='home'][data-layout='short'] .game-wrapper {
+  grid-area: frame;
+  width: auto;
+  height: 100%;
+  justify-content: flex-start;
+}
+
+body[data-page='home'][data-layout='short'] .game-canvas-container {
+  /* Giving way on a narrow window, so the modes board keeps 500 px */
+  width: min(100cqh * 420 / 520, 100cqw - 500px - 24px);
+}
+
+body[data-page='home'][data-layout='short'] .site-left {
+  display: block;
+  grid-area: modes;
+  min-height: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  /* Room above the board for its title plank, and around it for its shadow */
+  padding: 26px 8px 10px;
+  margin: -14px -8px 0;
+}
+
+body[data-page='home'][data-layout='short'] .site-right {
+  display: block;
+  grid-area: book;
+  padding-bottom: 6px;
+}
+
+body[data-page='home'][data-layout='short'] .site-below {
+  display: none;
+}
+
+/* A short window: the eight cards four across, in two rows (their names only, see below) */
+@media (max-height: 720px) {
+  @container (min-width: 480px) {
+    body[data-page='home'][data-layout='short'] .site-left .board-modes .mode-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+}
+
+/* Tall: the frame at its own size beside the notebook, the modes across below; the page scrolls */
 body[data-page='home'][data-layout='tall'] .app-container {
   overflow-y: auto;
 }
 
 body[data-page='home'][data-layout='tall'] .app-main {
   flex: none;
+  display: grid;
   container-type: inline-size;
   grid-template-columns: minmax(0, 432px) minmax(260px, 1fr);
   grid-template-areas:
     'frame book'
     'modes modes';
   align-items: start;
-  row-gap: 44px;
+  gap: 44px 24px;
   padding-top: 30px;
 }
 
 body[data-page='home'][data-layout='tall'] .site-left {
+  display: block;
   grid-area: modes;
+  container-type: inline-size;
 }
 
 body[data-page='home'][data-layout='tall'] .game-wrapper {
   grid-area: frame;
+  width: 100%;
 }
 
 body[data-page='home'][data-layout='tall'] .site-right {
+  display: block;
   grid-area: book;
 }
 
@@ -729,80 +832,16 @@ body[data-page='home'][data-layout='tall'] .game-canvas-container {
   width: 100%;
 }
 
-/* Lying: the frame as tall as the screen, the modes beside it, the notebook folded under them */
-body[data-page='home'][data-layout='short'] .app-main {
-  grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-areas:
-    'frame modes'
-    'frame book';
-  align-items: start;
-  padding-top: 12px;
+body[data-page='home'][data-layout='tall'] .site-below {
+  display: none;
 }
 
-body[data-page='home'][data-layout='short'] .game-wrapper {
-  grid-area: frame;
-  height: 100%;
-  justify-content: flex-start;
-}
-
-body[data-page='home'][data-layout='short'] .game-canvas-container {
-  width: min(100cqh * 420 / 520, 100cqw - 300px - 24px);
-}
-
-/* The modes scroll on a short screen; room above for their title plank */
-body[data-page='home'][data-layout='short'] .site-left {
-  grid-area: modes;
-  align-self: stretch;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  padding: 26px 8px 4px;
-  margin: 0 -8px;
-}
-
-body[data-page='home'][data-layout='short'] .site-right {
-  grid-area: book;
-  padding-bottom: 6px;
-}
-
-/* A little tighter, so the board fits beside the frame on a 768 px screen */
-body[data-page='home'][data-layout='short'] .board-modes {
-  gap: 10px;
-  padding-top: 30px;
-}
-
-body[data-page='home'][data-layout='short'] .board-modes .mode-card {
-  min-height: 46px;
-  padding-top: 4px;
-  padding-bottom: 4px;
-}
-
-body[data-page='home'][data-layout='short'] .board-modes .mode-detail {
-  gap: 8px;
-  padding-top: 10px;
-}
-
-body[data-page='home'][data-layout='short'] .board-modes .opt {
-  min-height: 30px;
-}
-
-body[data-page='home'][data-layout='short'] .board-modes .btn-start {
-  height: 50px;
-}
-
-/* The modes board follows its own width: as many card columns as fit (four on a tablet or a
-   laptop), and on a wide board the text and options left, the main button bottom right */
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-left {
-  container-type: inline-size;
-}
-
+/* Short and tall: the modes board follows its own width (at most four card columns; a narrow
+   board keeps the names only; a wide one has the text and options left, the main button right) */
 body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-grid {
-  /* At most four across: the eight cards in two even rows */
   grid-template-columns: repeat(auto-fill, minmax(max(168px, (100% - 18px) / 4), 1fr));
 }
 
-/* A narrow board: the cards keep their name only, as on a phone */
 @container (max-width: 559px) {
   body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-short {
     display: none;
@@ -813,7 +852,7 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-mo
   }
 }
 
-@container (min-width: 620px) {
+@container (min-width: 600px) {
   body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-detail {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 250px;
@@ -826,7 +865,7 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-mo
   }
 
   body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .opt-grid {
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 
   body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .mode-detail > .btn-start {
@@ -909,13 +948,14 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-mo
   background: var(--cream);
 }
 
-/* The frame grows into its playing size as the home page fades into the game */
-.game-canvas-container {
+/* The frame grows into its playing size once the home page has faded into the game (only
+   then: a window being resized must follow at once) */
+.game-canvas-container.is-growing {
   transition: width 0.6s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .game-canvas-container {
+  .game-canvas-container.is-growing {
     transition: none;
   }
 }
@@ -994,7 +1034,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 52px;
+  min-height: 48px;
   padding: 6px 8px;
   border-radius: var(--r-card);
   border: 1.5px solid rgba(95, 69, 44, 0.35);

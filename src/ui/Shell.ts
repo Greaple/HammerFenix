@@ -702,20 +702,20 @@ const STAR: Icon = { item: 8 };
 
 /**
  * The home page's layouts (`body[data-layout]`, `src/site.css`, after the canvas's note on
- * them): three columns when the frame and each board get at least `WIDE_BOARD` px (from
- * about 1370 px wide and 640 px high: a laptop's window); otherwise,
- * upright, the frame at its own size beside the notebook and the modes across under them;
- * lying (a laptop's window), the frame as tall as the screen beside the modes, the notebook
- * folded into buttons; under 600 px wide, the phone's.
+ * them): three columns while each board keeps `WIDE_BOARD` px and the frame `WIDE_FRAME` px
+ * (from about 1190 x 580); otherwise, upright, the frame at its own size beside the notebook
+ * and the modes across under them; lying, the frame as tall as the window beside the modes, the
+ * notebook folded into buttons; under 600 px wide, the phone's.
  */
 type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
 const PHONE_QUERY = '(max-width: 599px)';
-/** The smallest scale `fitBoards` gives a board: 12 px text stays above 10 px. */
-const MIN_FIT = 0.85;
+/** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
+const MIN_FIT = 0.82;
 
-/** The narrowest board (and frame) of the three columns: narrower, the modes board grows too tall. */
-const WIDE_BOARD = 420;
-/** Room around the three columns (`src/site.css`): gutters and gaps, and above the frame. */
+/** The narrowest board of the three columns (`site.css`): narrower, it would need too much scaling. */
+const WIDE_BOARD = 360;
+/** The smallest frame worth the three columns: smaller, the frame beside the modes is better. */
+const WIDE_FRAME = 380;
 const WIDE_ROOM_X = 32 + 2 * 28;
 const WIDE_ROOM_Y = 64 + 24 + 24;
 const UPRIGHT_QUERY = '(orientation: portrait)';
@@ -886,14 +886,21 @@ export class Shell {
     // The three columns depend on both sizes: drawn again when the layout changes, and the
     // boards fitted again to their columns
     let layout = this.homeLayout;
+    let pending = false;
     window.addEventListener('resize', () => {
-      const now = this.homeLayout;
-      if (now !== layout) {
-        layout = now;
-        this.refresh();
-      } else {
-        this.fitBoards();
-      }
+      // Once per frame while the window is being dragged
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        const now = this.homeLayout;
+        if (now !== layout) {
+          layout = now;
+          this.refresh();
+        } else {
+          this.fitBoards();
+        }
+      });
     });
     // The game's fonts change the boards' heights once loaded
     void document.fonts?.ready.then(() => this.fitBoards());
@@ -1021,7 +1028,14 @@ export class Shell {
 
   hide(): void {
     this.fadeBlur = null;
-    if (this.dom) document.getElementById('game-canvas-container')?.style.removeProperty('width');
+    const frame = this.dom ? document.getElementById('game-canvas-container') : null;
+    if (frame?.style.width) {
+      // After the fade: the frame grows to its playing size, and follows the window at once
+      // again when that is done
+      frame.classList.add('is-growing');
+      frame.style.removeProperty('width');
+      window.setTimeout(() => frame.classList.remove('is-growing'), 700);
+    }
     this.dropIntro();
     this.endCapture();
     this.screen = null;
@@ -1821,7 +1835,7 @@ export class Shell {
     // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
     // much itself
     const frame = Math.min(680, ((h - WIDE_ROOM_Y) * 420) / 520, w - WIDE_ROOM_X - 2 * WIDE_BOARD);
-    if (h >= 640 && frame >= WIDE_BOARD) return 'wide';
+    if (frame >= WIDE_FRAME) return 'wide';
     return this.upright?.matches ? 'tall' : 'short';
   }
 

@@ -109,6 +109,9 @@ async function main(): Promise<void> {
       if (Math.abs(res - lastRes) < 0.01) return;
       lastRes = res;
       app.renderer.resize(420, 520, res);
+      // Drawn again at once: a resized canvas is blank until the next draw, which showed black
+      // while the window was being resized
+      app.render();
       forceRender = true;
     }).observe(canvasContainer);
   }
