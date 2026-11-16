@@ -1010,6 +1010,13 @@ export class Shell {
     this.fadeAsked = performance.now();
     this.fadeFrom = null;
     this.fadeMs = ms;
+    // The village blurred for the fade, so it does not show that it and the first level are
+    // not drawn at the same place (U.4); the home page shows it sharp
+    if (this.root.visible) {
+      this.clear();
+      this.drawBackground();
+      this.drawTitle(2, 290);
+    }
     this.showLayout();
   }
 
@@ -1280,14 +1287,14 @@ export class Shell {
       const id = Number(key.slice(2));
       if (id !== this.questId) {
         this.questId = id;
-        this.render();
+        this.renderKeeping(key);
         return true;
       }
     } else if (key.startsWith('f:')) {
       const id = Number(key.slice(2));
       if (id !== this.fridgeId) {
         this.fridgeId = id;
-        this.render();
+        this.renderKeeping(key);
         return true;
       }
     } else if (this.screen === 'menu' && (/^(opt|run):/.test(key) || this.hintShown)) {
@@ -1296,6 +1303,19 @@ export class Shell {
       this.showHint();
     }
     return false;
+  }
+
+  /**
+   * Draws the page again with the element `key` where it was on screen: on a phone the quest
+   * that closes above the one pressed would otherwise pull it up.
+   */
+  private renderKeeping(key: string): void {
+    const page = this.dom?.page;
+    const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
+    const before = find()?.getBoundingClientRect().top;
+    this.render();
+    const after = find()?.getBoundingClientRect().top;
+    if (page && before !== undefined && after !== undefined) page.scrollTop += after - before;
   }
 
   /** The hint of the focused option, under the options of the chosen mode. */
@@ -1567,7 +1587,7 @@ export class Shell {
 
   /**
    * The village of the first level (`menu`, vector): the home page's frame, sharp now that no
-   * panel covers it, and blurred behind the intro's skip and the sound panel.
+   * panel covers it, and blurred for the fade into the first level (`fadeOut`).
    */
   private drawBackground(): void {
     const bg = this.lib.attach('menu');
@@ -2969,9 +2989,21 @@ export class Shell {
       track,
       knob,
     );
+    const value = h('span', { class: 'set-value' }, `${v} %`);
+    // While dragging, the gauge moves in place: a redraw would drop the pointer capture
     const at = (e: PointerEvent) => {
       const r = track.getBoundingClientRect();
-      this.setVolume((100 * (e.clientX - r.left)) / Math.max(1, r.width));
+      const raw = (100 * (e.clientX - r.left)) / Math.max(1, r.width);
+      const vol = Math.max(0, Math.min(100, Math.round(raw / VOLUME_STEP) * VOLUME_STEP));
+      this.focusKey = 'set:volume';
+      if (vol === this.settings.volume) return;
+      this.settings = { ...this.settings, volume: vol };
+      this.onSettings?.(this.settings);
+      (track.firstElementChild as HTMLElement).style.width = `${vol}%`;
+      knob.style.left = `${vol}%`;
+      slider.setAttribute('aria-valuenow', String(vol));
+      slider.setAttribute('aria-valuetext', `${vol} %`);
+      value.textContent = `${vol} %`;
     };
     slider.addEventListener('pointerdown', (e) => {
       try {
@@ -2984,12 +3016,13 @@ export class Shell {
     slider.addEventListener('pointermove', (e) => {
       if (slider.hasPointerCapture?.(e.pointerId)) at(e);
     });
+    slider.addEventListener('lostpointercapture', () => this.render());
     return h(
       'div',
       { class: 'inset set-row' },
       h('span', { class: 'set-label', id: 'vol-l' }, t.volume),
       slider,
-      h('span', { class: 'set-value' }, `${v} %`),
+      value,
       this.screen === 'sound' ? null : h('p', { class: 'set-hint' }, t.volumeHint),
     );
   }

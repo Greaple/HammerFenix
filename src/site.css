@@ -627,6 +627,17 @@ body[data-page='home'] .logo {
   }
 }
 
+/* The frame grows into its playing size as the home page fades into the game */
+.game-canvas-container {
+  transition: width 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-canvas-container {
+    transition: none;
+  }
+}
+
 /* --- Pages: in place of the frame --- */
 
 body[data-page='page'] .app-main {
