@@ -418,8 +418,8 @@ async function main(): Promise<void> {
   showToolLabels();
   /** A key press of the game's (`ControlAction`) from a button: held long enough for a tick. */
   const pulse = (action: ControlAction) => {
-    input.setTouch(action, true);
-    window.setTimeout(() => input.setTouch(action, false), 120);
+    input.setButton(action, true);
+    window.setTimeout(() => input.setButton(action, false), 120);
   };
   const fullscreen = document.getElementById('tool-full');
   if (fullscreen && !document.fullscreenEnabled) fullscreen.hidden = true;

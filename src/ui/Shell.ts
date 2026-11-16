@@ -1,20 +1,21 @@
 /**
- * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d): the mode menu, the
- * results page after a game, the quests and the fridge. They are drawn inside the game frame
- * with the game's own graphics: the village scene (`menu`, vector), the game's title logo
- * (`mainTitle.png` of the original, upscaled: the only raster), item clips as icons, the
- * pause screen's space key, and the game's fonts (Satans titles, Franklin Gothic Heavy labels,
- * extracted from `_gfx.swf` by `tools/build-fonts.ts`). Panels are drawn as vectors in the
- * parchment and wood colors, so they stay sharp at any size (UI batch U.2).
+ * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d, UI redesign of
+ * 2026-11-16): the home page with the modes, the results page after a game, the quests, the
+ * fridge, the settings and controls pages, and the sound panel over a paused game. They are
+ * HTML pages around the game frame, as the original's were web pages around the game, in the
+ * port's parchment and wood (`src/site.css`) with the game's own drawings: item clips drawn as
+ * pictures (`site/ItemArt.ts`), the game's fonts (Satans titles, Franklin Gothic Heavy labels,
+ * extracted from `_gfx.swf` by `tools/build-fonts.ts`), the title logo and the game over
+ * picture. The frame keeps what the game draws: the village scene (`menu`, vector) and the
+ * logo behind the home page, the site's intro, and the pause screen's sound button.
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
- * the quest and fridge pages show the profile (3.2b): quests done, in progress and still to
- * discover, and the item collection with its "found N times" rule. The selected mode's options
- * are checkboxes under its text, the locked ones with the quest that unlocks them (3.3). The
- * settings page is the site's "Options" link at the bottom of its menu (2C.5): the five
- * settings with the guide's texts (section 8 of `guide.html`, typos fixed; the volume hint
- * names the sound, as the volume sets the sounds and the music).
+ * the quest and fridge pages show the profile (3.2b): quests done and in progress, and the item
+ * collection with its "found N times" rule. The chosen mode's options are checkboxes under its
+ * text, the locked ones with the quest that unlocks them (3.3). The settings page is the site's
+ * "Options" link (2C.5): the settings with the guide's texts (section 8 of `guide.html`, typos
+ * fixed; the volume hint names the sound, as the volume sets the sounds and the music).
  */
 import {
   BlurFilter,
@@ -330,6 +331,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     tabPlay: 'Jouer',
     tabFridge: 'Frigo',
     filter: 'Filtre',
+    lockedOptions: 'Options à débloquer : {0}',
+    runTime: 'Temps',
   },
   en: {
     solo: 'Adventure',
@@ -486,6 +489,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     tabPlay: 'Play',
     tabFridge: 'Fridge',
     filter: 'Filter',
+    lockedOptions: 'Options to unlock: {0}',
+    runTime: 'Time',
   },
   es: {
     solo: 'Aventura',
@@ -647,6 +652,8 @@ const TEXT: Record<Lang, Record<string, string>> = {
     tabPlay: 'Jugar',
     tabFridge: 'Frigo',
     filter: 'Filtro',
+    lockedOptions: 'Opciones por desbloquear: {0}',
+    runTime: 'Tiempo',
   },
 };
 
@@ -1284,11 +1291,20 @@ export class Shell {
         return true;
       }
     } else if (this.screen === 'menu' && (/^(opt|run):/.test(key) || this.hintShown)) {
-      // The hint under the options follows the focused option
-      this.render();
-      return true;
+      // The hint under the options follows the focused option. Written in place: a redraw
+      // here would replace the button a click is landing on
+      this.showHint();
     }
     return false;
+  }
+
+  /** The hint of the focused option, under the options of the chosen mode. */
+  private showHint(): void {
+    const mode = MODES.find((m) => m.mode === this.chosen);
+    const hint = mode ? this.optionHint(mode) : '';
+    this.hintShown = hint !== '';
+    this.dom?.modes.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.dom?.below.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
   }
 
   /** Gives the DOM focus to the focused element, unless the page is used by touch. */
@@ -1995,9 +2011,12 @@ export class Shell {
         ),
       );
     }
-    const opts = canStart ? this.modeOptions(mode) : [];
+    const all = canStart ? this.modeOptions(mode) : [];
+    // On a phone the locked options fold into one line, so the main button stays in view
+    const opts = phone ? all.filter((oid) => this.profile.hasOption(oid)) : all;
+    const folded = all.length - opts.length;
     const runs = canStart ? this.profile.runChoices(mode.mode) : [];
-    if (opts.length > 0 || runs.length > 0) {
+    if (opts.length > 0 || runs.length > 0 || folded > 0) {
       const box = h('div', { class: 'mode-options' });
       if (opts.length > 0) {
         box.append(
@@ -2054,6 +2073,9 @@ export class Shell {
             ),
           ),
         );
+      }
+      if (folded > 0) {
+        box.append(h('p', { class: 'opt-folded' }, this.lockIcon(), fmt(t.lockedOptions, folded)));
       }
       const hint = this.optionHint(mode);
       this.hintShown = hint !== '';
@@ -3282,12 +3304,17 @@ export class Shell {
         h('h1', { class: 'result-title', id: 'r-h' }, t[tr.mode]),
         lost
           ? h('p', { class: 'lost-run' }, t.lostRun)
-          : h('div', { class: 'stats' }, this.stat(t.timeattack, formatRunTime(tr.time))),
+          : h('div', { class: 'stats' }, this.stat(t.runTime, formatRunTime(tr.time))),
         !lost && tr.isNew
           ? h(
               'div',
-              { class: 'banner banner-quest stamp' },
-              h('span', { class: 'banner-title' }, t.newBest),
+              { class: 'banners' },
+              h(
+                'div',
+                { class: 'banner banner-quest stamp' },
+                this.img(STAR, 'banner-art'),
+                h('span', { class: 'banner-title' }, t.newBest),
+              ),
             )
           : null,
         tr.best !== null

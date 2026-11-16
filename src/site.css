@@ -911,6 +911,16 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   box-shadow: 0 3px 0 var(--wood-dark);
 }
 
+.opt-folded {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--ink-soft);
+}
+
 .opt-hint {
   margin: 0;
   min-height: 1.4em;
@@ -2310,8 +2320,12 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
     min-height: 40px;
   }
 
+  /* The main button stays in view above the tab bar */
   .board-detail .btn-start {
     height: 50px;
+    position: sticky;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    z-index: 2;
   }
 
   body[data-page='home'] .site-below {
@@ -2523,9 +2537,19 @@ body:not([data-page='playing']) #touch-pause {
   display: none;
 }
 
-/* Phone held sideways: the top bar floats over the page, so no chip over the frame */
+/* Phone held sideways: the top bar floats over the game, so no chip over the frame; the
+   site's pages keep the top bar in its place and the frame in a column */
 @media (orientation: landscape) and (max-height: 520px) {
   html.touch .play-chips {
     display: none;
+  }
+
+  html.touch body:not([data-page='playing']) .topbar {
+    position: static;
+  }
+
+  html.touch body:not([data-page='playing']) .game-wrapper {
+    display: flex;
+    height: auto;
   }
 }
