@@ -694,18 +694,22 @@ const FRIDGE_COLS = 8;
 const FRIDGE_ROWS = 3;
 const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
 
+/** The settings' picture: item 1208, the "Manette S-Téhéf" joystick (the canvas's choice). */
+const SETTINGS_ART: Icon = { item: 1208 };
+
 /** The rewards' picture: item 8, "Etoile des neiges". */
 const STAR: Icon = { item: 8 };
 
 /**
- * The home page's layouts (`src/site.css`, after the canvas's note on them): three columns
- * from 1280 px wide; from 600 to 1279 px, upright, the frame at its own size beside the
- * notebook and the modes across under them; lying, the frame as tall as the screen beside the
- * modes, the notebook folded into buttons; under 600 px, the phone's.
+ * The home page's layouts (`body[data-layout]`, `src/site.css`, after the canvas's note on
+ * them): three columns from 1280 x 840 px, where the boards fit beside the frame; otherwise,
+ * upright, the frame at its own size beside the notebook and the modes across under them;
+ * lying (a laptop's window), the frame as tall as the screen beside the modes, the notebook
+ * folded into buttons; under 600 px wide, the phone's.
  */
 type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
 const PHONE_QUERY = '(max-width: 599px)';
-const WIDE_QUERY = '(min-width: 1280px)';
+const WIDE_QUERY = '(min-width: 1280px) and (min-height: 840px)';
 const UPRIGHT_QUERY = '(orientation: portrait)';
 
 type QuestTab = 'progress' | 'done' | 'all';
@@ -777,6 +781,9 @@ export class Shell {
   private fridgeId: number | null = null;
   /** The home page shows an option's hint: moving the focus off it redraws the page. */
   private hintShown = false;
+  /** The village behind the home page, and its blur while it fades into the game. */
+  private bgLayer: Container | null = null;
+  private fadeBlur: BlurFilter | null = null;
   /** The give up button was pressed once (`performance.now()`): a second press gives up. */
   private quitArmed = 0;
   /** The player's settings, as the settings page shows them. */
@@ -994,6 +1001,8 @@ export class Shell {
   }
 
   hide(): void {
+    this.fadeBlur = null;
+    if (this.dom) document.getElementById('game-canvas-container')?.style.removeProperty('width');
     this.dropIntro();
     this.endCapture();
     this.screen = null;
@@ -1019,13 +1028,17 @@ export class Shell {
     this.fadeAsked = performance.now();
     this.fadeFrom = null;
     this.fadeMs = ms;
-    // The village blurred for the fade, so it does not show that it and the first level are
-    // not drawn at the same place (U.4); the home page shows it sharp
-    if (this.root.visible) {
-      this.clear();
-      this.drawBackground();
-      this.drawTitle(2, 290);
+    // The village goes out of focus as it fades, so the fade does not show that it and the
+    // first level are not drawn at the same place (U.4); the home page shows it sharp
+    const layer = this.bgLayer;
+    if (this.root.visible && layer && !layer.destroyed) {
+      layer.cacheAsTexture(false);
+      this.fadeBlur = new BlurFilter({ strength: 0, quality: 3, clipToViewport: false });
+      layer.filters = [this.fadeBlur];
     }
+    // The frame keeps its size through the fade, and takes its playing size after it
+    const frame = this.dom ? document.getElementById('game-canvas-container') : null;
+    if (frame && this.root.visible) frame.style.width = `${frame.getBoundingClientRect().width}px`;
     this.showLayout();
   }
 
@@ -1125,7 +1138,10 @@ export class Shell {
     if (this.fadeFrom !== null) {
       const a = 1 - (performance.now() - this.fadeFrom) / this.fadeMs;
       if (a <= 0) this.hide();
-      else this.root.alpha = a;
+      else {
+        this.root.alpha = a;
+        if (this.fadeBlur) this.fadeBlur.strength = BG_BLUR * 2 * (1 - a);
+      }
       return;
     }
     if (!this.screen) return;
@@ -1596,7 +1612,7 @@ export class Shell {
 
   /**
    * The village of the first level (`menu`, vector): the home page's frame, sharp now that no
-   * panel covers it, and blurred for the fade into the first level (`fadeOut`).
+   * panel covers it, and going out of focus in the fade into the first level (`fadeOut`).
    */
   private drawBackground(): void {
     const bg = this.lib.attach('menu');
@@ -1608,17 +1624,14 @@ export class Shell {
     const s = Math.max((W + 2 * m) / b.width, (H + 2 * m) / b.height);
     bg.scale.set(s);
     bg.position.set((W - b.width * s) / 2 - b.x * s, (H - b.height * s) / 2 - b.y * s);
-    // Not clipped to the screen: Pixi clips a filter to the screen's size in pixels divided by
-    // the target's resolution, which inside the 1.5x cache below cuts the picture short when
-    // the canvas is drawn at resolution 1 (a small frame on a phone), leaving it partly black
-    if (this.screen !== 'menu') {
-      bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4, clipToViewport: false })];
-    }
-    // Drawn once into a texture: a blurred picture needs no more than the frame's resolution
+    // Drawn once into a texture; `fadeOut` blurs it (not clipped to the screen: Pixi clips a
+    // filter to the screen's size in pixels divided by the target's resolution, which on a
+    // small frame left part of the picture black)
     const layer = new Container();
     layer.addChild(bg);
     layer.cacheAsTexture({ resolution: 1.5 });
     this.root.addChild(layer);
+    this.bgLayer = layer;
   }
 
   /** The game's title logo, `w` px wide, its top at `y`. */
@@ -1766,6 +1779,7 @@ export class Shell {
     body.dataset.screen = this.screen ?? 'playing';
     const d = this.dom;
     if (!d) return;
+    body.dataset.layout = this.homeLayout;
     if (this.screen === null) {
       for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) fill(b);
     }
@@ -2179,7 +2193,7 @@ export class Shell {
           'data-nav': 'settings',
           onclick: () => this.showSettings(),
         },
-        svgIcon(ICON.gear, { size: 20 }),
+        this.img(SETTINGS_ART, 'btn-art'),
         t.settings,
       ),
     );
@@ -2226,7 +2240,7 @@ export class Shell {
           'data-nav': 'settings',
           onclick: () => this.showSettings(),
         },
-        svgIcon(ICON.gear, { size: 22 }),
+        this.img(SETTINGS_ART, 'btn-art'),
       ),
     );
   }
@@ -2372,7 +2386,7 @@ export class Shell {
       tab('play', t.tabPlay, { clip: 'hammer_player' }, () => this.showMenu()),
       tab('quests', t.quests, { item: 20 }, () => this.showQuests()),
       tab('fridge', t.tabFridge, { item: 1018 }, () => this.showFridge()),
-      tab('settings', t.options, { item: 1208 }, () => this.showSettings()),
+      tab('settings', t.options, SETTINGS_ART, () => this.showSettings()),
     );
   }
 

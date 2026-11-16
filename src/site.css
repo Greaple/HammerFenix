@@ -93,6 +93,34 @@
   box-shadow: 0 1px 0 var(--wood-dark);
 }
 
+/* Sound off: the button is pressed in, in wood, as the chosen cards */
+.round-btn.muted,
+.round-btn.muted:hover {
+  background: var(--wood);
+  color: var(--gold);
+  border-color: var(--wood-dark);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+  transform: translateY(2px);
+}
+
+/* Only the page's own areas scroll, never the document under them */
+html,
+body {
+  overflow: hidden;
+}
+
+.btn-art {
+  width: 26px;
+  height: 26px;
+  margin: -4px 0;
+}
+
+.fold-gear .btn-art {
+  width: 34px;
+  height: 34px;
+  margin: 0;
+}
+
 .lang-pill select {
   font: 17px/1 var(--f-label);
   letter-spacing: 0;
@@ -608,157 +636,164 @@ body[data-page='home'] .logo {
   display: none;
 }
 
-/* From 600 to 1279 px (the canvas's in-between boards): no keys strip (the help dialog has
-   them) and no Igor; the boards in a grid, laid out by orientation below */
-@media (min-width: 600px) and (max-width: 1279px) {
-  body[data-page='home'] .app-main {
-    display: grid;
-    gap: 20px 24px;
-    justify-content: stretch;
-  }
+/* Between the phone and three columns (`body[data-layout]`, set by `Shell.homeLayout`, after the
+   canvas's in-between boards): no keys strip (the help dialog has them) and no Igor; the
+   boards in a grid, laid out by orientation below. Three columns need 1280 x 840 px, so a
+   laptop's window takes the lying layout */
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .app-main {
+  display: grid;
+  gap: 20px 24px;
+  justify-content: stretch;
+}
 
-  body[data-page='home'] .site-side {
-    flex: none;
-    margin: 0;
-    padding: 0;
-    max-height: none;
-    overflow: visible;
-  }
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-side {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  max-height: none;
+  overflow: visible;
+}
 
-  body[data-page='home'] .site-right {
-    display: block;
-  }
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-right {
+  display: block;
+}
 
-  body[data-page='home'] .game-wrapper {
-    width: 100%;
-  }
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .game-wrapper {
+  width: 100%;
+}
 
-  body[data-page='home'] .site-below,
-  body[data-page='home'] .igor-peek {
-    display: none;
-  }
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-below,
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .igor-peek {
+  display: none;
 }
 
 /* Upright (a tablet): the frame at its own size beside the notebook, the modes across below,
    the page scrolls */
-@media (min-width: 600px) and (max-width: 1279px) and (orientation: portrait) {
-  body[data-page='home'] .app-container {
-    overflow-y: auto;
-  }
+body[data-page='home'][data-layout='tall'] .app-container {
+  overflow-y: auto;
+}
 
-  body[data-page='home'] .app-main {
-    flex: none;
-    container-type: inline-size;
-    grid-template-columns: minmax(0, 432px) minmax(260px, 1fr);
-    grid-template-areas:
-      'frame book'
-      'modes modes';
-    align-items: start;
-    row-gap: 44px;
-    padding-top: 30px;
-  }
+body[data-page='home'][data-layout='tall'] .app-main {
+  flex: none;
+  container-type: inline-size;
+  grid-template-columns: minmax(0, 432px) minmax(260px, 1fr);
+  grid-template-areas:
+    'frame book'
+    'modes modes';
+  align-items: start;
+  row-gap: 44px;
+  padding-top: 30px;
+}
 
-  body[data-page='home'] .site-left {
-    grid-area: modes;
-  }
+body[data-page='home'][data-layout='tall'] .site-left {
+  grid-area: modes;
+}
 
-  body[data-page='home'] .game-wrapper {
-    grid-area: frame;
-  }
+body[data-page='home'][data-layout='tall'] .game-wrapper {
+  grid-area: frame;
+}
 
-  body[data-page='home'] .site-right {
-    grid-area: book;
-  }
+body[data-page='home'][data-layout='tall'] .site-right {
+  grid-area: book;
+}
 
-  body[data-page='home'] .game-canvas-container {
-    width: 100%;
-  }
+body[data-page='home'][data-layout='tall'] .game-canvas-container {
+  width: 100%;
+}
 
-  /* Four across on a tablet, fewer on a narrower window */
-  body[data-page='home'] .board-modes .mode-grid {
-    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  }
+/* Lying: the frame as tall as the screen, the modes beside it, the notebook folded under them */
+body[data-page='home'][data-layout='short'] .app-main {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'frame modes'
+    'frame book';
+  align-items: start;
+  padding-top: 12px;
+}
 
-  /* The text and options on the left, the main button at the bottom right */
-  body[data-page='home'] .board-modes .mode-detail {
+body[data-page='home'][data-layout='short'] .game-wrapper {
+  grid-area: frame;
+  height: 100%;
+  justify-content: flex-start;
+}
+
+body[data-page='home'][data-layout='short'] .game-canvas-container {
+  width: min(100cqh * 420 / 520, 100cqw - 300px - 24px);
+}
+
+/* The modes scroll on a short screen; room above for their title plank */
+body[data-page='home'][data-layout='short'] .site-left {
+  grid-area: modes;
+  align-self: stretch;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 26px 8px 10px;
+  margin: 0 -8px;
+}
+
+body[data-page='home'][data-layout='short'] .site-right {
+  grid-area: book;
+  padding-bottom: 6px;
+}
+
+/* A little tighter, so the board fits beside the frame on a 768 px screen */
+body[data-page='home'][data-layout='short'] .board-modes {
+  gap: 10px;
+  padding-top: 30px;
+}
+
+body[data-page='home'][data-layout='short'] .board-modes .mode-card {
+  min-height: 46px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+body[data-page='home'][data-layout='short'] .board-modes .mode-detail {
+  gap: 8px;
+  padding-top: 10px;
+}
+
+body[data-page='home'][data-layout='short'] .board-modes .opt {
+  min-height: 30px;
+}
+
+body[data-page='home'][data-layout='short'] .board-modes .btn-start {
+  height: 50px;
+}
+
+/* The modes board follows its own width: as many card columns as fit (four on a tablet or a
+   laptop), and on a wide board the text and options left, the main button bottom right */
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-left {
+  container-type: inline-size;
+}
+
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-grid {
+  /* At most four across: the eight cards in two even rows */
+  grid-template-columns: repeat(auto-fill, minmax(max(168px, (100% - 18px) / 4), 1fr));
+}
+
+@container (min-width: 620px) {
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-detail {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 250px;
     gap: 10px 22px;
     padding: 12px 4px 0;
   }
 
-  body[data-page='home'] .mode-detail > * {
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .mode-detail > * {
     grid-column: 1;
   }
 
-  body[data-page='home'] .mode-detail > .btn-start {
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .opt-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  }
+
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .mode-detail > .btn-start {
     grid-column: 2;
     grid-row: 1 / span 8;
     align-self: end;
-  }
-}
-
-/* Lying: the frame as tall as the screen, the modes beside it, the notebook folded under them */
-@media (min-width: 600px) and (max-width: 1279px) and (orientation: landscape) {
-  body[data-page='home'] .app-main {
-    grid-template-columns: auto minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
-    grid-template-areas:
-      'frame modes'
-      'frame book';
-    align-items: start;
-    padding-top: 12px;
-  }
-
-  body[data-page='home'] .game-wrapper {
-    grid-area: frame;
-    height: 100%;
-    justify-content: flex-start;
-  }
-
-  body[data-page='home'] .game-canvas-container {
-    width: min(100cqh * 420 / 520, 100cqw - 300px - 24px);
-  }
-
-  /* The modes scroll on a short screen; room above for their title plank */
-  body[data-page='home'] .site-left {
-    grid-area: modes;
-    align-self: stretch;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    padding: 26px 8px 10px;
-    margin: 0 -8px;
-  }
-
-  body[data-page='home'] .site-right {
-    grid-area: book;
-    padding-bottom: 6px;
-  }
-
-  /* A little tighter, so the board fits beside the frame on a 768 px screen */
-  body[data-page='home'] .board-modes {
-    gap: 10px;
-    padding-top: 30px;
-  }
-
-  body[data-page='home'] .board-modes .mode-card {
-    min-height: 46px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  body[data-page='home'] .board-modes .mode-detail {
-    gap: 8px;
-    padding-top: 10px;
-  }
-
-  body[data-page='home'] .board-modes .opt {
-    min-height: 30px;
-  }
-
-  body[data-page='home'] .board-modes .btn-start {
-    height: 50px;
   }
 }
 
@@ -824,8 +859,15 @@ body[data-page='home'] .logo {
 .fold-gear {
   flex: none;
   align-self: center;
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
+  background: var(--parchment);
+  border: 3px solid var(--wood);
+  box-shadow: 3px 6px 0 rgba(var(--night), 0.3);
+}
+
+.fold-gear:hover {
+  background: var(--cream);
 }
 
 /* The frame grows into its playing size as the home page fades into the game */
