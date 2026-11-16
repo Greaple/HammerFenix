@@ -415,6 +415,7 @@ body[data-page='playing'] .play-chips {
 }
 
 kbd.cap {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -809,6 +810,145 @@ body[data-page='home'][data-layout='short'] .site-below {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
   }
+}
+
+/* A short window under 600 px: the chosen mode's text on two lines, no options title */
+@media (max-height: 599px) {
+  body[data-page='home'][data-layout='short'] .board-modes .mode-desc {
+    font-size: 12px;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  body[data-page='home'][data-layout='short'] .board-modes .opt-title {
+    display: none;
+  }
+
+  body[data-page='home'][data-layout='short'] .book-fold .fold-btn {
+    min-height: 0;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+}
+
+/* Land: a window under 480 px tall (a phone held sideways, a very short laptop window). No
+   frame: the game takes it once it starts. The modes board takes the width, its cards on the
+   left and the chosen mode on the right; the notebook's buttons stand in a column beside it */
+body[data-page='home'][data-layout='land'] .logo {
+  display: block;
+}
+
+body[data-page='home'][data-layout='land'] .app-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(150px, 22vw, 220px);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  padding-top: 10px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+body[data-page='home'][data-layout='land'] .game-wrapper,
+body[data-page='home'][data-layout='land'] .site-below {
+  display: none;
+}
+
+body[data-page='home'][data-layout='land'] .site-left {
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  /* Room above the board for its title plank, and around it for its shadow */
+  padding: 28px 8px 10px;
+  margin: -12px -8px 0;
+}
+
+body[data-page='home'][data-layout='land'] .site-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 0;
+  padding-bottom: 10px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 14px;
+  padding: 26px 12px 12px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-grid {
+  gap: 4px 6px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-card {
+  min-height: 38px;
+  padding: 3px 18px 3px 6px;
+  gap: 6px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-short {
+  display: none;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-icon {
+  width: 26px;
+  height: 26px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-name {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-detail {
+  align-self: stretch;
+  border-top: none;
+  border-left: 2px dashed rgba(95, 69, 44, 0.25);
+  padding: 0 0 0 14px;
+  gap: 6px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .mode-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .opt-title {
+  display: none;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .opt {
+  min-height: 30px;
+}
+
+body[data-page='home'][data-layout='land'] .board-modes .btn-start {
+  margin-top: auto;
+  height: 44px;
+  font-size: 20px;
+}
+
+body[data-page='home'][data-layout='land'] .book-fold {
+  flex-direction: column;
+  gap: 8px;
+}
+
+body[data-page='home'][data-layout='land'] .book-fold .fold-btn {
+  flex: none;
+}
+
+body[data-page='home'][data-layout='land'] .book-fold .fold-gear {
+  align-self: flex-end;
 }
 
 /* Tall: the frame at its own size beside the notebook, the modes across below; the page scrolls */
@@ -1455,9 +1595,9 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
     clamp(10px, 2.4vh, 24px) max(var(--gutter), env(safe-area-inset-left));
 }
 
-/* A page's board: as tall as its content, never taller than the stage, centered in it. The
-   boards with a list (quests, fridge, results) take the stage's height instead, up to a cap, so
-   a big screen does not get a giant board */
+/* A page's board: as tall as its content, never taller than the stage, centered in it; its
+   list then scrolls in its own area. The fridge's shelves share the stage's height instead, up
+   to a cap, so a big screen does not get a giant board */
 .board-page {
   width: 100%;
   max-width: 1180px;
@@ -1472,7 +1612,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
 }
 
 .board-page.is-full {
-  height: min(100%, 860px);
+  height: min(100%, 760px);
 }
 
 .page-bar {
@@ -1502,6 +1642,29 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   overflow: hidden;
 }
 
+/* What still does not fit at the densest step (a very short window): the page scrolls as one,
+   its board at its own height, and nothing scrolls inside it */
+body[data-page='page'] .site-page.is-scrolling {
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.site-page.is-scrolling .board-page,
+.site-page.is-scrolling .result {
+  height: auto;
+  max-height: none;
+  margin: 0 auto;
+}
+
+.site-page.is-scrolling .board-page > *,
+.site-page.is-scrolling .result > .board-page > *,
+.site-page.is-scrolling [data-scroll],
+.site-page.is-scrolling [data-fit] {
+  min-height: auto;
+  overflow: visible;
+}
+
 /* The densest step of `Shell.fitPage`: the guide's longer hints go */
 .board-page[data-density='compact'] .set-hint,
 .board-page[data-density='compact'] .page-rule {
@@ -1527,6 +1690,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--gap);
 }
 
@@ -1767,7 +1931,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
 
 /* Denser: smaller cards, so a quest with many items keeps them all in view */
 .board-page[data-density='compact'] .need-grid {
-  --need: 76px;
+  --need: 82px;
   gap: 6px;
 }
 
@@ -1778,8 +1942,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
 
 .board-page[data-density='compact'] .need-name {
   min-height: 0;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
+  font-size: 11px;
 }
 
 /* --- Fridge --- */
@@ -1803,6 +1966,7 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(240px, 24vw, 320px);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--gap);
 }
 
@@ -2500,9 +2664,24 @@ html.touch .pager .btn-round {
   display: none;
 }
 
-/* Denser: a smaller picture over the board */
+/* Denser: a smaller picture over the board, the scores on one line, a row of items */
 .result:has(> .board-page[data-density='compact']) {
-  --pic: clamp(140px, 26vh, 240px);
+  --pic: clamp(130px, 24vh, 240px);
+}
+
+.board-page[data-density='compact'] .stat {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 14px;
+}
+
+.board-page[data-density='compact'] .stat-value {
+  font-size: var(--fs-l);
+}
+
+.board-page[data-density='compact'] .found {
+  min-height: calc(var(--cell) * 1.2 + var(--fs-l) * 1.2 + 16px) !important;
 }
 
 /* The one moving thing: the finished quest stamps in */
@@ -2876,9 +3055,50 @@ html.touch .pager .btn-round {
     height: 32px;
   }
 
+  /* The page scrolls as one, its board at its own height, one column */
   body[data-page='page'] .site-page {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding-top: 36px;
     padding-bottom: 0;
+  }
+
+  .board-page,
+  .board-page.is-full,
+  .result {
+    height: auto;
+    max-height: none;
+    margin: 0 auto;
+  }
+
+  .quest-split,
+  .fridge-split {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fridge-inside {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .shelf-row {
+    max-height: none;
+  }
+
+  .found {
+    min-height: 0 !important;
+  }
+
+  .mode-name {
+    overflow-wrap: anywhere;
+  }
+
+  .slot {
+    flex-wrap: wrap;
+    padding: 4px 2px;
   }
 
   /* Room under the page for the tab bar (a spacer: padding would offset the sticky card) */

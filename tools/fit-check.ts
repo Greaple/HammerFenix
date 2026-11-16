@@ -81,7 +81,11 @@ export function inspect(): string[] {
     (e) => visible(e) && scrolls(e),
   );
   for (const s of scrollers) {
-    const ok = s.hasAttribute('data-scroll') || (phone && s.matches('.site-page, .app-container'));
+    // The page's own area; on a phone, or past the densest step, the page itself
+    const ok =
+      s.hasAttribute('data-scroll') ||
+      s.matches('.site-page.is-scrolling, .site-side.is-scrolling') ||
+      (phone && s.matches('.site-page, .app-container'));
     if (!ok) out.push(`scrolls: ${label(s)} (${s.clientHeight}/${s.scrollHeight})`);
   }
   if (scrollers.length > 1) out.push(`${scrollers.length} areas scroll`);
@@ -100,7 +104,8 @@ export function inspect(): string[] {
       if (!visible(el)) continue;
       const r = rectOf(el);
       const inScroll =
-        el.parentElement?.closest('[data-scroll]') ?? (phone ? el.closest('.site-page') : null);
+        el.parentElement?.closest('[data-scroll], .is-scrolling') ??
+        (phone ? el.closest('.site-page, .app-container') : null);
       if (!inScroll) {
         if (r.left < -1 || r.right > W + 1 || r.top < -1 || r.bottom > H + 1) {
           out.push(`outside the window: ${label(el)} ${fmtRect(r)}`);

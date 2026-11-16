@@ -707,7 +707,14 @@ const STAR: Icon = { item: 8 };
  * and the modes across under them; lying, the frame as tall as the window beside the modes, the
  * notebook folded into buttons; under 600 px wide, the phone's.
  */
-type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
+type HomeLayout = 'wide' | 'tall' | 'short' | 'land' | 'phone';
+/**
+ * Under this height a window has no room for the frame beside the modes (a phone held
+ * sideways, a laptop window made very short): the home page is the modes alone (`land`).
+ */
+const LAND_H = 480;
+/** Under this height the short layout folds the locked options into one line. */
+const FOLD_H = 600;
 const PHONE_QUERY = '(max-width: 599px)';
 /** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
 const MIN_FIT = 0.82;
@@ -887,7 +894,7 @@ export class Shell {
     this.phone.addEventListener('change', () => this.refresh());
     // The three columns depend on both sizes: drawn again when the layout changes, and the
     // boards fitted again to their columns
-    let layout = this.homeLayout;
+    let layout = this.homeKey;
     let pending = false;
     window.addEventListener('resize', () => {
       // Once per frame while the window is being dragged
@@ -895,7 +902,7 @@ export class Shell {
       pending = true;
       requestAnimationFrame(() => {
         pending = false;
-        const now = this.homeLayout;
+        const now = this.homeKey;
         if (now !== layout) {
           layout = now;
           this.refresh();
@@ -1840,12 +1847,25 @@ export class Shell {
     if (typeof window === 'undefined') return 'wide';
     const w = window.innerWidth;
     const h = window.innerHeight;
+    if (h < LAND_H) return 'land';
     // The frame as the page draws it (`site.css`): as tall as the window, at most 680 px wide,
     // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
     // much itself
     const frame = Math.min(680, ((h - WIDE_ROOM_Y) * 420) / 520, w - WIDE_ROOM_X - 2 * WIDE_BOARD);
     if (frame >= WIDE_FRAME) return 'wide';
     return this.upright?.matches ? 'tall' : 'short';
+  }
+
+  /** Whether the home page folds the locked options into one line, to keep Start in view. */
+  private get homeFold(): boolean {
+    const layout = this.homeLayout;
+    if (layout === 'land' || layout === 'phone') return true;
+    return layout === 'short' && typeof window !== 'undefined' && window.innerHeight < FOLD_H;
+  }
+
+  /** What the home page is built from: drawn again when it changes. */
+  private get homeKey(): string {
+    return `${this.homeLayout}${this.homeFold ? '+fold' : ''}`;
   }
 
   /** Builds the page of the current screen around (or over) the frame. */
@@ -1899,12 +1919,14 @@ export class Shell {
    * A page's board fits the stage under the top bar (`site.css`, "Pages"): when what must stay
    * in view (the board, its `[data-fit]` areas) still overflows, the board turns denser (the
    * guide's longer hints go, smaller cards), then smaller as a browser's zoom would, down to
-   * the last of `ZOOM_STEPS`. A phone's page scrolls instead.
+   * the last of `ZOOM_STEPS`; past that (a very short window), the page scrolls as one, as a
+   * phone's page always does.
    */
   private fitPage(): void {
     const page = this.dom?.page;
     if (!page || this.isPhone || this.pageKind() !== 'page') return;
     const board = page.querySelector<HTMLElement>(':scope .board-page');
+    page.classList.remove('is-scrolling');
     if (!board) return;
     board.style.removeProperty('zoom');
     delete board.dataset.density;
@@ -1922,6 +1944,10 @@ export class Shell {
       if (!over()) return;
       board.style.setProperty('zoom', String(zoom));
     }
+    if (!over()) return;
+    // Still too tall: the page scrolls as one, at the densest step but full size
+    board.style.removeProperty('zoom');
+    page.classList.add('is-scrolling');
   }
 
   /**
@@ -1939,7 +1965,7 @@ export class Shell {
       if (!board) continue;
       board.style.removeProperty('transform');
       board.style.removeProperty('margin-bottom');
-      if (layout !== 'wide' && layout !== 'short') continue;
+      if (layout !== 'wide' && layout !== 'short' && layout !== 'land') continue;
       const cs = getComputedStyle(col);
       const room = col.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       const need = board.offsetHeight;
@@ -2070,13 +2096,17 @@ export class Shell {
           { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
           this.modeCards(false),
         ),
-        h('div', { class: 'mode-detail', 'aria-live': 'polite' }, this.modeDetail(shown, false)),
+        h(
+          'div',
+          { class: 'mode-detail', 'aria-live': 'polite' },
+          this.modeDetail(shown, false, this.homeFold),
+        ),
       ),
     );
-    // Lying screens under 1280 px: the notebook folds into buttons under the modes, and the
-    // keys are left to the help dialog ("?")
+    // Lying screens under 1280 px: the notebook folds into buttons under (or beside) the
+    // modes, and the keys are left to the help dialog ("?")
     const layout = this.homeLayout;
-    fill(d.book, layout === 'short' ? this.notebookFolded() : this.notebook());
+    fill(d.book, layout === 'short' || layout === 'land' ? this.notebookFolded() : this.notebook());
     if (layout === 'wide') fill(d.below, this.keysStrip());
   }
 
@@ -2136,7 +2166,7 @@ export class Shell {
    * The chosen mode: its text, the quest that unlocks it, its best time, its options (the
    * site's `.mopt` box) and fields, and the main button.
    */
-  private modeDetail(mode: ModeEntry | null, phone: boolean): HTMLElement[] {
+  private modeDetail(mode: ModeEntry | null, phone: boolean, fold = phone): HTMLElement[] {
     const t = this.t;
     const out: HTMLElement[] = [];
     if (phone) {
@@ -2181,8 +2211,8 @@ export class Shell {
       );
     }
     const all = canStart ? this.modeOptions(mode) : [];
-    // On a phone the locked options fold into one line, so the main button stays in view
-    const opts = phone ? all.filter((oid) => this.profile.hasOption(oid)) : all;
+    // On a small screen the locked options fold into one line, so the main button stays in view
+    const opts = fold ? all.filter((oid) => this.profile.hasOption(oid)) : all;
     const folded = all.length - opts.length;
     const runs = canStart ? this.profile.runChoices(mode.mode) : [];
     if (opts.length > 0 || runs.length > 0 || folded > 0) {
@@ -2641,7 +2671,7 @@ export class Shell {
     const none = count('none');
     return h(
       'section',
-      { class: 'board board-page is-full board-quests', 'aria-labelledby': 'q-h' },
+      { class: 'board board-page board-quests', 'aria-labelledby': 'q-h' },
       this.plank(t.quests, { item: 20 }, 'q-h'),
       h(
         'div',
