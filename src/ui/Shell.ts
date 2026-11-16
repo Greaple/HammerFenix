@@ -711,6 +711,8 @@ type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
 const PHONE_QUERY = '(max-width: 599px)';
 /** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
 const MIN_FIT = 0.82;
+/** `Shell.fitPage`'s zoom steps, once the board is at its densest. */
+const ZOOM_STEPS = [0.94, 0.88];
 
 /** The narrowest board of the three columns (`site.css`): narrower, it would need too much scaling. */
 const WIDE_BOARD = 360;
@@ -899,11 +901,15 @@ export class Shell {
           this.refresh();
         } else {
           this.fitBoards();
+          this.fitPage();
         }
       });
     });
     // The game's fonts change the boards' heights once loaded
-    void document.fonts?.ready.then(() => this.fitBoards());
+    void document.fonts?.ready.then(() => {
+      this.fitBoards();
+      this.fitPage();
+    });
     this.upright = window.matchMedia(UPRIGHT_QUERY);
     this.upright.addEventListener('change', () => this.refresh());
     this.showLayout();
@@ -1372,8 +1378,11 @@ export class Shell {
     const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
     const before = find()?.getBoundingClientRect().top;
     this.render();
-    const after = find()?.getBoundingClientRect().top;
-    if (page && before !== undefined && after !== undefined) page.scrollTop += after - before;
+    const el = find();
+    const after = el?.getBoundingClientRect().top;
+    // The area that scrolls: the page's list, or the page itself on a phone
+    const area = el?.closest('[data-scroll]') ?? page;
+    if (area && before !== undefined && after !== undefined) area.scrollTop += after - before;
   }
 
   /** The hint of the focused option, under the options of the chosen mode. */
@@ -1844,6 +1853,9 @@ export class Shell {
     this.showLayout();
     const d = this.dom;
     if (!d || !this.screen) return;
+    // The page's scrolling area keeps its place when the same page is drawn again
+    const same = d.page.dataset.screen === this.screen;
+    const kept = same ? (d.page.querySelector('[data-scroll]')?.scrollTop ?? 0) : 0;
     const empty = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
     for (const b of empty) fill(b);
     switch (this.screen) {
@@ -1876,8 +1888,40 @@ export class Shell {
       if (d.page.dataset.screen !== this.screen) d.page.scrollTop = 0;
     }
     d.page.dataset.screen = this.screen;
+    const area = d.page.querySelector('[data-scroll]');
+    if (area) area.scrollTop = kept;
     this.fitBoards();
+    this.fitPage();
     this.applyFocus();
+  }
+
+  /**
+   * A page's board fits the stage under the top bar (`site.css`, "Pages"): when what must stay
+   * in view (the board, its `[data-fit]` areas) still overflows, the board turns denser (the
+   * guide's longer hints go, smaller cards), then smaller as a browser's zoom would, down to
+   * the last of `ZOOM_STEPS`. A phone's page scrolls instead.
+   */
+  private fitPage(): void {
+    const page = this.dom?.page;
+    if (!page || this.isPhone || this.pageKind() !== 'page') return;
+    const board = page.querySelector<HTMLElement>(':scope .board-page');
+    if (!board) return;
+    board.style.removeProperty('zoom');
+    delete board.dataset.density;
+    const room = () => {
+      const cs = getComputedStyle(page);
+      return page.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom);
+    };
+    const over = () =>
+      [board, ...board.querySelectorAll<HTMLElement>('[data-fit]')].some(
+        (el) => el.scrollHeight > el.clientHeight + 1,
+      ) || board.getBoundingClientRect().bottom > room() + 1;
+    if (!over()) return;
+    board.dataset.density = 'compact';
+    for (const zoom of ZOOM_STEPS) {
+      if (!over()) return;
+      board.style.setProperty('zoom', String(zoom));
+    }
   }
 
   /**
@@ -2597,7 +2641,7 @@ export class Shell {
     const none = count('none');
     return h(
       'section',
-      { class: 'board board-page', 'aria-labelledby': 'q-h' },
+      { class: 'board board-page is-full board-quests', 'aria-labelledby': 'q-h' },
       this.plank(t.quests, { item: 20 }, 'q-h'),
       h(
         'div',
@@ -2632,10 +2676,11 @@ export class Shell {
       ),
       h(
         'div',
-        { class: 'split' },
+        { class: 'quest-split' },
         h(
           'div',
-          { class: 'quest-list', id: 'q-list', role: 'tabpanel' },
+          // The page's one scrolling area (on a phone, the page scrolls instead)
+          { class: 'quest-list', id: 'q-list', role: 'tabpanel', 'data-scroll': phone ? null : '' },
           list.length === 0 ? h('p', { class: 'empty' }, t.noQuest) : null,
           list.map((id) => {
             const done = q.status(p, id) === 'done';
@@ -2674,7 +2719,7 @@ export class Shell {
         ),
         this.questId === null || phone ? null : this.questDetail(this.questId),
       ),
-      h('p', { class: 'note' }, t.questRule),
+      h('p', { class: 'note page-rule' }, t.questRule),
     );
   }
 
@@ -2687,7 +2732,7 @@ export class Shell {
     const reqs = q.requirements(id);
     return h(
       'div',
-      { class: 'inset quest-detail', 'aria-live': 'polite' },
+      { class: 'inset quest-detail', 'aria-live': 'polite', 'data-fit': this.isPhone ? null : '' },
       h(
         'div',
         { class: 'detail-title' },
@@ -2843,7 +2888,7 @@ export class Shell {
     }
     return h(
       'section',
-      { class: 'board board-page board-fridge', 'aria-labelledby': 'f-h' },
+      { class: 'board board-page is-full board-fridge', 'aria-labelledby': 'f-h' },
       this.plank(t.fridge, { item: 1018 }, 'f-h', 1.2),
       h(
         'div',
@@ -2883,7 +2928,7 @@ export class Shell {
       ),
       h(
         'div',
-        { class: 'split' },
+        { class: 'fridge-split' },
         h(
           'div',
           { class: 'fridge-main', id: 'f-shelves', role: 'tabpanel' },
@@ -2930,7 +2975,7 @@ export class Shell {
         ),
         this.fridgeId === null ? null : this.itemCard(this.fridgeId),
       ),
-      h('p', { class: 'note' }, t.fridgeRule),
+      h('p', { class: 'note page-rule' }, t.fridgeRule),
     );
   }
 
@@ -2982,7 +3027,7 @@ export class Shell {
     }
     return h(
       'aside',
-      { class: 'inset item-card', 'aria-live': 'polite' },
+      { class: 'inset item-card', 'aria-live': 'polite', 'data-fit': this.isPhone ? null : '' },
       h('div', { class: 'item-disc' }, this.itemImg(id, state)),
       h('h2', null, n > 0 ? this.texts.getItemName(id) : t.unknown),
       h('p', { class: `item-status is-${state}` }, status),
@@ -3022,24 +3067,28 @@ export class Shell {
         { class: 'check-grid' },
         (['detail', 'shake', 'sound', 'music'] as const).map((row) => this.checkCard(row)),
       ),
-      this.volumeRow(),
       h(
         'div',
-        { class: 'inset set-row' },
-        h('span', { class: 'set-label', id: 'hd-l' }, t.hd),
+        { class: 'set-pair' },
+        this.volumeRow(),
         h(
-          'button',
-          {
-            type: 'button',
-            class: 'btn-ghost hd-btn',
-            'aria-describedby': 'hd-h',
-            'aria-labelledby': 'hd-l hd-v',
-            'data-nav': 'set:hd',
-            onclick: () => this.stepHd(1),
-          },
-          h('span', { id: 'hd-v' }, hdValue),
+          'div',
+          { class: 'inset set-row' },
+          h('span', { class: 'set-label', id: 'hd-l' }, t.hd),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn-ghost hd-btn',
+              'aria-describedby': 'hd-h',
+              'aria-labelledby': 'hd-l hd-v',
+              'data-nav': 'set:hd',
+              onclick: () => this.stepHd(1),
+            },
+            h('span', { id: 'hd-v' }, hdValue),
+          ),
+          h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
         ),
-        h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
       ),
       h(
         'div',
@@ -3417,12 +3466,12 @@ export class Shell {
         banners.length > 0 ? h('div', { class: 'banners' }, banners) : null,
         h(
           'div',
-          { class: 'found' },
+          { class: 'found', 'data-fit': this.isPhone ? null : '' },
           h('h2', { class: 'sub-title' }, picks.length > 0 ? t.collected : t.none),
           picks.length > 0
             ? h(
                 'div',
-                { class: 'found-grid' },
+                { class: 'found-grid', 'data-scroll': this.isPhone ? null : '' },
                 picks.map(([id, n]) =>
                   h(
                     'div',
