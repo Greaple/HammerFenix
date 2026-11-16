@@ -710,6 +710,9 @@ const STAR: Icon = { item: 8 };
  */
 type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
 const PHONE_QUERY = '(max-width: 599px)';
+/** The smallest scale `fitBoards` gives a board: 12 px text stays above 10 px. */
+const MIN_FIT = 0.85;
+
 /** The narrowest board (and frame) of the three columns: narrower, the modes board grows too tall. */
 const WIDE_BOARD = 420;
 /** Room around the three columns (`src/site.css`): gutters and gaps, and above the frame. */
@@ -880,14 +883,20 @@ export class Shell {
     }
     this.phone = window.matchMedia(PHONE_QUERY);
     this.phone.addEventListener('change', () => this.refresh());
-    // The three columns depend on both sizes: drawn again when the layout changes
+    // The three columns depend on both sizes: drawn again when the layout changes, and the
+    // boards fitted again to their columns
     let layout = this.homeLayout;
     window.addEventListener('resize', () => {
       const now = this.homeLayout;
-      if (now === layout) return;
-      layout = now;
-      this.refresh();
+      if (now !== layout) {
+        layout = now;
+        this.refresh();
+      } else {
+        this.fitBoards();
+      }
     });
+    // The game's fonts change the boards' heights once loaded
+    void document.fonts?.ready.then(() => this.fitBoards());
     this.upright = window.matchMedia(UPRIGHT_QUERY);
     this.upright.addEventListener('change', () => this.refresh());
     this.showLayout();
@@ -1360,6 +1369,7 @@ export class Shell {
     this.hintShown = hint !== '';
     this.dom?.modes.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
     this.dom?.below.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.fitBoards();
   }
 
   /** Gives the DOM focus to the focused element, unless the page is used by touch. */
@@ -1852,7 +1862,39 @@ export class Shell {
       if (d.page.dataset.screen !== this.screen) d.page.scrollTop = 0;
     }
     d.page.dataset.screen = this.screen;
+    this.fitBoards();
     this.applyFocus();
+  }
+
+  /**
+   * A home board taller than its column is scaled down to fit it, as a browser's zoom would:
+   * its layout stays the same, so nothing wraps differently or is cut. Below `MIN_FIT`, the
+   * text would get too small: the column scrolls instead.
+   */
+  private fitBoards(): void {
+    const d = this.dom;
+    if (!d || this.screen !== 'menu') return;
+    const layout = this.homeLayout;
+    for (const col of [d.modes, d.book]) {
+      const board = col.querySelector<HTMLElement>(':scope > .board');
+      col.classList.remove('is-scrolling');
+      if (!board) continue;
+      board.style.removeProperty('transform');
+      board.style.removeProperty('margin-bottom');
+      if (layout !== 'wide' && layout !== 'short') continue;
+      const cs = getComputedStyle(col);
+      const room = col.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const need = board.offsetHeight;
+      if (need <= room || room <= 0) continue;
+      const scale = room / need;
+      if (scale < MIN_FIT) {
+        col.classList.add('is-scrolling');
+        continue;
+      }
+      board.style.transform = `scale(${scale})`;
+      // The space the board no longer takes, so the column has nothing to scroll
+      board.style.marginBottom = `${-need * (1 - scale)}px`;
+    }
   }
 
   /** A picture of the game's clip, sized by CSS. */
@@ -1971,7 +2013,6 @@ export class Shell {
           this.modeCards(false),
         ),
         h('div', { class: 'mode-detail', 'aria-live': 'polite' }, this.modeDetail(shown, false)),
-        this.img({ clip: 'hammer_player' }, 'igor-peek'),
       ),
     );
     // Lying screens under 1280 px: the notebook folds into buttons under the modes, and the
@@ -2067,8 +2108,10 @@ export class Shell {
           ? fmt(t.modeLockedBy2, this.questForMode('timeattack'), this.questForMode('multicoop'))
           : fmt(t.modeLockedBy, this.questForMode(mode.mode));
     if (note) out.push(h('p', { class: 'lock-note' }, this.lockIcon(), note));
-    // The Time Attack modes: the best time of the run they play
-    const run = canStart ? this.runOf(mode.mode) : null;
+    // The Time Attack modes: the best time of the run they play (the soccer's field is a run
+    // too, but a match has no time)
+    const timed = mode.mode === 'timeattack' || mode.mode === 'multitime';
+    const run = canStart && timed ? this.runOf(mode.mode) : null;
     if (run !== null) {
       const best = this.profile.bestTime(mode.mode, run);
       out.push(

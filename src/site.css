@@ -602,22 +602,26 @@ body[data-page='home'] .app-main {
 body[data-page='home'] .site-side {
   display: block;
   flex: 1 1 0;
-  /* Room around the board for the title planks, its shadow and Igor, outside its width */
-  min-width: calc(300px + 60px);
-  max-width: calc(460px + 60px);
-  max-height: calc(100% + 26px);
+  /* The column's height is the window's; room above the board for its title plank and around
+     it for its shadow, outside its width */
+  min-width: calc(420px + 20px);
+  max-width: calc(460px + 20px);
+  height: calc(100% + 26px);
+  overflow: hidden;
+  padding: 26px 10px 14px;
+  margin: -26px -10px 0;
+}
+
+/* A board taller than its column is scaled down to fit (`Shell.fitBoards`), from its top;
+   one that would get too small scrolls instead */
+body[data-page='home'] .site-side > .board {
+  transform-origin: top center;
+}
+
+body[data-page='home'] .site-side.is-scrolling {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 26px 10px 30px 50px;
-  margin: -26px -10px 0 -50px;
-}
-
-body[data-page='home'] .site-right {
-  min-width: calc(300px + 20px);
-  max-width: calc(460px + 20px);
-  padding-left: 10px;
-  margin-left: -10px;
 }
 
 body[data-page='home'] .game-wrapper {
@@ -665,7 +669,7 @@ body[data-page='home'] .logo {
 }
 
 /* Between the phone and three columns (`body[data-layout]`, set by `Shell.homeLayout`, after the
-   canvas's in-between boards): no keys strip (the help dialog has them) and no Igor; the
+   canvas's in-between boards): no keys strip (the help dialog has them); the
    boards in a grid, laid out by orientation below. Three columns need 1280 x 840 px, so a
    laptop's window takes the lying layout */
 body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .app-main {
@@ -691,11 +695,7 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .game-wra
 }
 
 body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-below,
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .igor-peek {
-  display: none;
-}
-
-/* Upright (a tablet): the frame at its own size beside the notebook, the modes across below,
+body[data-page='home']:is([data-layout='tall'], [data-layout='short']) /* Upright (a tablet): the frame at its own size beside the notebook, the modes across below,
    the page scrolls */
 body[data-page='home'][data-layout='tall'] .app-container {
   overflow-y: auto;
@@ -983,11 +983,6 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   gap: 14px;
 }
 
-.board-book + .board-modes,
-.board-modes + .board-book {
-  margin-top: 44px;
-}
-
 .mode-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1239,16 +1234,6 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   color: inherit;
   width: 20px;
   height: 20px;
-}
-
-.igor-peek {
-  position: absolute;
-  left: -46px;
-  bottom: -26px;
-  width: 74px;
-  height: 74px;
-  transform: scaleX(-1);
-  filter: drop-shadow(0 4px 2px rgba(var(--night), 0.3));
 }
 
 .book-tiles {
