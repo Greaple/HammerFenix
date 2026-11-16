@@ -151,6 +151,7 @@ async function main(): Promise<void> {
   const profile = new Profile(new QuestEngine(dataStore.quests, dataStore.items));
   const shell = new Shell(lib, input, dataStore, profile);
   await shell.load(baseUrl);
+  shell.attachPage(app.renderer);
   app.stage.addChild(shell.root, shell.pauseLayer);
   session.gameRoot.visible = false;
   shell.showMenu();
@@ -388,15 +389,63 @@ async function main(): Promise<void> {
     showMute();
   });
 
-  // Language selector
-  if (langSelect) langSelect.value = dataStore.langId;
-  langSelect?.addEventListener('change', async () => {
-    await dataStore.setLang(langSelect.value);
+  // Language: the top bar's selector and the settings page's choice
+  const changeLang = async (id: string) => {
+    await dataStore.setLang(id);
+    if (langSelect) langSelect.value = dataStore.langId;
     session.saveSettings();
     showHelpKeys(shell.bindings, dataStore.langId);
     showDevice();
     applyPageText(lang());
+    showToolLabels();
     shell.refresh();
+  };
+  if (langSelect) langSelect.value = dataStore.langId;
+  langSelect?.addEventListener('change', () => void changeLang(langSelect.value));
+  shell.onLang = (id) => void changeLang(id);
+
+  // The toolbar beside the frame while a game plays: the game's own keys, as buttons
+  const tools = document.getElementById('play-tools');
+  const showToolLabels = () => {
+    const labels = shell.toolLabels;
+    tools?.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach((btn) => {
+      const label = labels[btn.dataset.tool!] ?? '';
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+      btn.classList.remove('is-armed');
+    });
+  };
+  showToolLabels();
+  /** A key press of the game's (`ControlAction`) from a button: held long enough for a tick. */
+  const pulse = (action: ControlAction) => {
+    input.setTouch(action, true);
+    window.setTimeout(() => input.setTouch(action, false), 120);
+  };
+  const fullscreen = document.getElementById('tool-full');
+  if (fullscreen && !document.fullscreenEnabled) fullscreen.hidden = true;
+  tools?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tool]');
+    if (!btn) return;
+    btn.blur(); // the bomb key must not press it again
+    const tool = btn.dataset.tool;
+    if (tool === 'pause') pulse('pause');
+    else if (tool === 'map') pulse('map');
+    else if (tool === 'music') pulse('music');
+    else if (tool === 'full') {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void document.documentElement.requestFullscreen().catch(() => {});
+    } else if (tool === 'quit') {
+      if (shell.armQuit()) {
+        showToolLabels();
+        pulse('suicide');
+      } else {
+        const sure = shell.toolLabels.quitSure;
+        btn.setAttribute('aria-label', sure);
+        btn.title = sure;
+        btn.classList.add('is-armed');
+        window.setTimeout(showToolLabels, 3000);
+      }
+    }
   });
 
   // Dialog & Debug open triggers
