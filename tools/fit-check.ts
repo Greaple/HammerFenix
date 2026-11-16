@@ -183,6 +183,9 @@ export function inspect(): string[] {
     for (const c of document.querySelectorAll('.pad-key, .touch-btn, .play-tools')) {
       if (!visible(c)) continue;
       const cr = rectOf(c);
+      if (cr.left < -1 || cr.right > W + 1 || cr.top < -1 || cr.bottom > H + 1) {
+        out.push(`control outside the window: ${label(c)} ${fmtRect(cr)}`);
+      }
       if (
         cr.right > fr.left + 1 &&
         cr.left < fr.right - 1 &&

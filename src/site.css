@@ -844,7 +844,7 @@ body[data-page='home'][data-layout='land'] .logo {
 
 body[data-page='home'][data-layout='land'] .app-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(150px, 22vw, 220px);
+  grid-template-columns: minmax(0, 1fr) clamp(140px, 20vw, 220px);
   grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
@@ -876,7 +876,7 @@ body[data-page='home'][data-layout='land'] .site-right {
 
 body[data-page='home'][data-layout='land'] .board-modes {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   align-items: start;
   gap: 8px 14px;
   padding: 26px 12px 12px;
@@ -903,7 +903,7 @@ body[data-page='home'][data-layout='land'] .board-modes .mode-icon {
 
 body[data-page='home'][data-layout='land'] .board-modes .mode-name {
   font-size: 13px;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 body[data-page='home'][data-layout='land'] .board-modes .mode-detail {
@@ -1703,6 +1703,13 @@ body[data-page='page'] .site-page.is-scrolling {
 .site-page.is-scrolling [data-fit] {
   min-height: auto;
   overflow: visible;
+}
+
+/* Continue stays in view at the foot of the scrolling page */
+.site-page.is-scrolling .btn-continue {
+  position: sticky;
+  bottom: 8px;
+  z-index: 3;
 }
 
 /* The densest step of `Shell.fitPage`: the guide's longer hints go */
@@ -3354,7 +3361,9 @@ body:not([data-page='playing']) #touch-pause {
     position: static;
   }
 
-  html.touch body:not([data-page='playing']) .game-wrapper {
+  html.touch
+    body:not([data-page='playing']):not([data-page='home'][data-layout='land'])
+    .game-wrapper {
     display: flex;
     height: auto;
   }
