@@ -512,15 +512,6 @@ export class InputController {
     this.codesHeld = new Set(this.keysDown.values());
   }
 
-  /**
-   * A game key pressed by a button of the page (the playing toolbar, UI redesign), from no
-   * device in particular: the prompts stay those of the device in use.
-   */
-  setButton(action: ControlAction, pressed: boolean): void {
-    if (pressed) this.touchHeld.add(action);
-    else this.touchHeld.delete(action);
-  }
-
   /** Player 1's on-screen buttons. */
   setTouch(action: ControlAction, pressed: boolean): void {
     this.onAnyGesture?.();

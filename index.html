@@ -20,9 +20,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="HammerFenix" />
     <link rel="stylesheet" href="/src/style.css" />
-    <link rel="stylesheet" href="/src/site.css" />
   </head>
-  <body data-page="home">
+  <body>
     <div id="app" class="app-container">
       <header class="topbar">
         <div class="brand">
@@ -59,9 +58,6 @@
           <button id="btn-open-compare" class="btn" title="Original game in Ruffle">Flash</button>
           <button id="btn-open-symbols" class="btn" title="SWF symbol browser">Assets</button>
         </div>
-
-        <!-- The mode of the game under way and its options (Shell `fillChips`) -->
-        <div id="play-chips" class="play-chips" aria-live="polite"></div>
 
         <nav class="top-actions">
           <button
@@ -107,8 +103,6 @@
       </header>
 
       <main class="app-main">
-        <!-- The site around the frame (Shell): the modes on the left, the notebook on the right -->
-        <div id="site-modes" class="site-side site-left"></div>
         <div id="game-wrapper" class="game-wrapper">
           <div id="game-canvas-container" class="game-canvas-container" role="application">
             <!-- PixiJS canvas injected dynamically -->
@@ -122,11 +116,7 @@
                 <span data-i18n="retry">Try again</span>
               </button>
             </div>
-            <!-- Over the frame: the modes on a phone, the sound panel over the paused game -->
-            <div id="frame-overlay" class="frame-overlay"></div>
           </div>
-          <!-- Under the frame: the keys, or on a phone the chosen mode -->
-          <div id="site-below" class="site-below"></div>
 
           <!-- On-screen touch controls for phones and tablets (main.ts `bindPad`, `bindTouch`) -->
           <div id="touch-controls" class="touch-controls">
@@ -170,40 +160,7 @@
             </div>
           </div>
         </div>
-        <div id="site-book" class="site-side site-right"></div>
-
-        <!-- Beside the frame while a game plays (main.ts `bindTools`) -->
-        <nav id="play-tools" class="play-tools">
-          <button type="button" id="tool-pause" class="tool-btn is-wood" data-tool="pause">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
-          </button>
-          <button type="button" id="tool-map" class="tool-btn" data-tool="map">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" />
-            </svg>
-          </button>
-          <button type="button" id="tool-music" class="tool-btn" data-tool="music">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0zM19 16a2.5 2.5 0 1 1-5 0a2.5 2.5 0 1 1 5 0z"
-              />
-            </svg>
-          </button>
-          <button type="button" id="tool-full" class="tool-btn" data-tool="full">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-            </svg>
-          </button>
-          <button type="button" id="tool-quit" class="tool-btn" data-tool="quit">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4h11l-1.5 4L16 12H5" /></svg>
-          </button>
-        </nav>
       </main>
-
-      <!-- The quest, fridge, settings, controls and results pages, in place of the frame -->
-      <div id="site-page" class="site-page"></div>
-      <!-- The phone's tab bar -->
-      <nav id="site-tabbar" class="site-tabbar"></nav>
     </div>
 
     <!-- Help: the story, the controls and the credits -->
