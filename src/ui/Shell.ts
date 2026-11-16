@@ -1084,7 +1084,9 @@ export class Shell {
     }
     // The frame keeps its size through the fade, and takes its playing size after it
     const frame = this.dom ? document.getElementById('game-canvas-container') : null;
-    if (frame && this.root.visible) frame.style.width = `${frame.getBoundingClientRect().width}px`;
+    const width = frame?.getBoundingClientRect().width ?? 0;
+    // (Not on a phone's home page, which has no frame: the game takes the screen at once)
+    if (frame && this.root.visible && width > 0) frame.style.width = `${width}px`;
     this.showLayout();
   }
 
@@ -2063,24 +2065,24 @@ export class Shell {
     this.hintShown = false;
     const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
     if (this.isPhone) {
+      // No frame on a phone (the game takes the whole screen once it starts): the modes and
+      // the chosen mode; the tab bar has the notebook's pages, Start is pinned above it
       fill(
-        d.overlay,
+        d.modes,
         h(
           'section',
-          { class: 'board board-phone-modes', 'aria-label': t.modesTitle },
+          { class: 'board board-modes board-phone', 'aria-labelledby': 'modes-h' },
+          this.plank(t.modesTitle, null, 'modes-h', -1.5, 2),
           h(
             'div',
-            { class: 'mode-grid', role: 'radiogroup', 'aria-label': t.modesTitle },
+            { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
             this.modeCards(true),
           ),
-        ),
-      );
-      fill(
-        d.below,
-        h(
-          'section',
-          { class: 'board board-detail', 'aria-live': 'polite' },
-          this.modeDetail(shown, true),
+          h(
+            'div',
+            { class: 'mode-detail board-detail', 'aria-live': 'polite' },
+            this.modeDetail(shown, true),
+          ),
         ),
       );
       return;

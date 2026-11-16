@@ -85,7 +85,8 @@ export function inspect(): string[] {
     const ok =
       s.hasAttribute('data-scroll') ||
       s.matches('.site-page.is-scrolling, .site-side.is-scrolling') ||
-      (phone && s.matches('.site-page, .app-container'));
+      ((phone || document.body.dataset.layout === 'tall') &&
+        s.matches('.site-page, .app-container'));
     if (!ok) out.push(`scrolls: ${label(s)} (${s.clientHeight}/${s.scrollHeight})`);
   }
   if (scrollers.length > 1) out.push(`${scrollers.length} areas scroll`);
@@ -105,8 +106,11 @@ export function inspect(): string[] {
       const r = rectOf(el);
       const inScroll =
         el.parentElement?.closest('[data-scroll], .is-scrolling') ??
-        (phone ? el.closest('.site-page, .app-container') : null);
-      if (!inScroll) {
+        (phone || document.body.dataset.layout === 'tall'
+          ? el.closest('.site-page, .app-container')
+          : null);
+      // The main button stays in view everywhere (pinned where the page scrolls)
+      if (!inScroll || el.matches('.btn-start')) {
         if (r.left < -1 || r.right > W + 1 || r.top < -1 || r.bottom > H + 1) {
           out.push(`outside the window: ${label(el)} ${fmtRect(r)}`);
           continue;
@@ -140,8 +144,10 @@ export function inspect(): string[] {
       if (!visible(board)) continue;
       const br = rectOf(board);
       for (const el of board.querySelectorAll('*')) {
-        // The plank stands over the edge; a stamp is still scaling in
+        // The plank stands over the edge; a stamp is still scaling in; a pinned button is
+        // over the page, not in its board
         if (!visible(el) || el.closest('.plank, .veil, .stamp')) continue;
+        if (pinned(el, board)) continue;
         const r = rectOf(el);
         if (r.left < br.left - 1 || r.right > br.right + 1) {
           out.push(`sticks out of ${label(board)}: ${label(el)}`);
@@ -188,6 +194,14 @@ export function inspect(): string[] {
     }
   }
   return [...new Set(out)];
+}
+
+/** Whether `el`, or a box around it inside `board`, is pinned to the window. */
+function pinned(el: Element, board: Element): boolean {
+  for (let a: Element | null = el; a && a !== board; a = a.parentElement) {
+    if (getComputedStyle(a).position === 'fixed') return true;
+  }
+  return false;
 }
 
 function fmtRect(r: DOMRect): string {
@@ -397,4 +411,28 @@ export function summary(failures: Failure[]): string[] {
   return [...by].map(
     ([k, v]) => `${k}  <- ${[...v].slice(0, 6).join(', ')}${v.size > 6 ? ` +${v.size - 6}` : ''}`,
   );
+}
+
+/**
+ * Starts an Adventure game, checks the playing page (the frame whole, the toolbar or the touch
+ * controls beside it, not over it), and goes back to the home page. `touch` marks the page as a
+ * touch screen first, as a phone or tablet does.
+ */
+export async function checkPlaying(opts: { touch?: boolean } = {}): Promise<string[]> {
+  const s = g().shell;
+  const session = g().gameSession;
+  const root = document.documentElement;
+  const touch0 = root.classList.contains('touch');
+  if (opts.touch) root.classList.add('touch');
+  try {
+    s.chosen = 'solo';
+    s.startChosen();
+    await wait(3000);
+    return inspect();
+  } finally {
+    session.stop?.();
+    s.showMenu();
+    root.classList.toggle('touch', touch0);
+    await wait(300);
+  }
 }

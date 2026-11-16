@@ -960,7 +960,11 @@ body[data-page='home'][data-layout='tall'] .app-main {
   flex: none;
   display: grid;
   container-type: inline-size;
-  grid-template-columns: minmax(0, 432px) minmax(260px, 1fr);
+  /* The frame leaves the modes board its height under it (about 620 px with the top bar) */
+  grid-template-columns: minmax(0, min(432px, max(260px, (100dvh - 620px) * 420 / 520))) minmax(
+      260px,
+      1fr
+    );
   grid-template-areas:
     'frame book'
     'modes modes';
@@ -1029,6 +1033,12 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-mo
     grid-column: 2;
     grid-row: 1 / span 8;
     align-self: end;
+  }
+
+  /* Tall: the page scrolls, the main button stays in view at its foot */
+  body[data-page='home'][data-layout='tall'] .mode-detail > .btn-start {
+    position: sticky;
+    bottom: 12px;
   }
 }
 
@@ -1164,6 +1174,36 @@ html:not(.touch) body[data-page='playing'] .game-wrapper {
 
 html:not(.touch) body[data-page='playing'] .game-canvas-container {
   width: min(760px, 100cqw - 100px, max(240px, var(--frame-h) * 420 / 520));
+}
+
+/* A short window: the toolbar in a row in the top bar, in place of the mode's chips, so it is
+   never taller than the frame (the canvas's PlayingLaptop, short pages) */
+@media (max-height: 520px) {
+  html:not(.touch) body[data-page='playing'] .play-tools {
+    position: fixed;
+    top: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 4;
+    flex-direction: row;
+    gap: 6px;
+    padding: 3px 8px;
+    border-width: 2px;
+    box-shadow: none;
+  }
+
+  html:not(.touch) body[data-page='playing'] .tool-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  html:not(.touch) body[data-page='playing'] .play-chips {
+    display: none;
+  }
+
+  html:not(.touch) body[data-page='playing'] .game-canvas-container {
+    width: min(760px, 100cqw, max(160px, var(--frame-h) * 420 / 520));
+  }
 }
 
 /* ========================================================
@@ -2505,6 +2545,50 @@ html.touch .pager .btn-round {
   align-self: center;
 }
 
+/* The panel follows the frame's size: a small frame (a phone, a short window) gets the two
+   boxes side by side, a smaller title and no note */
+.frame-overlay {
+  container: frame / size;
+}
+
+@container frame (max-height: 470px) {
+  .board-sound {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .board-sound .sound-title {
+    font-size: 24px;
+  }
+
+  .board-sound .sound-rows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board-sound .check-card {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .board-sound .set-row {
+    padding: 8px 12px;
+  }
+
+  .board-sound .slider {
+    order: 3;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .board-sound .set-value {
+    margin-left: auto;
+  }
+
+  .board-sound > .note {
+    display: none;
+  }
+}
+
 /* --- Results --- */
 
 /* The picture over the board's top edge (`--pic`: the game over picture's width), the board
@@ -2910,65 +2994,57 @@ html.touch .pager .btn-round {
     display: block;
   }
 
-  /* Home: the frame full width, the modes over the village, the chosen mode under it */
+  /* Home: no frame (the game takes the whole screen once it starts). The modes board takes the
+     width; the page scrolls under Start, pinned above the tab bar */
   body[data-page='home'] .app-container {
     overflow-y: auto;
   }
 
   body[data-page='home'] .app-main {
     flex: none;
-    container-type: inline-size;
-    flex-direction: column;
-    align-items: stretch;
-    padding-top: 8px;
-    padding-bottom: 96px;
+    display: block;
+    padding-top: 30px;
+    padding-bottom: calc(160px + env(safe-area-inset-bottom));
   }
 
-  body[data-page='home'] .game-wrapper {
-    width: 100%;
-  }
-
-  body[data-page='home'] .game-canvas-container {
-    width: 100%;
-    max-width: 480px;
-  }
-
-  body[data-page='home'] .site-side {
+  body[data-page='home'] .game-wrapper,
+  body[data-page='home'] .site-below,
+  body[data-page='home'] .site-right {
     display: none;
   }
 
-  .board-phone-modes {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-    padding: 9px;
-    border-radius: var(--r-inset);
+  body[data-page='home'] .site-left {
+    display: block;
+    max-width: 480px;
+    margin: 0 auto;
   }
 
-  .board-phone-modes .mode-grid {
-    gap: 5px;
+  .board-phone {
+    padding: 30px 10px 12px;
+    gap: 10px;
   }
 
-  .board-phone-modes .mode-card {
+  .board-phone .mode-grid {
+    gap: 6px;
+  }
+
+  .board-phone .mode-card {
     min-height: 44px;
-    padding: 4px 6px;
+    padding: 4px 18px 4px 6px;
   }
 
-  .board-phone-modes .mode-icon {
-    width: 30px;
-    height: 30px;
+  .board-phone .mode-icon {
+    width: clamp(24px, 7.5vw, 30px);
+    height: clamp(24px, 7.5vw, 30px);
   }
 
-  .board-phone-modes .mode-card .lock {
-    position: static;
+  /* (No hyphens: the game's font has no hyphen to draw) */
+  .board-phone .mode-name {
+    font-size: clamp(12px, 3.6vw, 14px);
+    overflow-wrap: break-word;
   }
 
   .board-detail {
-    width: 100%;
-    max-width: 480px;
-    padding: 12px;
-    border-radius: var(--r-inset);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -3000,12 +3076,25 @@ html.touch .pager .btn-round {
     min-height: 40px;
   }
 
-  /* The main button stays in view above the tab bar */
-  .board-detail .btn-start {
+  /* The main button (Start, Continue) stays in view above the tab bar, whatever the page's
+     scroll; the page leaves room for it under its content */
+  .board-detail .btn-start,
+  .board-result .btn-continue {
     height: 50px;
-    position: sticky;
-    bottom: calc(80px + env(safe-area-inset-bottom));
-    z-index: 2;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    max-width: 456px;
+    margin: 0 auto;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    z-index: 4;
+    box-shadow:
+      0 4px 0 var(--wood-dark),
+      0 6px 18px rgba(var(--night), 0.35);
+  }
+
+  body[data-screen='result'] .site-page::after {
+    height: calc(160px + env(safe-area-inset-bottom)) !important;
   }
 
   body[data-page='home'] .site-below {
@@ -3090,10 +3179,6 @@ html.touch .pager .btn-round {
 
   .found {
     min-height: 0 !important;
-  }
-
-  .mode-name {
-    overflow-wrap: anywhere;
   }
 
   .slot {
