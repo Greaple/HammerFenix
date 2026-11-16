@@ -587,16 +587,24 @@ kbd.cap.pad img {
 
 /* --- Home: the modes and the notebook beside the frame --- */
 
+/* The frame takes the window's height, up to what leaves each board 420 px (`Shell.homeLayout`
+   picks this layout while the frame keeps 420 px too); the boards share the width it leaves,
+   up to 460 px each (a wider board is a shorter one). The keys strip shows under the frame when
+   the window has the height for it; otherwise the help dialog ("?") has the keys. */
 body[data-page='home'] .app-main {
+  --strip: 0px;
   align-items: flex-start;
+  justify-content: center;
   gap: var(--side-gap);
-  padding-top: 34px;
+  padding-top: 24px;
 }
 
 body[data-page='home'] .site-side {
   display: block;
+  flex: 1 1 0;
   /* Room around the board for the title planks, its shadow and Igor, outside its width */
-  flex: 0 0 calc(var(--side-w) + 60px);
+  min-width: calc(300px + 60px);
+  max-width: calc(460px + 60px);
   max-height: calc(100% + 26px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -606,23 +614,43 @@ body[data-page='home'] .site-side {
 }
 
 body[data-page='home'] .site-right {
-  flex-basis: calc(var(--side-w) + 20px);
+  min-width: calc(300px + 20px);
+  max-width: calc(460px + 20px);
   padding-left: 10px;
   margin-left: -10px;
 }
 
 body[data-page='home'] .game-wrapper {
   width: auto;
-  flex: 0 1 auto;
-  --below-frame: 52px;
+  flex: 0 0 auto;
+  --below-frame: var(--strip);
 }
 
 body[data-page='home'] .game-canvas-container {
   width: min(
-    620px,
-    100cqw - 2 * var(--side-w) - 2 * var(--side-gap),
-    max(240px, (100cqh - 52px) * 420 / 520)
+    680px,
+    max(240px, (100cqh - var(--strip)) * 420 / 520),
+    100cqw - 2 * (420px + var(--side-gap))
   );
+}
+
+body[data-page='home'] .site-below {
+  display: none;
+}
+
+/* As many option columns as the board's width allows */
+body[data-page='home'][data-layout='wide'] .board-modes .opt-grid {
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+}
+
+@media (min-height: 860px) {
+  body[data-page='home'] .app-main {
+    --strip: 52px;
+  }
+
+  body[data-page='home'] .site-below:not(:empty) {
+    display: flex;
+  }
 }
 
 body[data-page='home'] .touch-controls,
@@ -729,7 +757,7 @@ body[data-page='home'][data-layout='short'] .site-left {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 26px 8px 10px;
+  padding: 26px 8px 4px;
   margin: 0 -8px;
 }
 
@@ -772,6 +800,17 @@ body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .site-lef
 body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-grid {
   /* At most four across: the eight cards in two even rows */
   grid-template-columns: repeat(auto-fill, minmax(max(168px, (100% - 18px) / 4), 1fr));
+}
+
+/* A narrow board: the cards keep their name only, as on a phone */
+@container (max-width: 559px) {
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-short {
+    display: none;
+  }
+
+  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-card {
+    min-height: 44px;
+  }
 }
 
 @container (min-width: 620px) {

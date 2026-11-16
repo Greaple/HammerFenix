@@ -702,14 +702,19 @@ const STAR: Icon = { item: 8 };
 
 /**
  * The home page's layouts (`body[data-layout]`, `src/site.css`, after the canvas's note on
- * them): three columns from 1280 x 840 px, where the boards fit beside the frame; otherwise,
+ * them): three columns when the frame and each board get at least `WIDE_BOARD` px (from
+ * about 1370 px wide and 640 px high: a laptop's window); otherwise,
  * upright, the frame at its own size beside the notebook and the modes across under them;
  * lying (a laptop's window), the frame as tall as the screen beside the modes, the notebook
  * folded into buttons; under 600 px wide, the phone's.
  */
 type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
 const PHONE_QUERY = '(max-width: 599px)';
-const WIDE_QUERY = '(min-width: 1280px) and (min-height: 840px)';
+/** The narrowest board (and frame) of the three columns: narrower, the modes board grows too tall. */
+const WIDE_BOARD = 420;
+/** Room around the three columns (`src/site.css`): gutters and gaps, and above the frame. */
+const WIDE_ROOM_X = 32 + 2 * 28;
+const WIDE_ROOM_Y = 64 + 24 + 24;
 const UPRIGHT_QUERY = '(orientation: portrait)';
 
 type QuestTab = 'progress' | 'done' | 'all';
@@ -807,7 +812,6 @@ export class Shell {
   private art: ItemArt | null = null;
   private dom: SiteDom | null = null;
   private phone: MediaQueryList | null = null;
-  private wide: MediaQueryList | null = null;
   private upright: MediaQueryList | null = null;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
@@ -876,8 +880,14 @@ export class Shell {
     }
     this.phone = window.matchMedia(PHONE_QUERY);
     this.phone.addEventListener('change', () => this.refresh());
-    this.wide = window.matchMedia(WIDE_QUERY);
-    this.wide.addEventListener('change', () => this.refresh());
+    // The three columns depend on both sizes: drawn again when the layout changes
+    let layout = this.homeLayout;
+    window.addEventListener('resize', () => {
+      const now = this.homeLayout;
+      if (now === layout) return;
+      layout = now;
+      this.refresh();
+    });
     this.upright = window.matchMedia(UPRIGHT_QUERY);
     this.upright.addEventListener('change', () => this.refresh());
     this.showLayout();
@@ -1794,7 +1804,14 @@ export class Shell {
   /** The home page's layout for the window's size and orientation. */
   private get homeLayout(): HomeLayout {
     if (this.isPhone) return 'phone';
-    if (this.wide?.matches ?? true) return 'wide';
+    if (typeof window === 'undefined') return 'wide';
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // The frame as the page draws it (`site.css`): as tall as the window, at most 680 px wide,
+    // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
+    // much itself
+    const frame = Math.min(680, ((h - WIDE_ROOM_Y) * 420) / 520, w - WIDE_ROOM_X - 2 * WIDE_BOARD);
+    if (h >= 640 && frame >= WIDE_BOARD) return 'wide';
     return this.upright?.matches ? 'tall' : 'short';
   }
 
