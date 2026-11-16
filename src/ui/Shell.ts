@@ -697,10 +697,16 @@ const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
 /** The rewards' picture: item 8, "Etoile des neiges". */
 const STAR: Icon = { item: 8 };
 
-/** The page's width at most where the site takes the phone layout (`src/site.css`). */
-const PHONE_QUERY = '(max-width: 640px)';
-/** The page's width at least where the notebook has its own column (`src/site.css`). */
-const WIDE_QUERY = '(min-width: 1100px)';
+/**
+ * The home page's layouts (`src/site.css`, after the canvas's note on them): three columns
+ * from 1280 px wide; from 600 to 1279 px, upright, the frame at its own size beside the
+ * notebook and the modes across under them; lying, the frame as tall as the screen beside the
+ * modes, the notebook folded into buttons; under 600 px, the phone's.
+ */
+type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
+const PHONE_QUERY = '(max-width: 599px)';
+const WIDE_QUERY = '(min-width: 1280px)';
+const UPRIGHT_QUERY = '(orientation: portrait)';
 
 type QuestTab = 'progress' | 'done' | 'all';
 type FridgeFilter = 'all' | 'almost' | 'never';
@@ -795,6 +801,7 @@ export class Shell {
   private dom: SiteDom | null = null;
   private phone: MediaQueryList | null = null;
   private wide: MediaQueryList | null = null;
+  private upright: MediaQueryList | null = null;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
@@ -864,6 +871,8 @@ export class Shell {
     this.phone.addEventListener('change', () => this.refresh());
     this.wide = window.matchMedia(WIDE_QUERY);
     this.wide.addEventListener('change', () => this.refresh());
+    this.upright = window.matchMedia(UPRIGHT_QUERY);
+    this.upright.addEventListener('change', () => this.refresh());
     this.showLayout();
   }
 
@@ -1768,6 +1777,13 @@ export class Shell {
     return this.phone?.matches ?? false;
   }
 
+  /** The home page's layout for the window's size and orientation. */
+  private get homeLayout(): HomeLayout {
+    if (this.isPhone) return 'phone';
+    if (this.wide?.matches ?? true) return 'wide';
+    return this.upright?.matches ? 'tall' : 'short';
+  }
+
   /** Builds the page of the current screen around (or over) the frame. */
   private renderPage(): void {
     this.showLayout();
@@ -1927,10 +1943,11 @@ export class Shell {
         this.img({ clip: 'hammer_player' }, 'igor-peek'),
       ),
     );
-    // Narrower screens have one column: the notebook goes under the modes
-    if (this.wide?.matches ?? true) fill(d.book, this.notebook());
-    else d.modes.append(this.notebook());
-    fill(d.below, this.keysStrip());
+    // Lying screens under 1280 px: the notebook folds into buttons under the modes, and the
+    // keys are left to the help dialog ("?")
+    const layout = this.homeLayout;
+    fill(d.book, layout === 'short' ? this.notebookFolded() : this.notebook());
+    if (layout === 'wide') fill(d.below, this.keysStrip());
   }
 
   /** The modes and the intro, as cards: icon, name, short text (not on a phone), padlock. */
@@ -2164,6 +2181,52 @@ export class Shell {
         },
         svgIcon(ICON.gear, { size: 20 }),
         t.settings,
+      ),
+    );
+  }
+
+  /** The notebook folded: a button each for the quests and the fridge, and the settings. */
+  private notebookFolded(): HTMLElement {
+    const t = this.t;
+    const c = this.counts();
+    const btn = (screen: 'quests' | 'fridge', icon: Icon, [have, all]: [number, number]) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'fold-btn',
+          'data-nav': `tab:${screen}`,
+          onclick: () => (screen === 'quests' ? this.showQuests() : this.showFridge()),
+        },
+        this.img(icon, 'fold-art'),
+        h(
+          'span',
+          { class: 'fold-text' },
+          h('span', { class: 'tile-name' }, t[screen]),
+          h(
+            'span',
+            { class: 'fold-count' },
+            this.bar(all > 0 ? have / all : 0, screen === 'quests' ? 'progress' : 'fridge'),
+            h('span', null, `${have} / ${all}`),
+          ),
+        ),
+      );
+    return h(
+      'nav',
+      { class: 'book-fold', 'aria-label': t.book },
+      btn('quests', { item: 20 }, c.quests),
+      btn('fridge', { item: 1018 }, c.fridge),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-round fold-gear',
+          'aria-label': t.settings,
+          title: t.settings,
+          'data-nav': 'settings',
+          onclick: () => this.showSettings(),
+        },
+        svgIcon(ICON.gear, { size: 22 }),
       ),
     );
   }
