@@ -85,8 +85,7 @@ export function inspect(): string[] {
     const ok =
       s.hasAttribute('data-scroll') ||
       s.matches('.site-page.is-scrolling, .site-side.is-scrolling') ||
-      ((phone || document.body.dataset.layout === 'tall') &&
-        s.matches('.site-page, .app-container'));
+      (phone && s.matches('.site-page, .app-container'));
     if (!ok) out.push(`scrolls: ${label(s)} (${s.clientHeight}/${s.scrollHeight})`);
   }
   if (scrollers.length > 1) out.push(`${scrollers.length} areas scroll`);
@@ -106,16 +105,14 @@ export function inspect(): string[] {
       const r = rectOf(el);
       const inScroll =
         el.parentElement?.closest('[data-scroll], .is-scrolling') ??
-        (phone || document.body.dataset.layout === 'tall'
-          ? el.closest('.site-page, .app-container')
-          : null);
+        (phone ? el.closest('.site-page, .app-container') : null);
       // The main button stays in view everywhere (pinned where the page scrolls)
       if (!inScroll || el.matches('.btn-start')) {
         if (r.left < -1 || r.right > W + 1 || r.top < -1 || r.bottom > H + 1) {
           out.push(`outside the window: ${label(el)} ${fmtRect(r)}`);
           continue;
         }
-        if (!el.closest('.site-tabbar') && r.bottom > bottom + 1) {
+        if (!el.closest('.site-tabbar, .tabbar-inner') && r.bottom > bottom + 1) {
           out.push(`under the tab bar: ${label(el)}`);
         }
       }
@@ -474,9 +471,26 @@ export async function checkPlaying(opts: { touch?: boolean } = {}): Promise<stri
   if (opts.touch) root.classList.add('touch');
   try {
     s.chosen = 'solo';
+    s.showMenu();
+    await wait(300);
+    const frame = document.getElementById('game-canvas-container');
+    const before = frame?.getBoundingClientRect();
+    // (A phone's frame makes room for the touch controls after the fade: not checked there)
+    const framed = document.body.dataset.layout === 'framed' && window.innerWidth >= 600;
     s.startChosen();
-    await wait(3000);
-    return inspect();
+    // The fade waits for the level (up to 2 s), then the frame takes its playing size
+    await wait(4500);
+    const out = inspect();
+    const after = frame?.getBoundingClientRect();
+    // With the site inside the frame, the game starts in the frame as it is (around the frame,
+    // it grows into its playing size after the fade)
+    const shown = framed && before && before.width > 0;
+    if (shown && after && Math.abs(after.height - before.height) > 2) {
+      out.push(
+        `frame resized as the game started: ${Math.round(before.height)} -> ${Math.round(after.height)}`,
+      );
+    }
+    return out;
   } finally {
     session.stop?.();
     s.showMenu();

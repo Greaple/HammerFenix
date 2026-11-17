@@ -612,12 +612,13 @@ html.touch .btn-back {
      height if needed (`Shell.fitBoards`).
    - short: a lying window too narrow for that: the frame as tall as the window, the modes
      beside it, the notebook folded into buttons under them.
-   - tall: an upright window: the frame at its own size beside the notebook, the modes across
-     under them; the page scrolls.
-   - phone: under 600 px (the phone section below). */
+   - land: under 480 px high, the modes without the frame.
+   - framed: any other window (phones and tablets upright, narrow windows): the whole site
+     inside the frame (the Framed section below). */
 
 body[data-page='home'] .touch-controls,
 body[data-page='page'] .touch-controls,
+body[data-page='framed'] .touch-controls,
 body[data-page='intro'] .touch-controls {
   display: none !important;
 }
@@ -952,94 +953,42 @@ body[data-page='home'][data-layout='land'] .book-fold .fold-gear {
   align-self: flex-end;
 }
 
-/* Tall: the frame at its own size beside the notebook, the modes across below; the page scrolls */
-body[data-page='home'][data-layout='tall'] .app-container {
-  overflow-y: auto;
-}
-
-body[data-page='home'][data-layout='tall'] .app-main {
-  flex: none;
-  display: grid;
-  container-type: inline-size;
-  /* The frame leaves the modes board its height under it (about 620 px with the top bar) */
-  grid-template-columns: minmax(0, min(432px, max(260px, (100dvh - 620px) * 420 / 520))) minmax(
-      260px,
-      1fr
-    );
-  grid-template-areas:
-    'frame book'
-    'modes modes';
-  align-items: start;
-  gap: 44px 24px;
-  padding-top: 30px;
-}
-
-body[data-page='home'][data-layout='tall'] .site-left {
-  display: block;
-  grid-area: modes;
-  container-type: inline-size;
-}
-
-body[data-page='home'][data-layout='tall'] .game-wrapper {
-  grid-area: frame;
-  width: 100%;
-}
-
-body[data-page='home'][data-layout='tall'] .site-right {
-  display: block;
-  grid-area: book;
-}
-
-body[data-page='home'][data-layout='tall'] .game-canvas-container {
-  width: 100%;
-}
-
-body[data-page='home'][data-layout='tall'] .site-below {
-  display: none;
-}
-
-/* Short and tall: the modes board follows its own width (at most four card columns; a narrow
-   board keeps the names only; a wide one has the text and options left, the main button right) */
-body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-grid {
+/* Short: the modes board follows its own width (at most four card columns; a narrow board keeps
+   the names only; a wide one has the text and options left, the main button right) */
+body[data-page='home'][data-layout='short'] .board-modes .mode-grid {
   grid-template-columns: repeat(auto-fill, minmax(max(168px, (100% - 18px) / 4), 1fr));
 }
 
 @container (max-width: 559px) {
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-short {
+  body[data-page='home'][data-layout='short'] .board-modes .mode-short {
     display: none;
   }
 
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-card {
+  body[data-page='home'][data-layout='short'] .board-modes .mode-card {
     min-height: 44px;
   }
 }
 
 @container (min-width: 600px) {
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .mode-detail {
+  body[data-page='home'][data-layout='short'] .board-modes .mode-detail {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 250px;
     gap: 10px 22px;
     padding: 12px 4px 0;
   }
 
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .mode-detail > * {
+  body[data-page='home'][data-layout='short'] .mode-detail > * {
     grid-column: 1;
   }
 
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .board-modes .opt-grid {
+  body[data-page='home'][data-layout='short'] .board-modes .opt-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   }
 
-  body[data-page='home']:is([data-layout='tall'], [data-layout='short']) .mode-detail > .btn-start {
+  body[data-page='home'][data-layout='short'] .mode-detail > .btn-start {
     grid-column: 2;
     grid-row: 1 / span 8;
     align-self: end;
-  }
-
-  /* Tall: the page scrolls, the main button stays in view at its foot */
-  body[data-page='home'][data-layout='tall'] .mode-detail > .btn-start {
-    position: sticky;
-    bottom: 12px;
   }
 }
 
@@ -2985,6 +2934,361 @@ html.touch .pager .btn-round {
 }
 
 /* ========================================================
+   Framed: the whole site inside the game frame (phones and tablets upright, narrow windows),
+   as the original game had its menus
+   ======================================================== */
+
+/* The frame at its playing size (room kept for the touch controls, or the toolbar), so starting
+   a game never resizes it; but a phone gives the menus the whole width (the frame makes room
+   for the touch controls after the fade into a game) */
+@media (max-width: 599px) {
+  body[data-page='framed'] {
+    --below-frame: 0px;
+  }
+}
+
+html:not(.touch) body[data-page='framed'] .game-canvas-container {
+  width: min(760px, 100cqw - 100px, max(240px, var(--frame-h) * 420 / 520));
+}
+
+/* Laid out at the frame's size over its scale (`Shell.scaleFrameSite`): `--lw` x `--lh`, drawn
+   `--k` times larger. Sizes are fixed here: the frame's height, not the window's, is the room */
+.frame-site {
+  --fs-h: 20px;
+  --fs-l: 15px;
+  --fs-b: 13px;
+  --gap: 10px;
+  --pad: 12px;
+  --plank-fs: 28px;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--lw, 100%);
+  height: var(--lh, 100%);
+  zoom: var(--k, 1);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--f-body);
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.frame-site button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Fading into a game: the site goes with the village */
+.frame-overlay.is-fading > * {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+
+/* The page's one scrolling area, the main button under it, the tab bar at the bottom */
+.frame-scroll {
+  flex: 1 1 auto;
+  padding: 0 8px 10px;
+}
+
+.frame-action {
+  flex: none;
+  padding: 4px 10px 8px;
+}
+
+.frame-action .btn-start {
+  width: 100%;
+  height: 48px;
+  font-size: 20px;
+}
+
+.frame-site .tabbar-inner {
+  flex: none;
+  height: 62px;
+  padding: 4px 6px 6px;
+}
+
+/* Home: the village and the logo above the modes board, which sits at the bottom */
+.frame-home {
+  box-sizing: border-box;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-top: calc(var(--lh, 520px) * 0.2);
+}
+
+.board-phone {
+  padding: 30px 10px 12px;
+  gap: 10px;
+}
+
+.board-phone .mode-grid {
+  gap: 6px;
+}
+
+.board-phone .mode-card {
+  min-height: 44px;
+  padding: 4px 18px 4px 6px;
+}
+
+.board-phone .mode-icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* (No hyphens: the game's font has no hyphen to draw) */
+.board-phone .mode-name {
+  font-size: 13px;
+  overflow-wrap: break-word;
+}
+
+/* A small phone's frame: the longest names still on one line */
+@container frame (max-width: 360px) {
+  .board-phone .mode-card {
+    gap: 6px;
+    padding: 4px 16px 4px 5px;
+  }
+
+  .board-phone .mode-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .board-phone .mode-name {
+    font-size: 12px;
+  }
+}
+
+.board-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail-name {
+  font: 17px/1.2 var(--f-label);
+  color: var(--wood);
+}
+
+.detail-short {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.board-detail .mode-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.board-detail .opt {
+  min-height: 40px;
+}
+
+/* The tab bar: play, quests, fridge, settings */
+.tabbar-inner {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--wood);
+  border-top: 4px solid var(--wood-dark);
+  box-shadow: 0 -4px 10px rgba(var(--night), 0.25);
+}
+
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  border: none;
+  background: none;
+  color: var(--gold-dull) !important;
+  font: 13px/1 var(--f-label) !important;
+}
+
+.tab.is-current {
+  color: var(--focus) !important;
+}
+
+.tab-art {
+  width: 30px;
+  height: 30px;
+}
+
+/* The tab bar leads home: no Back on the pages it reaches (the controls page keeps its own,
+   back to the settings) */
+.frame-site :is(.board-quests, .board-fridge, .board-settings) .btn-back {
+  display: none;
+}
+
+.frame-site :is(.board-quests, .board-fridge, .board-settings) .page-bar:empty,
+.frame-site .board-settings > .page-bar {
+  display: none;
+}
+
+/* Pages in the frame: one column, as tall as their content; the frame's area scrolls */
+.frame-site .board-page,
+.frame-site .board-page.is-full,
+.frame-site .result {
+  width: auto;
+  max-width: none;
+  height: auto;
+  max-height: none;
+  margin: calc(var(--plank-over) + 6px) 0 0;
+}
+
+.frame-site .board-page {
+  padding: calc(var(--plank-over) + 8px) 10px 12px;
+}
+
+.frame-site .quest-split,
+.frame-site .fridge-split {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.frame-site .fridge-inside {
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-site .shelf-row {
+  max-height: none;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  row-gap: 2px;
+}
+
+@container frame (min-width: 480px) {
+  .frame-site .shelf-row {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.frame-site .cell {
+  height: 72px;
+}
+
+.frame-site .cell .art {
+  width: 50px;
+  height: 50px;
+}
+
+.frame-site .found {
+  min-height: 0 !important;
+}
+
+.frame-site .slot {
+  flex-wrap: wrap;
+  padding: 4px 2px;
+}
+
+.frame-site .plank {
+  padding: 6px 18px 5px;
+}
+
+.frame-site .quest-detail {
+  padding: 12px;
+}
+
+.frame-site .fridge-count {
+  flex: 1 1 100%;
+  font-size: 15px;
+}
+
+.frame-site .fridge-count .bar.wide {
+  flex: 1;
+  width: auto;
+}
+
+/* The chosen item stays in view at the foot of the frame's area, without its family */
+.frame-site .item-card {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 4px;
+  align-items: center;
+  box-shadow:
+    0 2px 0 rgba(95, 69, 44, 0.22),
+    0 -4px 16px rgba(var(--night), 0.18);
+}
+
+.frame-site .item-card .item-disc {
+  grid-row: span 3;
+  width: 56px;
+  height: 56px;
+}
+
+.frame-site .item-card h2,
+.frame-site .item-status {
+  text-align: left;
+}
+
+.frame-site .item-status {
+  font-size: 12px;
+}
+
+.frame-site .item-card .family {
+  display: none;
+}
+
+.frame-site .need-grid {
+  --need: 80px;
+  gap: 8px;
+}
+
+.frame-site .need-art {
+  width: 40px;
+  height: 40px;
+}
+
+.frame-site .check-grid,
+.frame-site .set-pair {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.frame-site .result {
+  --pic: 200px;
+}
+
+.frame-site .result-title {
+  font-size: 36px;
+}
+
+.frame-site .ctl-row {
+  grid-template-columns: minmax(64px, 1fr) repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.frame-site .ctl-move {
+  font-size: 13px;
+  overflow-wrap: break-word;
+}
+
+.frame-site .ctl-head {
+  font-size: 12px;
+}
+
+/* ========================================================
    Phone
    ======================================================== */
 
@@ -2995,346 +3299,6 @@ html.touch .pager .btn-round {
 
   .credit {
     display: none;
-  }
-
-  body[data-page='home'] .logo {
-    display: block;
-  }
-
-  /* Home: no frame (the game takes the whole screen once it starts). The modes board takes the
-     width; the page scrolls under Start, pinned above the tab bar */
-  body[data-page='home'] .app-container {
-    overflow-y: auto;
-  }
-
-  body[data-page='home'] .app-main {
-    flex: none;
-    display: block;
-    /* As tall as its content, so the room left for Start is under the board */
-    container-type: inline-size;
-    padding-top: 30px;
-    padding-bottom: calc(160px + env(safe-area-inset-bottom));
-  }
-
-  /* (Once the shell has drawn the home page: the frame shows the loading screen before) */
-  body[data-page='home'][data-layout='phone'] .game-wrapper,
-  body[data-page='home'] .site-below,
-  body[data-page='home'] .site-right {
-    display: none;
-  }
-
-  body[data-page='home'] .site-left {
-    display: block;
-    max-width: 480px;
-    margin: 0 auto;
-  }
-
-  .board-phone {
-    padding: 30px 10px 12px;
-    gap: 10px;
-  }
-
-  .board-phone .mode-grid {
-    gap: 6px;
-  }
-
-  .board-phone .mode-card {
-    min-height: 44px;
-    padding: 4px 18px 4px 6px;
-  }
-
-  .board-phone .mode-icon {
-    width: clamp(24px, 7.5vw, 30px);
-    height: clamp(24px, 7.5vw, 30px);
-  }
-
-  /* (No hyphens: the game's font has no hyphen to draw) */
-  .board-phone .mode-name {
-    font-size: clamp(12px, 3.6vw, 14px);
-    overflow-wrap: break-word;
-  }
-
-  .board-detail {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .detail-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 10px;
-  }
-
-  .detail-name {
-    font: 17px/1.2 var(--f-label);
-    color: var(--wood);
-  }
-
-  .detail-short {
-    font-size: 12px;
-    color: var(--ink-soft);
-  }
-
-  .board-detail .mode-desc {
-    font-size: 12px;
-    line-height: 1.45;
-  }
-
-  .board-detail .opt {
-    min-height: 40px;
-  }
-
-  /* The main button (Start, Continue) stays in view above the tab bar, whatever the page's
-     scroll; the page leaves room for it under its content */
-  .board-detail .btn-start,
-  .board-result .btn-continue {
-    height: 50px;
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    max-width: 456px;
-    margin: 0 auto;
-    bottom: calc(84px + env(safe-area-inset-bottom));
-    z-index: 4;
-    box-shadow:
-      0 4px 0 var(--wood-dark),
-      0 6px 18px rgba(var(--night), 0.35);
-  }
-
-  body[data-screen='result'] .site-page::after {
-    height: calc(160px + env(safe-area-inset-bottom)) !important;
-  }
-
-  body[data-page='home'] .site-below {
-    display: flex;
-    justify-content: center;
-  }
-
-  /* The tab bar: play, quests, fridge, settings */
-  body[data-page='home'] .site-tabbar,
-  body[data-page='page'] .site-tabbar {
-    display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 5;
-  }
-
-  .tabbar-inner {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    height: calc(72px + env(safe-area-inset-bottom));
-    padding: 6px 8px calc(10px + env(safe-area-inset-bottom));
-    background: var(--wood);
-    border-top: 4px solid var(--wood-dark);
-    box-shadow: 0 -4px 10px rgba(var(--night), 0.25);
-  }
-
-  .tab {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 2px;
-    border: none;
-    background: none;
-    color: var(--gold-dull) !important;
-    font: 14px/1 var(--f-label) !important;
-  }
-
-  .tab.is-current {
-    color: var(--focus) !important;
-  }
-
-  .tab-art {
-    width: 32px;
-    height: 32px;
-  }
-
-  /* The page scrolls as one, its board at its own height, one column */
-  body[data-page='page'] .site-page {
-    display: block;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding-top: 36px;
-    padding-bottom: 0;
-  }
-
-  .board-page,
-  .board-page.is-full,
-  .result {
-    height: auto;
-    max-height: none;
-    margin: 0 auto;
-  }
-
-  .quest-split,
-  .fridge-split {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .fridge-inside {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .shelf-row {
-    max-height: none;
-  }
-
-  .found {
-    min-height: 0 !important;
-  }
-
-  .slot {
-    flex-wrap: wrap;
-    padding: 4px 2px;
-  }
-
-  /* Room under the page for the tab bar (a spacer: padding would offset the sticky card) */
-  body[data-page='page'] .site-page::after {
-    content: '';
-    display: block;
-    height: calc(96px + env(safe-area-inset-bottom));
-  }
-
-  .board-page {
-    padding: 40px 14px 18px;
-  }
-
-  .plank {
-    padding: 6px 18px 5px;
-  }
-
-  .plank h1 {
-    font-size: 30px;
-  }
-
-  .plank-art {
-    width: 36px;
-    height: 36px;
-  }
-
-  .shelf-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    row-gap: 2px;
-  }
-
-  .cell {
-    height: 76px;
-  }
-
-  .cell .art {
-    width: 52px;
-    height: 52px;
-  }
-
-  .quest-detail {
-    position: static;
-    padding: 14px;
-  }
-
-  .fridge-count {
-    flex: 1 1 100%;
-    font-size: 15px;
-  }
-
-  .fridge-count .bar.wide {
-    flex: 1;
-    width: auto;
-  }
-
-  /* The chosen item stays in view above the tab bar, without its family */
-  .item-card {
-    position: sticky;
-    top: auto;
-    bottom: calc(84px + env(safe-area-inset-bottom));
-    z-index: 2;
-    max-width: none;
-    padding: 10px 12px;
-    display: grid;
-    grid-template-columns: 64px minmax(0, 1fr);
-    column-gap: 12px;
-    row-gap: 4px;
-    align-items: center;
-    box-shadow:
-      0 2px 0 rgba(95, 69, 44, 0.22),
-      0 -4px 16px rgba(var(--night), 0.18);
-  }
-
-  .item-card .item-disc {
-    grid-row: span 3;
-    width: 64px;
-    height: 64px;
-  }
-
-  .item-disc .art {
-    width: 48px;
-    height: 48px;
-  }
-
-  .item-card h2,
-  .item-status {
-    text-align: left;
-  }
-
-  .item-status {
-    font-size: 12px;
-  }
-
-  .item-card .family {
-    display: none;
-  }
-
-  .quest-list {
-    max-width: none;
-  }
-
-  .need-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 8px;
-  }
-
-  .need {
-    padding: 8px 4px;
-  }
-
-  .need-art,
-  .need-art .art {
-    width: 44px;
-    height: 44px;
-  }
-
-  .detail-title h2,
-  .item-card h2 {
-    font-size: 20px;
-  }
-
-  .check-grid,
-  .sound-rows {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .result-title {
-    font-size: 40px;
-  }
-
-  .melted {
-    width: 240px;
-  }
-
-  .result-logo {
-    width: 280px;
-  }
-
-  .ctl-row {
-    grid-template-columns: minmax(64px, 1fr) repeat(3, minmax(0, 1fr));
-    gap: 4px;
   }
 
   /* While playing: pause, the mode and the sound in the top bar */

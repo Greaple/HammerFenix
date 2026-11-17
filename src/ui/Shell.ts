@@ -701,13 +701,14 @@ const SETTINGS_ART: Icon = { item: 1208 };
 const STAR: Icon = { item: 8 };
 
 /**
- * The home page's layouts (`body[data-layout]`, `src/site.css`, after the canvas's note on
- * them): three columns while each board keeps `WIDE_BOARD` px and the frame `WIDE_FRAME` px
- * (from about 1190 x 580); otherwise, upright, the frame at its own size beside the notebook
- * and the modes across under them; lying, the frame as tall as the window beside the modes, the
- * notebook folded into buttons; under 600 px wide, the phone's.
+ * The site's layouts (`body[data-layout]`, `src/site.css`): three columns while each board
+ * keeps `WIDE_BOARD` px and the frame `WIDE_FRAME` px (from about 1190 x 580); a lying window
+ * with the frame at its full height and `SHORT_BOARD` px beside it, the frame beside the modes
+ * (`short`); a very short window, the modes without the frame (`land`); any other (phones and
+ * tablets upright, narrow windows), the whole site inside the frame (`framed`), as the original
+ * game had its menus.
  */
-type HomeLayout = 'wide' | 'tall' | 'short' | 'land' | 'phone';
+type HomeLayout = 'wide' | 'short' | 'land' | 'framed';
 /**
  * Under this height a window has no room for the frame beside the modes (a phone held
  * sideways, a laptop window made very short): the home page is the modes alone (`land`).
@@ -715,7 +716,6 @@ type HomeLayout = 'wide' | 'tall' | 'short' | 'land' | 'phone';
 const LAND_H = 480;
 /** Under this height the short layout folds the locked options into one line. */
 const FOLD_H = 600;
-const PHONE_QUERY = '(max-width: 599px)';
 /** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
 const MIN_FIT = 0.82;
 /** `Shell.fitPage`'s zoom steps, once the board is at its densest. */
@@ -727,7 +727,12 @@ const WIDE_BOARD = 360;
 const WIDE_FRAME = 380;
 const WIDE_ROOM_X = 32 + 2 * 28;
 const WIDE_ROOM_Y = 64 + 24 + 24;
-const UPRIGHT_QUERY = '(orientation: portrait)';
+/** The modes board beside a full-height frame (`short`), and the room around them. */
+const SHORT_BOARD = 500;
+const SHORT_ROOM_X = 32 + 24;
+const SHORT_ROOM_Y = 64 + 12 + 24;
+/** The frame's scale for the site inside it (`framed`): never smaller, at most this larger. */
+const FRAME_K_MAX = 1.35;
 
 type QuestTab = 'progress' | 'done' | 'all';
 type FridgeFilter = 'all' | 'almost' | 'never';
@@ -823,8 +828,6 @@ export class Shell {
   /** The game's drawings as pictures for the pages, once the page gave a renderer. */
   private art: ItemArt | null = null;
   private dom: SiteDom | null = null;
-  private phone: MediaQueryList | null = null;
-  private upright: MediaQueryList | null = null;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
@@ -890,8 +893,8 @@ export class Shell {
     for (const box of Object.values(dom) as HTMLElement[]) {
       box.addEventListener('focusin', (e: FocusEvent) => this.onFocusIn(e.target as HTMLElement));
     }
-    this.phone = window.matchMedia(PHONE_QUERY);
-    this.phone.addEventListener('change', () => this.refresh());
+    // The site inside the frame is laid out at the frame's size over its scale (`framed`)
+    new ResizeObserver(() => this.scaleFrameSite()).observe(dom.overlay);
     // The three columns depend on both sizes: drawn again when the layout changes, and the
     // boards fitted again to their columns
     let layout = this.homeKey;
@@ -917,9 +920,23 @@ export class Shell {
       this.fitBoards();
       this.fitPage();
     });
-    this.upright = window.matchMedia(UPRIGHT_QUERY);
-    this.upright.addEventListener('change', () => this.refresh());
     this.showLayout();
+  }
+
+  /**
+   * The size the site inside the frame is laid out at (`--lw`, `--lh`) and its scale (`--k`):
+   * the frame's size on a phone, a tablet's frame drawn larger, at most `FRAME_K_MAX` times.
+   */
+  private scaleFrameSite(): void {
+    const box = this.dom?.overlay;
+    if (!box) return;
+    const w = box.clientWidth;
+    const h = box.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    const k = Math.max(1, Math.min(FRAME_K_MAX, w / 420));
+    box.style.setProperty('--k', String(k));
+    box.style.setProperty('--lw', `${w / k}px`);
+    box.style.setProperty('--lh', `${h / k}px`);
   }
 
   get visible(): boolean {
@@ -1383,7 +1400,7 @@ export class Shell {
    * that closes above the one pressed would otherwise pull it up.
    */
   private renderKeeping(key: string): void {
-    const page = this.dom?.page;
+    const page = this.siteKind() === 'framed' ? this.dom?.overlay : this.dom?.page;
     const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
     const before = find()?.getBoundingClientRect().top;
     // (`render` scrolls a focus moved by the keys into view: done again after the shift below)
@@ -1404,6 +1421,7 @@ export class Shell {
     this.hintShown = hint !== '';
     this.dom?.modes.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
     this.dom?.below.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.dom?.overlay.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
     this.fitBoards();
   }
 
@@ -1657,10 +1675,10 @@ export class Shell {
       this.root.addChild(this.introLayer);
       this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
     } else {
-      // The village and the logo: the home page's frame, and what the frame shows if a page
-      // leaves it on screen
+      // The village and the logo: the home page's frame; the pages inside the frame
+      // (`framed`) have the village alone behind them, their own title over it
       this.drawBackground();
-      this.drawTitle(2, 290);
+      if (this.screen === 'menu') this.drawTitle(2, 290);
     }
     this.renderPage();
   }
@@ -1826,45 +1844,61 @@ export class Shell {
     }
   }
 
+  /** `pageKind`, with the whole site inside the frame on screens too small for it around. */
+  private siteKind(): string {
+    const kind = this.pageKind();
+    return (kind === 'home' || kind === 'page') && this.compact ? 'framed' : kind;
+  }
+
   /** Sets the page's layout and empties what the current screen does not use. */
   private showLayout(): void {
     if (typeof document === 'undefined') return;
     const body = document.body;
-    body.dataset.page = this.pageKind();
+    body.dataset.page = this.siteKind();
     body.dataset.screen = this.screen ?? 'playing';
     const d = this.dom;
     if (!d) return;
     body.dataset.layout = this.homeLayout;
     if (this.screen === null) {
-      for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) fill(b);
+      // (The site inside the frame fades out with the village: emptied once that is over)
+      const fading = this.fadeReady !== null;
+      for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) {
+        if (!(fading && b === d.overlay)) fill(b);
+      }
+      d.overlay.classList.toggle('is-fading', fading);
+    } else {
+      d.overlay.classList.remove('is-fading');
     }
     if (this.screen === null || this.screen === 'sound') this.fillChips();
     else fill(d.chips);
   }
 
-  private get isPhone(): boolean {
-    return this.phone?.matches ?? false;
+  /** Whether the site is inside the frame (`framed`): the pages take one column and scroll. */
+  private get compact(): boolean {
+    return this.homeLayout === 'framed';
   }
 
   /** The home page's layout for the window's size and orientation. */
   private get homeLayout(): HomeLayout {
-    if (this.isPhone) return 'phone';
     if (typeof window === 'undefined') return 'wide';
     const w = window.innerWidth;
     const h = window.innerHeight;
-    if (h < LAND_H) return 'land';
+    if (h < LAND_H && w >= 600) return 'land';
     // The frame as the page draws it (`site.css`): as tall as the window, at most 680 px wide,
     // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
     // much itself
     const frame = Math.min(680, ((h - WIDE_ROOM_Y) * 420) / 520, w - WIDE_ROOM_X - 2 * WIDE_BOARD);
     if (frame >= WIDE_FRAME) return 'wide';
-    return this.upright?.matches ? 'tall' : 'short';
+    // The frame as tall as the window, and the modes board beside it
+    const full = ((h - SHORT_ROOM_Y) * 420) / 520;
+    if (w > h && w - SHORT_ROOM_X - full >= SHORT_BOARD) return 'short';
+    return 'framed';
   }
 
   /** Whether the home page folds the locked options into one line, to keep Start in view. */
   private get homeFold(): boolean {
     const layout = this.homeLayout;
-    if (layout === 'land' || layout === 'phone') return true;
+    if (layout === 'land' || layout === 'framed') return true;
     return layout === 'short' && typeof window !== 'undefined' && window.innerHeight < FOLD_H;
   }
 
@@ -1878,46 +1912,94 @@ export class Shell {
     this.showLayout();
     const d = this.dom;
     if (!d || !this.screen) return;
+    const framed = this.siteKind() === 'framed';
     // The page's scrolling area keeps its place when the same page is drawn again
-    const same = d.page.dataset.screen === this.screen;
-    const kept = same ? (d.page.querySelector('[data-scroll]')?.scrollTop ?? 0) : 0;
+    const host = framed ? d.overlay : d.page;
+    const same = host.dataset.screen === this.screen;
+    const kept = same ? (host.querySelector('[data-scroll]')?.scrollTop ?? 0) : 0;
     const empty = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
     for (const b of empty) fill(b);
+    let page: HTMLElement | null = null;
     switch (this.screen) {
       case 'menu':
-        this.pageHome(d);
+        if (framed) page = this.framedHome();
+        else this.pageHome(d);
         break;
       case 'quests':
-        fill(d.page, this.pageQuests());
+        page = this.pageQuests();
         break;
       case 'fridge':
-        fill(d.page, this.pageFridge());
+        page = this.pageFridge();
         break;
       case 'settings':
-        fill(d.page, this.pageSettings());
+        page = this.pageSettings();
         break;
       case 'controls':
-        fill(d.page, this.pageControls());
+        page = this.pageControls();
         break;
       case 'result':
-        fill(d.page, this.time ? this.pageTimeResult(this.time) : this.pageResult());
+        page = this.time ? this.pageTimeResult(this.time) : this.pageResult();
         break;
       case 'sound':
         fill(d.overlay, this.panelSound());
         break;
     }
-    if (this.screen !== 'sound' && this.screen !== 'intro' && this.isPhone) {
-      fill(d.tabbar, this.tabbar());
-    }
-    if (this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings') {
-      if (d.page.dataset.screen !== this.screen) d.page.scrollTop = 0;
-    }
-    d.page.dataset.screen = this.screen;
-    const area = d.page.querySelector('[data-scroll]');
+    if (framed) this.scaleFrameSite();
+    if (page && framed) fill(d.overlay, this.frameSite(page));
+    else if (page) fill(d.page, page);
+    d.overlay.dataset.screen = framed ? this.screen : '';
+    d.page.dataset.screen = framed ? '' : this.screen;
+    const area = host.querySelector('[data-scroll]');
     if (area) area.scrollTop = kept;
     this.fitBoards();
     this.fitPage();
     this.applyFocus();
+  }
+
+  /**
+   * The site inside the frame (`framed`): the page in a scrolling area, its main button (Start,
+   * Continue) pinned under it, and the tab bar at the bottom, laid out at the frame's size over
+   * its scale (`scaleFrameSite`).
+   */
+  private frameSite(page: HTMLElement): HTMLElement {
+    const main = page.querySelector<HTMLElement>('.btn-start');
+    const action = main ? h('div', { class: 'frame-action' }, main) : null;
+    return h(
+      'div',
+      { class: 'frame-site' },
+      h('div', { class: 'frame-scroll', 'data-scroll': '' }, page),
+      action,
+      this.tabbar(),
+    );
+  }
+
+  /**
+   * The home page inside the frame: the village and the logo (drawn in the frame), the modes
+   * and the chosen mode under them, as the phone's.
+   */
+  private framedHome(): HTMLElement {
+    const t = this.t;
+    this.hintShown = false;
+    const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
+    return h(
+      'div',
+      { class: 'frame-home' },
+      h(
+        'section',
+        { class: 'board board-modes board-phone', 'aria-labelledby': 'modes-h' },
+        this.plank(t.modesTitle, null, 'modes-h', -1.5, 2),
+        h(
+          'div',
+          { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
+          this.modeCards(true),
+        ),
+        h(
+          'div',
+          { class: 'mode-detail board-detail', 'aria-live': 'polite' },
+          this.modeDetail(shown, true),
+        ),
+      ),
+    );
   }
 
   /**
@@ -1929,7 +2011,7 @@ export class Shell {
    */
   private fitPage(): void {
     const page = this.dom?.page;
-    if (!page || this.isPhone || this.pageKind() !== 'page') return;
+    if (!page || this.compact || this.pageKind() !== 'page') return;
     const board = page.querySelector<HTMLElement>(':scope .board-page');
     page.classList.remove('is-scrolling');
     if (!board) return;
@@ -2067,29 +2149,6 @@ export class Shell {
     const t = this.t;
     this.hintShown = false;
     const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
-    if (this.isPhone) {
-      // No frame on a phone (the game takes the whole screen once it starts): the modes and
-      // the chosen mode; the tab bar has the notebook's pages, Start is pinned above it
-      fill(
-        d.modes,
-        h(
-          'section',
-          { class: 'board board-modes board-phone', 'aria-labelledby': 'modes-h' },
-          this.plank(t.modesTitle, null, 'modes-h', -1.5, 2),
-          h(
-            'div',
-            { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
-            this.modeCards(true),
-          ),
-          h(
-            'div',
-            { class: 'mode-detail board-detail', 'aria-live': 'polite' },
-            this.modeDetail(shown, true),
-          ),
-        ),
-      );
-      return;
-    }
     fill(
       d.modes,
       h(
@@ -2672,7 +2731,7 @@ export class Shell {
     ];
     const list = this.questList();
     if (this.questId === null || !list.includes(this.questId)) this.questId = list[0] ?? null;
-    const phone = this.isPhone;
+    const phone = this.compact;
     const none = count('none');
     return h(
       'section',
@@ -2767,7 +2826,7 @@ export class Shell {
     const reqs = q.requirements(id);
     return h(
       'div',
-      { class: 'inset quest-detail', 'aria-live': 'polite', 'data-fit': this.isPhone ? null : '' },
+      { class: 'inset quest-detail', 'aria-live': 'polite', 'data-fit': this.compact ? null : '' },
       h(
         'div',
         { class: 'detail-title' },
@@ -3062,7 +3121,7 @@ export class Shell {
     }
     return h(
       'aside',
-      { class: 'inset item-card', 'aria-live': 'polite', 'data-fit': this.isPhone ? null : '' },
+      { class: 'inset item-card', 'aria-live': 'polite', 'data-fit': this.compact ? null : '' },
       h('div', { class: 'item-disc' }, this.itemImg(id, state)),
       h('h2', null, n > 0 ? this.texts.getItemName(id) : t.unknown),
       h('p', { class: `item-status is-${state}` }, status),
@@ -3501,12 +3560,12 @@ export class Shell {
         banners.length > 0 ? h('div', { class: 'banners' }, banners) : null,
         h(
           'div',
-          { class: 'found', 'data-fit': this.isPhone ? null : '' },
+          { class: 'found', 'data-fit': this.compact ? null : '' },
           h('h2', { class: 'sub-title' }, picks.length > 0 ? t.collected : t.none),
           picks.length > 0
             ? h(
                 'div',
-                { class: 'found-grid', 'data-scroll': this.isPhone ? null : '' },
+                { class: 'found-grid', 'data-scroll': this.compact ? null : '' },
                 picks.map(([id, n]) =>
                   h(
                     'div',

@@ -849,6 +849,15 @@ html[data-input='gamepad'] .touch-controls {
     width: min(760px, 100cqw - 2 * 196px, max(240px, 100cqh * 420 / 520));
   }
 
+  /* The site inside the frame (`framed`) takes the same frame, so a game starts in it */
+  html.touch body[data-page='framed'] {
+    --below-frame: 0px;
+  }
+
+  html.touch body[data-page='framed'] .game-canvas-container {
+    width: min(760px, 100cqw - 2 * 196px, max(240px, 100cqh * 420 / 520));
+  }
+
   html.touch body[data-page='playing'] .touch-pad {
     grid-column: 1;
     grid-row: 1;
