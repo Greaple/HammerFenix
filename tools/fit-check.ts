@@ -121,9 +121,12 @@ export function inspect(): string[] {
           out.push(`under the tab bar: ${label(el)}`);
         }
       }
-      for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      // (A box pinned to the page, a dialog, is not cut by the boxes around it)
+      const loose = getComputedStyle(el).position === 'fixed';
+      for (let a = loose ? null : el.parentElement; a && a !== document.body; a = a.parentElement) {
         // Inside a scrolling area, the area is what is checked
         if (a === inScroll) break;
+        if (getComputedStyle(a).position === 'fixed') break;
         if (!clips(a)) continue;
         const ar = rectOf(a);
         if (
