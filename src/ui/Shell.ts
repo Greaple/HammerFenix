@@ -1987,7 +1987,7 @@ export class Shell {
       site?.querySelector<HTMLElement>(':scope > .board-page, :scope > .result > .board-page');
     if (!box) return;
     delete box.dataset.density;
-    if (box.scrollHeight > box.clientHeight + 1) box.dataset.density = 'compact';
+    if (box.scrollHeight > box.clientHeight) box.dataset.density = 'compact';
   }
 
   /**
