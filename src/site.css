@@ -620,11 +620,6 @@ body[data-page='intro'] .touch-controls {
   display: none !important;
 }
 
-/* No wordmark beside the frame's own logo */
-body[data-page='home'] .logo {
-  display: none;
-}
-
 /* A board taller than its column is scaled down from its top to fit it; one that would get too
    small scrolls instead (`Shell.fitBoards`) */
 body[data-page='home'] .site-side > .board {
@@ -3102,22 +3097,22 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   transition: opacity 0.45s ease;
 }
 
-/* --- Home: the logo (drawn in the frame) over one parchment panel, as the live site's menu:
-   the modes with their short line, the chosen mode's options, the quests and the fridge, and
-   the main button with the settings beside it */
+/* --- Home: one parchment panel over the village, as the live site's menu: the modes with
+   their short line, the chosen mode's text and options, the quests and the fridge, and the
+   main button with the settings beside it (the site's logo is in the top bar) */
 .frame-home {
   position: absolute;
   inset: 0;
-  padding: 100px 10px 10px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 .fs-panel {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 9px;
   /* Clear of the board's inner line (6 px in) */
   padding: 12px 13px 13px;
   border-radius: var(--r-inset);
@@ -3125,28 +3120,28 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 
 .fs-panel .mode-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  gap: 6px;
 }
 
 .fs-panel .mode-card {
-  min-height: 38px;
-  gap: 6px;
-  padding: 3px 18px 3px 5px;
+  min-height: 44px;
+  gap: 7px;
+  padding: 4px 18px 4px 6px;
 }
 
 .fs-panel .mode-icon {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
 }
 
 .fs-panel .mode-name {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.1;
 }
 
 .fs-panel .mode-short {
   font-size: 12px;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .fs-panel .mode-card .lock {
@@ -3163,7 +3158,7 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   border-top: 2px dashed rgba(95, 69, 44, 0.25);
 }
 
-/* The mode's text when it has no options to show (the options say more about it) */
+/* The chosen mode's text: three lines, two when it has options too */
 .fs-detail .mode-desc {
   margin: 0;
   font-size: 12px;
@@ -3176,7 +3171,8 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 }
 
 .fs-detail:has(.mode-options) .mode-desc {
-  display: none;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 .fs-detail :is(.lock-note, .best-time) {
@@ -3247,8 +3243,10 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   font-size: 13px;
 }
 
-/* Denser (`Shell.fitFrame`): the cards keep their name only */
-.frame-home[data-density='compact'] .mode-short {
+/* Denser (`Shell.fitFrame`): the cards keep their name only, the mode's text goes when it has
+   options */
+.frame-home[data-density='compact'] .mode-short,
+.frame-home[data-density='compact'] .fs-detail:has(.mode-options) .mode-desc {
   display: none;
 }
 

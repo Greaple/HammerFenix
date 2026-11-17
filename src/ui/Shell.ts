@@ -21,13 +21,10 @@ import {
   BlurFilter,
   Container,
   Graphics,
-  ImageSource,
   Rectangle,
   type Renderer,
-  Sprite,
   Text,
   TextStyle,
-  Texture,
 } from 'pixi.js';
 import {
   BINDABLE_BUTTONS,
@@ -772,7 +769,6 @@ export class Shell {
   private readonly input: InputController;
   private readonly texts: ShellTexts;
   private readonly profile: Profile;
-  private title: Texture | null = null;
   private screen: Screen | null = null;
   /** When `fadeOut` started (`performance.now()`), while it runs. */
   private fadeFrom: number | null = null;
@@ -869,10 +865,9 @@ export class Shell {
     this.introLayer.on('pointerdown', () => this.intro?.click());
   }
 
-  /** Loads the title logo. */
+  /** Where the site's pictures are (the results' logo and game over picture). */
   async load(baseUrl: string): Promise<void> {
     this.baseUrl = baseUrl;
-    this.title = await loadTexture(`${baseUrl}${TITLE_FILE}`);
   }
 
   /**
@@ -1679,10 +1674,9 @@ export class Shell {
       this.root.addChild(this.introLayer);
       this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
     } else {
-      // The village and the logo: the home page's frame; the pages inside the frame
-      // (`framed`) have the village alone behind them, their own title over it
+      // The village: the home page's frame, and behind the pages inside the frame (`framed`).
+      // No title over it: the site's logo is in the top bar
       this.drawBackground();
-      if (this.screen === 'menu') this.drawTitle(2, 290);
     }
     this.renderPage();
   }
@@ -1709,24 +1703,6 @@ export class Shell {
     layer.cacheAsTexture({ resolution: 1.5 });
     this.root.addChild(layer);
     this.bgLayer = layer;
-  }
-
-  /** The game's title logo, `w` px wide, its top at `y`. */
-  private drawTitle(y: number, w: number): void {
-    if (!this.title) {
-      this.text('Hammerfest', 'title', W / 2, y + 20, { size: 34, color: C.gold, shadow: true });
-      return;
-    }
-    const s = new Sprite(this.title);
-    s.scale.set(w / this.title.width);
-    s.anchor.set(0.5, 0);
-    s.position.set(W / 2, y);
-    // A soft shade, so the thin "Les Cavernes de" reads over the village
-    const shade = new Graphics()
-      .ellipse(W / 2, y + s.height * 0.52, w * 0.5, s.height * 0.36)
-      .fill({ color: 0x0b1530, alpha: 0.45 });
-    shade.filters = [new BlurFilter({ strength: 18, quality: 3 })];
-    this.root.addChild(shade, s);
   }
 
   private text(
@@ -3758,20 +3734,4 @@ export function formatRunTime(ms: number): string {
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */
 function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-/**
- * An image as a mipmapped texture (it shows smaller than its size), or null if it fails.
- * Waits for `load`, not `img.decode()`: in a hidden tab Chrome can fail or never settle a
- * decode, and the page then stayed on the loading screen.
- */
-async function loadTexture(url: string): Promise<Texture | null> {
-  const img = new Image();
-  const loaded = new Promise<boolean>((resolve) => {
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-  });
-  img.src = url;
-  if (!(await loaded)) return null;
-  return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
 }
