@@ -248,8 +248,20 @@ describe('sound during a game (port additions)', () => {
 
   it('a new game starts from the top bar switch, not from the last game switches', () => {
     s.setMuted(true);
+    const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
+    const play = vi.spyOn(s.audio, 'playMusic');
     start();
     expect([s.game.fl_mute, s.audio.effectsMuted]).toEqual([true, true]);
+    // The music plays, silent from its first note: every volume set from its start on is 0
+    expect(s.game.fl_music).toBe(true);
+    const started = play.mock.invocationCallOrder.at(-1)!;
+    const after = musicVol.mock.calls.filter(
+      (_, i) => musicVol.mock.invocationCallOrder[i] > started,
+    );
+    expect(after.length).toBeGreaterThan(0);
+    expect(after.every(([v]) => v === 0)).toBe(true);
+    musicVol.mockRestore();
+    play.mockRestore();
     s.setMuted(false);
     s.setMusicOn(false);
     s.syncMuted();
