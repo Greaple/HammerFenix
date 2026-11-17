@@ -109,6 +109,9 @@ async function main(): Promise<void> {
       if (Math.abs(res - lastRes) < 0.01) return;
       lastRes = res;
       app.renderer.resize(420, 520, res);
+      // Drawn again at once: a resized canvas is blank until the next draw, which showed black
+      // while the window was being resized
+      app.render();
       forceRender = true;
     }).observe(canvasContainer);
   }
@@ -490,7 +493,12 @@ async function main(): Promise<void> {
   // 8. Controllers (roadmap G.1): the screens show the buttons of the device in use
   const notice = new PadNotice();
   const showDevice = () => {
-    document.documentElement.dataset.input = input.device;
+    const root = document.documentElement;
+    root.dataset.input = input.device;
+    // The touch controls follow the device in use: a key or a mouse click hides them (a
+    // computer, or a touch screen's emulation left on), a touch shows them again
+    if (input.device === 'touch') root.classList.add('touch');
+    else if (input.device === 'keyboard') root.classList.remove('touch');
     const layout = input.padLayout;
     document.querySelectorAll<HTMLElement>('kbd[data-pad]').forEach((el) => {
       const b = el.dataset.pad as PadButton;
@@ -637,7 +645,7 @@ function bindPad(input: InputController): void {
 /**
  * Marks the page as a touch screen (`html.touch`): the touch controls show and the screens
  * drop their keyboard hints. On from the start on phones and tablets, and on a computer once
- * its screen is touched.
+ * its screen is touched; off again once a key or a mouse is used (`showDevice`).
  */
 function initTouch(): void {
   const root = document.documentElement;

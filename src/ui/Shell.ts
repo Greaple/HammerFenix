@@ -21,13 +21,10 @@ import {
   BlurFilter,
   Container,
   Graphics,
-  ImageSource,
   Rectangle,
   type Renderer,
-  Sprite,
   Text,
   TextStyle,
-  Texture,
 } from 'pixi.js';
 import {
   BINDABLE_BUTTONS,
@@ -692,21 +689,49 @@ type TextKind = keyof typeof FONT;
 /** Fridge shelves: items per row and rows per page (the redesign's glass shelves). */
 const FRIDGE_COLS = 8;
 const FRIDGE_ROWS = 3;
-const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
+/** Inside the frame (`framed`): six items a row, and the quests four at a time. */
+const FRIDGE_FRAME_COLS = 6;
+const QUEST_FRAME_PAGE = 4;
+/** Inside the frame the results show this many items found (two rows), the rest counted. */
+const FOUND_FRAME = 16;
+
+/** The settings' picture: item 1208, the "Manette S-Téhéf" joystick (the canvas's choice). */
+const SETTINGS_ART: Icon = { item: 1208 };
 
 /** The rewards' picture: item 8, "Etoile des neiges". */
 const STAR: Icon = { item: 8 };
 
 /**
- * The home page's layouts (`src/site.css`, after the canvas's note on them): three columns
- * from 1280 px wide; from 600 to 1279 px, upright, the frame at its own size beside the
- * notebook and the modes across under them; lying, the frame as tall as the screen beside the
- * modes, the notebook folded into buttons; under 600 px, the phone's.
+ * The site's layouts (`body[data-layout]`, `src/site.css`): three columns while each board
+ * keeps `WIDE_BOARD` px and the frame `WIDE_FRAME` px (from about 1190 x 580); a lying window
+ * with the frame at its full height and `SHORT_BOARD` px beside it, the frame beside the modes
+ * (`short`); a very short window, the modes without the frame (`land`); any other (phones and
+ * tablets upright, narrow windows), the whole site inside the frame (`framed`), as the original
+ * game had its menus.
  */
-type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
-const PHONE_QUERY = '(max-width: 599px)';
-const WIDE_QUERY = '(min-width: 1280px)';
-const UPRIGHT_QUERY = '(orientation: portrait)';
+type HomeLayout = 'wide' | 'short' | 'land' | 'framed';
+/**
+ * Under this height a window has no room for the frame beside the modes (a phone held
+ * sideways, a laptop window made very short): the home page is the modes alone (`land`).
+ */
+const LAND_H = 480;
+/** Under this height the short layout folds the locked options into one line. */
+const FOLD_H = 600;
+/** The smallest scale `fitBoards` gives a board: 12 px text stays at about 10 px. */
+const MIN_FIT = 0.82;
+/** `Shell.fitPage`'s zoom steps, once the board is at its densest. */
+const ZOOM_STEPS = [0.94];
+
+/** The narrowest board of the three columns (`site.css`): narrower, it would need too much scaling. */
+const WIDE_BOARD = 360;
+/** The smallest frame worth the three columns: smaller, the frame beside the modes is better. */
+const WIDE_FRAME = 380;
+const WIDE_ROOM_X = 32 + 2 * 28;
+const WIDE_ROOM_Y = 64 + 24 + 24;
+/** The modes board beside a full-height frame (`short`), and the room around them. */
+const SHORT_BOARD = 500;
+const SHORT_ROOM_X = 32 + 24;
+const SHORT_ROOM_Y = 64 + 12 + 24;
 
 type QuestTab = 'progress' | 'done' | 'all';
 type FridgeFilter = 'all' | 'almost' | 'never';
@@ -717,14 +742,12 @@ interface SiteDom {
   modes: HTMLElement;
   /** Right of the frame: the player's notebook (home, wide screens). */
   book: HTMLElement;
-  /** Over the frame: the modes on a phone, the sound panel over the paused game. */
+  /** Over the frame: the whole site inside it (`framed`), the sound panel over the paused game. */
   overlay: HTMLElement;
-  /** Under the frame: the keys (wide screens), the chosen mode (phone). */
+  /** Under the frame: the keys (wide screens). */
   below: HTMLElement;
   /** The full pages (quests, fridge, settings, controls, results), in place of the frame. */
   page: HTMLElement;
-  /** The phone's tab bar. */
-  tabbar: HTMLElement;
   /** The mode of the game under way, in the top bar. */
   chips: HTMLElement;
 }
@@ -746,7 +769,6 @@ export class Shell {
   private readonly input: InputController;
   private readonly texts: ShellTexts;
   private readonly profile: Profile;
-  private title: Texture | null = null;
   private screen: Screen | null = null;
   /** When `fadeOut` started (`performance.now()`), while it runs. */
   private fadeFrom: number | null = null;
@@ -774,9 +796,14 @@ export class Shell {
   private questId: number | null = null;
   private fridgeFilter: FridgeFilter = 'all';
   private fridgePage = 0;
+  /** The page of the quest list inside the frame, four quests at a time. */
+  private questPage = 0;
   private fridgeId: number | null = null;
   /** The home page shows an option's hint: moving the focus off it redraws the page. */
   private hintShown = false;
+  /** The village behind the home page, and its blur while it fades into the game. */
+  private bgLayer: Container | null = null;
+  private fadeBlur: BlurFilter | null = null;
   /** The give up button was pressed once (`performance.now()`): a second press gives up. */
   private quitArmed = 0;
   /** The player's settings, as the settings page shows them. */
@@ -799,9 +826,6 @@ export class Shell {
   /** The game's drawings as pictures for the pages, once the page gave a renderer. */
   private art: ItemArt | null = null;
   private dom: SiteDom | null = null;
-  private phone: MediaQueryList | null = null;
-  private wide: MediaQueryList | null = null;
-  private upright: MediaQueryList | null = null;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
@@ -841,10 +865,9 @@ export class Shell {
     this.introLayer.on('pointerdown', () => this.intro?.click());
   }
 
-  /** Loads the title logo. */
+  /** Where the site's pictures are (the results' logo and game over picture). */
   async load(baseUrl: string): Promise<void> {
     this.baseUrl = baseUrl;
-    this.title = await loadTexture(`${baseUrl}${TITLE_FILE}`);
   }
 
   /**
@@ -860,20 +883,58 @@ export class Shell {
       overlay: el('frame-overlay'),
       below: el('site-below'),
       page: el('site-page'),
-      tabbar: el('site-tabbar'),
       chips: el('play-chips'),
     };
     this.dom = dom;
     for (const box of Object.values(dom) as HTMLElement[]) {
       box.addEventListener('focusin', (e: FocusEvent) => this.onFocusIn(e.target as HTMLElement));
     }
-    this.phone = window.matchMedia(PHONE_QUERY);
-    this.phone.addEventListener('change', () => this.refresh());
-    this.wide = window.matchMedia(WIDE_QUERY);
-    this.wide.addEventListener('change', () => this.refresh());
-    this.upright = window.matchMedia(UPRIGHT_QUERY);
-    this.upright.addEventListener('change', () => this.refresh());
+    // The site inside the frame is laid out at the frame's size over its scale (`framed`)
+    new ResizeObserver(() => this.scaleFrameSite()).observe(dom.overlay);
+    // The three columns depend on both sizes: drawn again when the layout changes, and the
+    // boards fitted again to their columns
+    let layout = this.homeKey;
+    let pending = false;
+    window.addEventListener('resize', () => {
+      // Once per frame while the window is being dragged
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        pending = false;
+        const now = this.homeKey;
+        this.scaleFrameSite();
+        if (now !== layout) {
+          layout = now;
+          this.refresh();
+        } else {
+          this.fitBoards();
+          this.fitPage();
+        }
+      });
+    });
+    // The game's fonts change the boards' heights once loaded
+    void document.fonts?.ready.then(() => {
+      this.fitBoards();
+      this.fitPage();
+    });
     this.showLayout();
+  }
+
+  /**
+   * The size the site inside the frame is laid out at (`--lw`, `--lh`: the game's own 420 x 520)
+   * and its scale (`--k`), as the frame draws the game: every screen fits it without scrolling,
+   * smaller on a phone, larger on a tablet.
+   */
+  private scaleFrameSite(): void {
+    const box = this.dom?.overlay;
+    if (!box) return;
+    const w = box.clientWidth;
+    const h = box.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    const k = w / 420;
+    box.style.setProperty('--k', String(k));
+    box.style.setProperty('--lw', '420px');
+    box.style.setProperty('--lh', `${h / k}px`);
   }
 
   get visible(): boolean {
@@ -994,6 +1055,15 @@ export class Shell {
   }
 
   hide(): void {
+    this.fadeBlur = null;
+    const frame = this.dom ? document.getElementById('game-canvas-container') : null;
+    if (frame?.style.width) {
+      // After the fade: the frame grows to its playing size, and follows the window at once
+      // again when that is done
+      frame.classList.add('is-growing');
+      frame.style.removeProperty('width');
+      window.setTimeout(() => frame.classList.remove('is-growing'), 700);
+    }
     this.dropIntro();
     this.endCapture();
     this.screen = null;
@@ -1019,13 +1089,19 @@ export class Shell {
     this.fadeAsked = performance.now();
     this.fadeFrom = null;
     this.fadeMs = ms;
-    // The village blurred for the fade, so it does not show that it and the first level are
-    // not drawn at the same place (U.4); the home page shows it sharp
-    if (this.root.visible) {
-      this.clear();
-      this.drawBackground();
-      this.drawTitle(2, 290);
+    // The village goes out of focus as it fades, so the fade does not show that it and the
+    // first level are not drawn at the same place (U.4); the home page shows it sharp
+    const layer = this.bgLayer;
+    if (this.root.visible && layer && !layer.destroyed) {
+      layer.cacheAsTexture(false);
+      this.fadeBlur = new BlurFilter({ strength: 0, quality: 3, clipToViewport: false });
+      layer.filters = [this.fadeBlur];
     }
+    // The frame keeps its size through the fade, and takes its playing size after it
+    const frame = this.dom ? document.getElementById('game-canvas-container') : null;
+    const width = frame?.getBoundingClientRect().width ?? 0;
+    // (Not on a phone's home page, which has no frame: the game takes the screen at once)
+    if (frame && this.root.visible && width > 0) frame.style.width = `${width}px`;
     this.showLayout();
   }
 
@@ -1125,7 +1201,10 @@ export class Shell {
     if (this.fadeFrom !== null) {
       const a = 1 - (performance.now() - this.fadeFrom) / this.fadeMs;
       if (a <= 0) this.hide();
-      else this.root.alpha = a;
+      else {
+        this.root.alpha = a;
+        if (this.fadeBlur) this.fadeBlur.strength = BG_BLUR * 2 * (1 - a);
+      }
       return;
     }
     if (!this.screen) return;
@@ -1203,7 +1282,7 @@ export class Shell {
   private navElements(): HTMLElement[] {
     const d = this.dom;
     if (!d) return [];
-    const boxes = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    const boxes = [d.modes, d.book, d.overlay, d.below, d.page];
     return boxes.flatMap((b) =>
       [...b.querySelectorAll<HTMLElement>('[data-nav]')].filter(
         (el) => el.getClientRects().length > 0 && !el.closest('[hidden]'),
@@ -1319,12 +1398,18 @@ export class Shell {
    * that closes above the one pressed would otherwise pull it up.
    */
   private renderKeeping(key: string): void {
-    const page = this.dom?.page;
+    const page = this.siteKind() === 'framed' ? this.dom?.overlay : this.dom?.page;
     const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
     const before = find()?.getBoundingClientRect().top;
+    // (`render` scrolls a focus moved by the keys into view: done again after the shift below)
+    const moved = this.navMoved;
     this.render();
-    const after = find()?.getBoundingClientRect().top;
-    if (page && before !== undefined && after !== undefined) page.scrollTop += after - before;
+    const el = find();
+    const after = el?.getBoundingClientRect().top;
+    // The area that scrolls: the page's list, or the page itself on a phone
+    const area = el?.closest('[data-scroll]') ?? page;
+    if (area && before !== undefined && after !== undefined) area.scrollTop += after - before;
+    if (moved) el?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
 
   /** The hint of the focused option, under the options of the chosen mode. */
@@ -1334,6 +1419,8 @@ export class Shell {
     this.hintShown = hint !== '';
     this.dom?.modes.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
     this.dom?.below.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.dom?.overlay.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.fitBoards();
   }
 
   /** Gives the DOM focus to the focused element, unless the page is used by touch. */
@@ -1348,8 +1435,7 @@ export class Shell {
     const inSite =
       !active ||
       active === document.body ||
-      (d !== null &&
-        [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar].some((b) => b.contains(active)));
+      (d !== null && [d.modes, d.book, d.overlay, d.below, d.page].some((b) => b.contains(active)));
     if (!inSite) return;
     if (active !== el) el.focus({ preventScroll: true });
     if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -1387,6 +1473,8 @@ export class Shell {
 
   /** The main button: starts the chosen mode, or plays the intro. */
   private startChosen(): void {
+    // Only from the home page (not again while it fades into the game)
+    if (this.screen !== 'menu') return;
     if (this.chosen === 'intro') {
       this.showIntro();
       return;
@@ -1586,17 +1674,16 @@ export class Shell {
       this.root.addChild(this.introLayer);
       this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
     } else {
-      // The village and the logo: the home page's frame, and what the frame shows if a page
-      // leaves it on screen
+      // The village: the home page's frame, and behind the pages inside the frame (`framed`).
+      // No title over it: the site's logo is in the top bar
       this.drawBackground();
-      this.drawTitle(2, 290);
     }
     this.renderPage();
   }
 
   /**
    * The village of the first level (`menu`, vector): the home page's frame, sharp now that no
-   * panel covers it, and blurred for the fade into the first level (`fadeOut`).
+   * panel covers it, and going out of focus in the fade into the first level (`fadeOut`).
    */
   private drawBackground(): void {
     const bg = this.lib.attach('menu');
@@ -1608,35 +1695,14 @@ export class Shell {
     const s = Math.max((W + 2 * m) / b.width, (H + 2 * m) / b.height);
     bg.scale.set(s);
     bg.position.set((W - b.width * s) / 2 - b.x * s, (H - b.height * s) / 2 - b.y * s);
-    // Not clipped to the screen: Pixi clips a filter to the screen's size in pixels divided by
-    // the target's resolution, which inside the 1.5x cache below cuts the picture short when
-    // the canvas is drawn at resolution 1 (a small frame on a phone), leaving it partly black
-    if (this.screen !== 'menu') {
-      bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4, clipToViewport: false })];
-    }
-    // Drawn once into a texture: a blurred picture needs no more than the frame's resolution
+    // Drawn once into a texture; `fadeOut` blurs it (not clipped to the screen: Pixi clips a
+    // filter to the screen's size in pixels divided by the target's resolution, which on a
+    // small frame left part of the picture black)
     const layer = new Container();
     layer.addChild(bg);
     layer.cacheAsTexture({ resolution: 1.5 });
     this.root.addChild(layer);
-  }
-
-  /** The game's title logo, `w` px wide, its top at `y`. */
-  private drawTitle(y: number, w: number): void {
-    if (!this.title) {
-      this.text('Hammerfest', 'title', W / 2, y + 20, { size: 34, color: C.gold, shadow: true });
-      return;
-    }
-    const s = new Sprite(this.title);
-    s.scale.set(w / this.title.width);
-    s.anchor.set(0.5, 0);
-    s.position.set(W / 2, y);
-    // A soft shade, so the thin "Les Cavernes de" reads over the village
-    const shade = new Graphics()
-      .ellipse(W / 2, y + s.height * 0.52, w * 0.5, s.height * 0.36)
-      .fill({ color: 0x0b1530, alpha: 0.45 });
-    shade.filters = [new BlurFilter({ strength: 18, quality: 3 })];
-    this.root.addChild(shade, s);
+    this.bgLayer = layer;
   }
 
   private text(
@@ -1758,30 +1824,73 @@ export class Shell {
     }
   }
 
+  /** `pageKind`, with the whole site inside the frame on screens too small for it around. */
+  private siteKind(): string {
+    const kind = this.pageKind();
+    return (kind === 'home' || kind === 'page') && this.compact ? 'framed' : kind;
+  }
+
   /** Sets the page's layout and empties what the current screen does not use. */
   private showLayout(): void {
     if (typeof document === 'undefined') return;
     const body = document.body;
-    body.dataset.page = this.pageKind();
+    body.dataset.page = this.siteKind();
     body.dataset.screen = this.screen ?? 'playing';
     const d = this.dom;
     if (!d) return;
+    body.dataset.layout = this.homeLayout;
     if (this.screen === null) {
-      for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) fill(b);
+      // (The site inside the frame fades out with the village: emptied once that is over)
+      const fading = this.fadeReady !== null;
+      for (const b of [d.modes, d.book, d.overlay, d.below, d.page]) {
+        if (!(fading && b === d.overlay)) fill(b);
+      }
+      d.overlay.classList.toggle('is-fading', fading);
+      // Nothing in it can be pressed while it fades (a second start, a page over the game)
+      d.overlay.inert = fading;
+      if (fading && d.overlay.contains(document.activeElement)) {
+        (document.activeElement as HTMLElement).blur();
+      }
+    } else {
+      d.overlay.classList.remove('is-fading');
+      d.overlay.inert = false;
     }
     if (this.screen === null || this.screen === 'sound') this.fillChips();
     else fill(d.chips);
   }
 
-  private get isPhone(): boolean {
-    return this.phone?.matches ?? false;
+  /** Whether the site is inside the frame (`framed`): the pages take one column and scroll. */
+  private get compact(): boolean {
+    return this.homeLayout === 'framed';
   }
 
   /** The home page's layout for the window's size and orientation. */
   private get homeLayout(): HomeLayout {
-    if (this.isPhone) return 'phone';
-    if (this.wide?.matches ?? true) return 'wide';
-    return this.upright?.matches ? 'tall' : 'short';
+    if (typeof window === 'undefined') return 'wide';
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (h < LAND_H) return 'land';
+    // The frame as the page draws it (`site.css`): as tall as the window, at most 680 px wide,
+    // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
+    // much itself
+    const frame = Math.min(680, ((h - WIDE_ROOM_Y) * 420) / 520, w - WIDE_ROOM_X - 2 * WIDE_BOARD);
+    if (frame >= WIDE_FRAME) return 'wide';
+    // The frame as tall as the window, and the modes board beside it
+    const full = ((h - SHORT_ROOM_Y) * 420) / 520;
+    if (w > h && w - SHORT_ROOM_X - full >= SHORT_BOARD) return 'short';
+    return 'framed';
+  }
+
+  /** Whether the home page folds the locked options into one line, to keep Start in view. */
+  private get homeFold(): boolean {
+    const layout = this.homeLayout;
+    if (layout === 'land' || layout === 'framed') return true;
+    return layout === 'short' && typeof window !== 'undefined' && window.innerHeight < FOLD_H;
+  }
+
+  /** What the home page is built from: drawn again when it changes. */
+  private get homeKey(): string {
+    return `${this.homeLayout}${this.homeFold ? '+fold' : ''}`;
   }
 
   /** Builds the page of the current screen around (or over) the frame. */
@@ -1789,39 +1898,170 @@ export class Shell {
     this.showLayout();
     const d = this.dom;
     if (!d || !this.screen) return;
-    const empty = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    const framed = this.siteKind() === 'framed';
+    // The page's scrolling area keeps its place when the same page is drawn again
+    const host = framed ? d.overlay : d.page;
+    const same = host.dataset.screen === this.screen;
+    const kept = same ? (host.querySelector('[data-scroll]')?.scrollTop ?? 0) : 0;
+    const empty = [d.modes, d.book, d.overlay, d.below, d.page];
     for (const b of empty) fill(b);
+    let page: HTMLElement | null = null;
     switch (this.screen) {
       case 'menu':
-        this.pageHome(d);
+        if (framed) page = this.framedHome();
+        else this.pageHome(d);
         break;
       case 'quests':
-        fill(d.page, this.pageQuests());
+        page = this.pageQuests();
         break;
       case 'fridge':
-        fill(d.page, this.pageFridge());
+        page = this.pageFridge();
         break;
       case 'settings':
-        fill(d.page, this.pageSettings());
+        page = this.pageSettings();
         break;
       case 'controls':
-        fill(d.page, this.pageControls());
+        page = this.pageControls();
         break;
       case 'result':
-        fill(d.page, this.time ? this.pageTimeResult(this.time) : this.pageResult());
+        page = this.time ? this.pageTimeResult(this.time) : this.pageResult();
         break;
       case 'sound':
         fill(d.overlay, this.panelSound());
         break;
     }
-    if (this.screen !== 'sound' && this.screen !== 'intro' && this.isPhone) {
-      fill(d.tabbar, this.tabbar());
-    }
-    if (this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings') {
-      if (d.page.dataset.screen !== this.screen) d.page.scrollTop = 0;
-    }
-    d.page.dataset.screen = this.screen;
+    if (page && framed) fill(d.overlay, this.frameSite(page));
+    if (framed) {
+      this.scaleFrameSite();
+      this.fitFrame();
+    } else if (page) fill(d.page, page);
+    d.overlay.dataset.screen = framed ? this.screen : '';
+    d.page.dataset.screen = framed ? '' : this.screen;
+    const area = host.querySelector('[data-scroll]');
+    if (area) area.scrollTop = kept;
+    this.fitBoards();
+    this.fitPage();
     this.applyFocus();
+  }
+
+  /**
+   * The site inside the frame (`framed`): the page laid out at the game's size and drawn at the
+   * frame's (`scaleFrameSite`), as the original's menus were; nothing scrolls.
+   */
+  private frameSite(page: HTMLElement): HTMLElement {
+    return h('div', { class: 'frame-site' }, page);
+  }
+
+  /**
+   * A screen inside the frame still taller than it (a long language, a long list of options)
+   * turns denser: the cards lose their short line, the guide's longer hints go.
+   */
+  private fitFrame(): void {
+    const site = this.dom?.overlay.querySelector<HTMLElement>(':scope > .frame-site');
+    const box =
+      site?.querySelector<HTMLElement>(':scope > .frame-home') ??
+      site?.querySelector<HTMLElement>(':scope > .board-page, :scope > .result > .board-page');
+    if (!box) return;
+    delete box.dataset.density;
+    if (box.scrollHeight > box.clientHeight) box.dataset.density = 'compact';
+  }
+
+  /**
+   * The home page inside the frame, as the live site's menu: the village and the logo (drawn in
+   * the frame) over one panel with the modes and their short line, the chosen mode's options,
+   * the quests and the fridge, and the main button with the settings beside it.
+   */
+  private framedHome(): HTMLElement {
+    const t = this.t;
+    this.hintShown = false;
+    const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
+    const detail = this.modeDetail(shown, false, false);
+    const start = detail.pop() ?? null;
+    const book = this.notebookFolded();
+    const gear = book.querySelector<HTMLElement>('.fold-gear');
+    gear?.remove();
+    return h(
+      'div',
+      { class: 'frame-home' },
+      h(
+        'section',
+        { class: 'board fs-panel', 'aria-label': t.modesTitle },
+        h(
+          'div',
+          { class: 'mode-grid', role: 'radiogroup', 'aria-label': t.modesTitle },
+          this.modeCards(false),
+        ),
+        h('div', { class: 'mode-detail fs-detail', 'aria-live': 'polite' }, detail),
+        book,
+        h('div', { class: 'fs-go' }, start, gear),
+      ),
+    );
+  }
+
+  /**
+   * A page's board fits the stage under the top bar (`site.css`, "Pages"): when what must stay
+   * in view (the board, its `[data-fit]` areas) still overflows, the board turns denser (the
+   * guide's longer hints go, smaller cards), then smaller as a browser's zoom would, down to
+   * the last of `ZOOM_STEPS`; past that (a very short window), the page scrolls as one, as a
+   * phone's page always does.
+   */
+  private fitPage(): void {
+    const page = this.dom?.page;
+    if (!page || this.compact || this.pageKind() !== 'page') return;
+    const board = page.querySelector<HTMLElement>(':scope .board-page');
+    page.classList.remove('is-scrolling');
+    if (!board) return;
+    board.style.removeProperty('zoom');
+    delete board.dataset.density;
+    const room = () => {
+      const cs = getComputedStyle(page);
+      return page.getBoundingClientRect().bottom - parseFloat(cs.paddingBottom);
+    };
+    const over = () =>
+      [board, ...board.querySelectorAll<HTMLElement>('[data-fit]')].some(
+        (el) => el.scrollHeight > el.clientHeight + 1,
+      ) || board.getBoundingClientRect().bottom > room() + 1;
+    if (!over()) return;
+    board.dataset.density = 'compact';
+    for (const zoom of ZOOM_STEPS) {
+      if (!over()) return;
+      board.style.setProperty('zoom', String(zoom));
+    }
+    if (!over()) return;
+    // Still too tall: the page scrolls as one, at the densest step but full size
+    board.style.removeProperty('zoom');
+    page.classList.add('is-scrolling');
+  }
+
+  /**
+   * A home board taller than its column is scaled down to fit it, as a browser's zoom would:
+   * its layout stays the same, so nothing wraps differently or is cut. Below `MIN_FIT`, the
+   * text would get too small: the column scrolls instead.
+   */
+  private fitBoards(): void {
+    const d = this.dom;
+    if (!d || this.screen !== 'menu') return;
+    const layout = this.homeLayout;
+    for (const col of [d.modes, d.book]) {
+      const board = col.querySelector<HTMLElement>(':scope > .board');
+      col.classList.remove('is-scrolling');
+      if (!board) continue;
+      board.style.removeProperty('transform');
+      board.style.removeProperty('margin-bottom');
+      if (layout !== 'wide' && layout !== 'short' && layout !== 'land') continue;
+      const cs = getComputedStyle(col);
+      const room = col.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const need = board.offsetHeight;
+      if (need <= room || room <= 0) continue;
+      const scale = room / need;
+      if (scale < MIN_FIT) {
+        col.classList.add('is-scrolling');
+        continue;
+      }
+      board.style.transform = `scale(${scale})`;
+      // The space the board no longer takes, so the column has nothing to scroll
+      board.style.marginBottom = `${-need * (1 - scale)}px`;
+    }
   }
 
   /** A picture of the game's clip, sized by CSS. */
@@ -1878,7 +2118,7 @@ export class Shell {
       'button',
       { type: 'button', class: 'btn-wood btn-back', 'data-nav': 'back', onclick: action },
       svgIcon(ICON.back, { size: 18 }),
-      this.t.back,
+      h('span', { class: 'btn-label' }, this.t.back),
     );
   }
 
@@ -1905,29 +2145,6 @@ export class Shell {
     const t = this.t;
     this.hintShown = false;
     const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
-    if (this.isPhone) {
-      fill(
-        d.overlay,
-        h(
-          'section',
-          { class: 'board board-phone-modes', 'aria-label': t.modesTitle },
-          h(
-            'div',
-            { class: 'mode-grid', role: 'radiogroup', 'aria-label': t.modesTitle },
-            this.modeCards(true),
-          ),
-        ),
-      );
-      fill(
-        d.below,
-        h(
-          'section',
-          { class: 'board board-detail', 'aria-live': 'polite' },
-          this.modeDetail(shown, true),
-        ),
-      );
-      return;
-    }
     fill(
       d.modes,
       h(
@@ -1939,14 +2156,18 @@ export class Shell {
           { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
           this.modeCards(false),
         ),
-        h('div', { class: 'mode-detail', 'aria-live': 'polite' }, this.modeDetail(shown, false)),
-        this.img({ clip: 'hammer_player' }, 'igor-peek'),
+        h(
+          'div',
+          { class: 'mode-detail', 'aria-live': 'polite' },
+          // (Land: with the chosen mode's name, which a narrow window's cards leave out)
+          this.modeDetail(shown, this.homeLayout === 'land', this.homeFold),
+        ),
       ),
     );
-    // Lying screens under 1280 px: the notebook folds into buttons under the modes, and the
-    // keys are left to the help dialog ("?")
+    // Lying screens under 1280 px: the notebook folds into buttons under (or beside) the
+    // modes, and the keys are left to the help dialog ("?")
     const layout = this.homeLayout;
-    fill(d.book, layout === 'short' ? this.notebookFolded() : this.notebook());
+    fill(d.book, layout === 'short' || layout === 'land' ? this.notebookFolded() : this.notebook());
     if (layout === 'wide') fill(d.below, this.keysStrip());
   }
 
@@ -2006,7 +2227,7 @@ export class Shell {
    * The chosen mode: its text, the quest that unlocks it, its best time, its options (the
    * site's `.mopt` box) and fields, and the main button.
    */
-  private modeDetail(mode: ModeEntry | null, phone: boolean): HTMLElement[] {
+  private modeDetail(mode: ModeEntry | null, phone: boolean, fold = phone): HTMLElement[] {
     const t = this.t;
     const out: HTMLElement[] = [];
     if (phone) {
@@ -2036,8 +2257,10 @@ export class Shell {
           ? fmt(t.modeLockedBy2, this.questForMode('timeattack'), this.questForMode('multicoop'))
           : fmt(t.modeLockedBy, this.questForMode(mode.mode));
     if (note) out.push(h('p', { class: 'lock-note' }, this.lockIcon(), note));
-    // The Time Attack modes: the best time of the run they play
-    const run = canStart ? this.runOf(mode.mode) : null;
+    // The Time Attack modes: the best time of the run they play (the soccer's field is a run
+    // too, but a match has no time)
+    const timed = mode.mode === 'timeattack' || mode.mode === 'multitime';
+    const run = canStart && timed ? this.runOf(mode.mode) : null;
     if (run !== null) {
       const best = this.profile.bestTime(mode.mode, run);
       out.push(
@@ -2049,8 +2272,8 @@ export class Shell {
       );
     }
     const all = canStart ? this.modeOptions(mode) : [];
-    // On a phone the locked options fold into one line, so the main button stays in view
-    const opts = phone ? all.filter((oid) => this.profile.hasOption(oid)) : all;
+    // On a small screen the locked options fold into one line, so the main button stays in view
+    const opts = fold ? all.filter((oid) => this.profile.hasOption(oid)) : all;
     const folded = all.length - opts.length;
     const runs = canStart ? this.profile.runChoices(mode.mode) : [];
     if (opts.length > 0 || runs.length > 0 || folded > 0) {
@@ -2179,7 +2402,7 @@ export class Shell {
           'data-nav': 'settings',
           onclick: () => this.showSettings(),
         },
-        svgIcon(ICON.gear, { size: 20 }),
+        this.img(SETTINGS_ART, 'btn-art'),
         t.settings,
       ),
     );
@@ -2226,7 +2449,7 @@ export class Shell {
           'data-nav': 'settings',
           onclick: () => this.showSettings(),
         },
-        svgIcon(ICON.gear, { size: 22 }),
+        this.img(SETTINGS_ART, 'btn-art'),
       ),
     );
   }
@@ -2340,40 +2563,6 @@ export class Shell {
       quests: [p.quests.length, q.quests.length],
       fridge: [ids.filter((id) => q.inFridge(p, id)).length, ids.length],
     };
-  }
-
-  /** The phone's tab bar: play, quests, fridge, settings, each with the game's picture. */
-  private tabbar(): HTMLElement {
-    const t = this.t;
-    const cur =
-      this.screen === 'quests'
-        ? 'quests'
-        : this.screen === 'fridge'
-          ? 'fridge'
-          : this.screen === 'settings' || this.screen === 'controls'
-            ? 'settings'
-            : 'play';
-    const tab = (id: string, label: string, icon: Icon, go: () => void) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: `tab${cur === id ? ' is-current' : ''}`,
-          'aria-current': cur === id ? 'page' : false,
-          'data-nav': `nav:${id}`,
-          onclick: go,
-        },
-        this.img(icon, 'tab-art'),
-        h('span', null, label),
-      );
-    return h(
-      'div',
-      { class: 'tabbar-inner' },
-      tab('play', t.tabPlay, { clip: 'hammer_player' }, () => this.showMenu()),
-      tab('quests', t.quests, { item: 20 }, () => this.showQuests()),
-      tab('fridge', t.tabFridge, { item: 1018 }, () => this.showFridge()),
-      tab('settings', t.options, { item: 1208 }, () => this.showSettings()),
-    );
   }
 
   /**
@@ -2503,13 +2692,22 @@ export class Shell {
       ['done', t.done, count('done')],
       ['all', t.all, count('progress') + count('done')],
     ];
-    const list = this.questList();
-    if (this.questId === null || !list.includes(this.questId)) this.questId = list[0] ?? null;
-    const phone = this.isPhone;
+    const all = this.questList();
+    if (this.questId === null || !all.includes(this.questId)) this.questId = all[0] ?? null;
+    // Inside the frame: four at a time, the page of the chosen quest
+    const framed = this.compact;
+    const pages = framed ? Math.max(1, Math.ceil(all.length / QUEST_FRAME_PAGE)) : 1;
+    if (framed && this.questId !== null) {
+      this.questPage = Math.floor(all.indexOf(this.questId) / QUEST_FRAME_PAGE);
+    }
+    this.questPage = Math.max(0, Math.min(pages - 1, this.questPage));
+    const list = framed
+      ? all.slice(this.questPage * QUEST_FRAME_PAGE, (this.questPage + 1) * QUEST_FRAME_PAGE)
+      : all;
     const none = count('none');
     return h(
       'section',
-      { class: 'board board-page', 'aria-labelledby': 'q-h' },
+      { class: 'board board-page board-quests', 'aria-labelledby': 'q-h' },
       this.plank(t.quests, { item: 20 }, 'q-h'),
       h(
         'div',
@@ -2530,6 +2728,7 @@ export class Shell {
                 'data-nav': `qtab:${id}`,
                 onclick: () => {
                   this.questTab = id;
+                  this.questPage = 0;
                   this.questId = this.questList()[0] ?? null;
                   this.focusKey = `qtab:${id}`;
                   this.render();
@@ -2544,10 +2743,16 @@ export class Shell {
       ),
       h(
         'div',
-        { class: 'split' },
+        { class: 'quest-split' },
         h(
           'div',
-          { class: 'quest-list', id: 'q-list', role: 'tabpanel' },
+          // The page's one scrolling area (inside the frame, pages of four instead)
+          {
+            class: 'quest-list',
+            id: 'q-list',
+            role: 'tabpanel',
+            'data-scroll': framed ? null : '',
+          },
           list.length === 0 ? h('p', { class: 'empty' }, t.noQuest) : null,
           list.map((id) => {
             const done = q.status(p, id) === 'done';
@@ -2579,14 +2784,53 @@ export class Shell {
                 this.bar(done ? 1 : pr.f, done ? 'done' : 'progress'),
               ),
             );
-            // On a phone the chosen quest opens under its row
-            return on && phone ? [row, this.questDetail(id)] : row;
+            return row;
           }),
-          none > 0 && list.length > 0 ? h('p', { class: 'note' }, fmt(t.moreQuests, none)) : null,
+          framed && pages > 1
+            ? this.pager('q', this.questPage, pages, (page) => {
+                this.questPage = page;
+                this.questId = all[page * QUEST_FRAME_PAGE] ?? null;
+                this.render();
+              })
+            : null,
+          none > 0 && list.length > 0 && !framed
+            ? h('p', { class: 'note' }, fmt(t.moreQuests, none))
+            : null,
         ),
-        this.questId === null || phone ? null : this.questDetail(this.questId),
+        this.questId === null ? null : this.questDetail(this.questId),
       ),
-      h('p', { class: 'note' }, t.questRule),
+      h('p', { class: 'note page-rule' }, t.questRule),
+    );
+  }
+
+  /**
+   * Previous and next page buttons around "Page n of m" (`key`prev, `key`next for the focus).
+   */
+  private pager(key: string, page: number, pages: number, go: (page: number) => void): HTMLElement {
+    const t = this.t;
+    const btn = (dir: -1 | 1) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-round',
+          'aria-label': dir < 0 ? t.prevPage : t.nextPage,
+          'aria-disabled': (dir < 0 ? page > 0 : page < pages - 1) ? false : 'true',
+          'data-nav': `${key}${dir < 0 ? 'prev' : 'next'}`,
+          onclick: () => {
+            this.focusKey = `${key}${dir < 0 ? 'prev' : 'next'}`;
+            const to = page + dir;
+            if (to >= 0 && to < pages) go(to);
+          },
+        },
+        svgIcon(dir < 0 ? ICON.prev : ICON.next, { size: 18 }),
+      );
+    return h(
+      'div',
+      { class: 'pager' },
+      btn(-1),
+      h('span', { class: 'pager-text' }, fmt(t.pageOf, page + 1, pages)),
+      btn(1),
     );
   }
 
@@ -2599,7 +2843,7 @@ export class Shell {
     const reqs = q.requirements(id);
     return h(
       'div',
-      { class: 'inset quest-detail', 'aria-live': 'polite' },
+      { class: 'inset quest-detail', 'aria-live': 'polite', 'data-fit': this.compact ? null : '' },
       h(
         'div',
         { class: 'detail-title' },
@@ -2653,6 +2897,15 @@ export class Shell {
 
   // ------------------------------------------------------------ fridge
 
+  /** Items a shelf holds: fewer inside the frame. */
+  private get fridgeCols(): number {
+    return this.compact ? FRIDGE_FRAME_COLS : FRIDGE_COLS;
+  }
+
+  private get fridgePageSize(): number {
+    return this.fridgeCols * FRIDGE_ROWS;
+  }
+
   /** The items the fridge's filter shows, in id order. */
   private fridgeIds(): number[] {
     const q = this.profile.quests;
@@ -2676,12 +2929,12 @@ export class Shell {
   private turnFridgePage(dx: number, key: string): void {
     const ids = this.fridgeIds();
     const i = ids.indexOf(Number(key.slice(2)));
-    const pages = Math.ceil(ids.length / FRIDGE_PAGE);
+    const pages = Math.ceil(ids.length / this.fridgePageSize);
     const page = this.fridgePage + dx;
     if (i < 0 || page < 0 || page >= pages) return;
-    const row = Math.floor((i % FRIDGE_PAGE) / FRIDGE_COLS);
-    const col = dx > 0 ? 0 : FRIDGE_COLS - 1;
-    const n = Math.min(ids.length - 1, page * FRIDGE_PAGE + row * FRIDGE_COLS + col);
+    const row = Math.floor((i % this.fridgePageSize) / this.fridgeCols);
+    const col = dx > 0 ? 0 : this.fridgeCols - 1;
+    const n = Math.min(ids.length - 1, page * this.fridgePageSize + row * this.fridgeCols + col);
     this.fridgePage = page;
     this.setFocus(`f:${ids[n]}`);
   }
@@ -2689,7 +2942,7 @@ export class Shell {
   private goFridgePage(page: number): void {
     const ids = this.fridgeIds();
     this.fridgePage = page;
-    this.fridgeId = ids[page * FRIDGE_PAGE] ?? null;
+    this.fridgeId = ids[page * this.fridgePageSize] ?? null;
     this.render();
   }
 
@@ -2699,12 +2952,13 @@ export class Shell {
     const p = this.profile.data;
     const [have, all] = this.counts().fridge;
     const ids = this.fridgeIds();
-    const pages = Math.max(1, Math.ceil(ids.length / FRIDGE_PAGE));
+    const pages = Math.max(1, Math.ceil(ids.length / this.fridgePageSize));
     if (this.fridgeId !== null && ids.includes(this.fridgeId)) {
-      this.fridgePage = Math.floor(ids.indexOf(this.fridgeId) / FRIDGE_PAGE);
+      this.fridgePage = Math.floor(ids.indexOf(this.fridgeId) / this.fridgePageSize);
     }
     this.fridgePage = Math.max(0, Math.min(pages - 1, this.fridgePage));
-    const shown = ids.slice(this.fridgePage * FRIDGE_PAGE, (this.fridgePage + 1) * FRIDGE_PAGE);
+    const size = this.fridgePageSize;
+    const shown = ids.slice(this.fridgePage * size, (this.fridgePage + 1) * size);
     if (this.fridgeId === null || !ids.includes(this.fridgeId)) this.fridgeId = shown[0] ?? null;
     const filters: [FridgeFilter, string][] = [
       ['all', t.fridgeAll],
@@ -2713,7 +2967,7 @@ export class Shell {
     ];
     const shelves: HTMLElement[] = [];
     for (let r = 0; r < FRIDGE_ROWS; r++) {
-      const row = shown.slice(r * FRIDGE_COLS, (r + 1) * FRIDGE_COLS);
+      const row = shown.slice(r * this.fridgeCols, (r + 1) * this.fridgeCols);
       if (row.length === 0 && r > 0) break;
       shelves.push(
         h(
@@ -2755,7 +3009,7 @@ export class Shell {
     }
     return h(
       'section',
-      { class: 'board board-page board-fridge', 'aria-labelledby': 'f-h' },
+      { class: 'board board-page is-full board-fridge', 'aria-labelledby': 'f-h' },
       this.plank(t.fridge, { item: 1018 }, 'f-h', 1.2),
       h(
         'div',
@@ -2795,7 +3049,7 @@ export class Shell {
       ),
       h(
         'div',
-        { class: 'split' },
+        { class: 'fridge-split' },
         h(
           'div',
           { class: 'fridge-main', id: 'f-shelves', role: 'tabpanel' },
@@ -2842,7 +3096,7 @@ export class Shell {
         ),
         this.fridgeId === null ? null : this.itemCard(this.fridgeId),
       ),
-      h('p', { class: 'note' }, t.fridgeRule),
+      h('p', { class: 'note page-rule' }, t.fridgeRule),
     );
   }
 
@@ -2894,7 +3148,7 @@ export class Shell {
     }
     return h(
       'aside',
-      { class: 'inset item-card', 'aria-live': 'polite' },
+      { class: 'inset item-card', 'aria-live': 'polite', 'data-fit': this.compact ? null : '' },
       h('div', { class: 'item-disc' }, this.itemImg(id, state)),
       h('h2', null, n > 0 ? this.texts.getItemName(id) : t.unknown),
       h('p', { class: `item-status is-${state}` }, status),
@@ -2934,24 +3188,28 @@ export class Shell {
         { class: 'check-grid' },
         (['detail', 'shake', 'sound', 'music'] as const).map((row) => this.checkCard(row)),
       ),
-      this.volumeRow(),
       h(
         'div',
-        { class: 'inset set-row' },
-        h('span', { class: 'set-label', id: 'hd-l' }, t.hd),
+        { class: 'set-pair' },
+        this.volumeRow(),
         h(
-          'button',
-          {
-            type: 'button',
-            class: 'btn-ghost hd-btn',
-            'aria-describedby': 'hd-h',
-            'aria-labelledby': 'hd-l hd-v',
-            'data-nav': 'set:hd',
-            onclick: () => this.stepHd(1),
-          },
-          h('span', { id: 'hd-v' }, hdValue),
+          'div',
+          { class: 'inset set-row' },
+          h('span', { class: 'set-label', id: 'hd-l' }, t.hd),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'btn-ghost hd-btn',
+              'aria-describedby': 'hd-h',
+              'aria-labelledby': 'hd-l hd-v',
+              'data-nav': 'set:hd',
+              onclick: () => this.stepHd(1),
+            },
+            h('span', { id: 'hd-v' }, hdValue),
+          ),
+          h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
         ),
-        h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
       ),
       h(
         'div',
@@ -3329,13 +3587,17 @@ export class Shell {
         banners.length > 0 ? h('div', { class: 'banners' }, banners) : null,
         h(
           'div',
-          { class: 'found' },
+          { class: 'found', 'data-fit': this.compact ? null : '' },
           h('h2', { class: 'sub-title' }, picks.length > 0 ? t.collected : t.none),
           picks.length > 0
             ? h(
                 'div',
-                { class: 'found-grid' },
-                picks.map(([id, n]) =>
+                { class: 'found-grid', 'data-scroll': this.compact ? null : '' },
+                // Inside the frame: two rows, the rest counted
+                (this.compact && picks.length > FOUND_FRAME
+                  ? picks.slice(0, FOUND_FRAME - 1)
+                  : picks
+                ).map(([id, n]) =>
                   h(
                     'div',
                     { class: 'found-cell', title: this.texts.getItemName(id) },
@@ -3343,6 +3605,13 @@ export class Shell {
                     h('span', { class: 'badge is-wood' }, `×${n}`),
                   ),
                 ),
+                this.compact && picks.length > FOUND_FRAME
+                  ? h(
+                      'div',
+                      { class: 'found-cell found-more' },
+                      `+${picks.length - FOUND_FRAME + 1}`,
+                    )
+                  : null,
               )
             : null,
         ),
@@ -3465,20 +3734,4 @@ export function formatRunTime(ms: number): string {
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */
 function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
-
-/**
- * An image as a mipmapped texture (it shows smaller than its size), or null if it fails.
- * Waits for `load`, not `img.decode()`: in a hidden tab Chrome can fail or never settle a
- * decode, and the page then stayed on the loading screen.
- */
-async function loadTexture(url: string): Promise<Texture | null> {
-  const img = new Image();
-  const loaded = new Promise<boolean>((resolve) => {
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-  });
-  img.src = url;
-  if (!(await loaded)) return null;
-  return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
 }

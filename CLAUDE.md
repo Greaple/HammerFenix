@@ -18,6 +18,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `/tools/level-sheets.html` on the dev server: level contact sheets (2B.2), saved to `.cache/level-sheets/`; options in `tools/level-sheets.ts`
 - `tools/compare.ts`: helpers for comparisons with the original in Ruffle (load in the dev page with `await import('/tools/compare.ts')`); usage in LEVELS.md "How (2B.5, 2B.6)"
 - `tools/upscale-bitmaps/`: the HD bitmap sets for big screens (Python, Spandrel; its README has the steps). The page picks a set by screen size, or the settings page's "Images HD" row; `?hd=1|2|4` forces one (kept until `?hd=auto`), and Ruffle comparisons want `?hd=1`
+- `tools/fit-check.ts`: checks that every site screen fits the window (load in the dev page with `const f = await import('/tools/fit-check.ts'); await f.check()`, and `f.checkPlaying()` for a game); resize the window first (Claude in Chrome, or the browser pane's viewport)
 - `npx tsx tools/scan-scripts.ts [--all]`: list what level scripts use that the engine does not handle (`tests/scripts.test.ts` fails on new problems)
 
 ## Original source (`assets-src/original`, identical to github.com/motion-twin/hammerfest)
@@ -37,7 +38,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
 - `src/game/Data.ts`: port of `Data.mt`. Values must match the original exactly.
 - `src/game/Quests.ts`, `Profile.ts`: the hammerfest.fr server's quests and the player profile (not a port; rules and guesses in PORT_STATUS.md "Quests and profile")
-- `src/ui/`: the site screens (`Shell.ts`: home, results, quests, fridge, settings, as HTML pages around the frame; `site/ItemArt.ts` draws the game's clips as pictures for them, `src/site.css` styles them) and the site's intro (`Intro.ts`, `public/gfx/intro.json`, in the frame), debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
+- `src/ui/`: the site screens (`Shell.ts`: home, results, quests, fridge, settings, as HTML pages around the frame, or inside it on small screens (`framed`); `site/ItemArt.ts` draws the game's clips as pictures for them, `src/site.css` styles them) and the site's intro (`Intro.ts`, `public/gfx/intro.json`, in the frame), debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
 
 ## Conventions
 
