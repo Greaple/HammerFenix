@@ -166,10 +166,14 @@ export function inspect(): string[] {
       );
       if (!own) continue;
       const cs = getComputedStyle(el);
-      if (parseFloat(cs.fontSize) < MIN_FONT) out.push(`small text ${cs.fontSize}: ${label(el)}`);
+      // The size as drawn: a zoomed box (`Shell.fitPage`, the frame's scale) draws it smaller
+      const size = parseFloat(cs.fontSize) * zoomOf(el);
+      if (size < MIN_FONT) out.push(`small text ${size.toFixed(1)}px: ${label(el)}`);
       if (el.scrollWidth > el.clientWidth + 1 && cs.display !== 'inline' && el.clientWidth > 0) {
         out.push(`text wider than its box: ${label(el)}`);
       }
+      const split = brokenWord(el);
+      if (split) out.push(`word broken across lines "${split}": ${label(el)}`);
     }
   }
 
@@ -200,6 +204,35 @@ export function inspect(): string[] {
     }
   }
   return [...new Set(out)];
+}
+
+/** The zoom `el` is drawn at: the product of its own and its boxes' `zoom`. */
+function zoomOf(el: Element): number {
+  let z = 1;
+  for (let a: Element | null = el; a; a = a.parentElement) {
+    const v = parseFloat(getComputedStyle(a).zoom);
+    if (v > 0) z *= v;
+  }
+  return z;
+}
+
+/**
+ * A word of `el`'s own text that the browser cut across two lines (a name too long for its
+ * card), or null. Hyphens and slashes are places a word may break.
+ */
+function brokenWord(el: Element): string | null {
+  for (const n of el.childNodes) {
+    if (n.nodeType !== Node.TEXT_NODE) continue;
+    const text = n.textContent ?? '';
+    for (const m of text.matchAll(/[^\s\-/]+/g)) {
+      const range = document.createRange();
+      range.setStart(n, m.index);
+      range.setEnd(n, m.index + m[0].length);
+      const tops = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
+      if (tops.size > 1) return m[0];
+    }
+  }
+  return null;
 }
 
 /** Whether `el`, or a box around it inside `board`, is pinned to the window. */

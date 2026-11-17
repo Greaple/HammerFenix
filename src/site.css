@@ -428,7 +428,7 @@ kbd.cap {
   box-shadow:
     0 2px 0 var(--keycap-shadow),
     0 0 0 1px var(--parchment-dark);
-  font: bold 11px/1 var(--f-body);
+  font: bold 12px/1 var(--f-body);
   text-transform: uppercase;
 }
 
@@ -712,7 +712,7 @@ body[data-page='home'][data-layout='wide'] .site-side {
   body[data-page='home'][data-layout='wide'] .board-modes .mode-name,
   body[data-page='home'][data-layout='short'] .board-modes .mode-name {
     font-size: 13px;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 
   body[data-page='home'][data-layout='wide'] .board-modes .mode-icon,
@@ -803,9 +803,10 @@ body[data-page='home'][data-layout='short'] .site-below {
   display: none;
 }
 
-/* A short window: the eight cards four across, in two rows (their names only, see below) */
+/* A short window: the eight cards four across, in two rows (their names only, see below),
+   once the board has room for the longest name on one line */
 @media (max-height: 720px) {
-  @container (min-width: 480px) {
+  @container (min-width: 680px) {
     body[data-page='home'][data-layout='short'] .site-left .board-modes .mode-grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -1773,8 +1774,8 @@ body[data-page='page'] .site-page.is-scrolling {
 
 .seal {
   flex: none;
-  width: clamp(32px, 5.4vh, 42px);
-  height: clamp(32px, 5.4vh, 42px);
+  width: clamp(34px, 5.4vh, 42px);
+  height: clamp(34px, 5.4vh, 42px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1782,7 +1783,7 @@ body[data-page='page'] .site-page.is-scrolling {
   background: var(--reward);
   border: 3px solid var(--progress);
   color: var(--wood);
-  font: 11px/1 var(--f-label);
+  font: 12px/1 var(--f-label);
 }
 
 .seal.is-done {
@@ -1989,7 +1990,6 @@ body[data-page='page'] .site-page.is-scrolling {
 
 .board-page[data-density='compact'] .need-name {
   min-height: 0;
-  font-size: 11px;
 }
 
 /* --- Fridge --- */
@@ -2107,7 +2107,7 @@ body[data-page='page'] .site-page.is-scrolling {
   position: absolute;
   right: 3px;
   top: 4px;
-  font-size: 11px;
+  font-size: 12px;
   padding: 0 5px;
 }
 
