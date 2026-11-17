@@ -29,8 +29,8 @@ const TEXT: Record<Lang, PageTexts> = {
     left: 'Gauche',
     right: 'Droite',
     down: 'Bas',
-    jumpShort: 'SAUT',
-    bombShort: 'BOMBE',
+    jumpShort: 'Sauter',
+    bombShort: 'Bombe',
     helpTitle: 'Comment jouer',
     storyTitle: 'L’histoire',
     story:
@@ -95,8 +95,8 @@ const TEXT: Record<Lang, PageTexts> = {
     left: 'Left',
     right: 'Right',
     down: 'Down',
-    jumpShort: 'JUMP',
-    bombShort: 'BOMB',
+    jumpShort: 'Jump',
+    bombShort: 'Bomb',
     helpTitle: 'How to play',
     storyTitle: 'The story',
     story:
@@ -160,8 +160,8 @@ const TEXT: Record<Lang, PageTexts> = {
     left: 'Izquierda',
     right: 'Derecha',
     down: 'Abajo',
-    jumpShort: 'SALTO',
-    bombShort: 'BOMBA',
+    jumpShort: 'Saltar',
+    bombShort: 'Bomba',
     helpTitle: 'Cómo jugar',
     storyTitle: 'La historia',
     story:

@@ -1,29 +1,29 @@
 /**
- * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d): the mode menu, the
- * results page after a game, the quests and the fridge. They are drawn inside the game frame
- * with the game's own graphics: the village scene (`menu`, vector), the game's title logo
- * (`mainTitle.png` of the original, upscaled: the only raster), item clips as icons, the
- * pause screen's space key, and the game's fonts (Satans titles, Franklin Gothic Heavy labels,
- * extracted from `_gfx.swf` by `tools/build-fonts.ts`). Panels are drawn as vectors in the
- * parchment and wood colors, so they stay sharp at any size (UI batch U.2).
+ * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d, UI redesign of
+ * 2026-11-16): the home page with the modes, the results page after a game, the quests, the
+ * fridge, the settings and controls pages, and the sound panel over a paused game. They are
+ * HTML pages around the game frame, as the original's were web pages around the game, in the
+ * port's parchment and wood (`src/site.css`) with the game's own drawings: item clips drawn as
+ * pictures (`site/ItemArt.ts`), the game's fonts (Satans titles, Franklin Gothic Heavy labels,
+ * extracted from `_gfx.swf` by `tools/build-fonts.ts`), the title logo and the game over
+ * picture. The frame keeps what the game draws: the village scene (`menu`, vector) and the
+ * logo behind the home page, the site's intro, and the pause screen's sound button.
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
- * the quest and fridge pages show the profile (3.2b): quests done, in progress and still to
- * discover, and the item collection with its "found N times" rule. The selected mode's options
- * are checkboxes under its text, the locked ones with the quest that unlocks them (3.3). The
- * settings page is the site's "Options" link at the bottom of its menu (2C.5): the five
- * settings with the guide's texts (section 8 of `guide.html`, typos fixed; the volume hint
- * names the sound, as the volume sets the sounds and the music).
+ * the quest and fridge pages show the profile (3.2b): quests done and in progress, and the item
+ * collection with its "found N times" rule. The chosen mode's options are checkboxes under its
+ * text, the locked ones with the quest that unlocks them (3.3). The settings page is the site's
+ * "Options" link (2C.5): the settings with the guide's texts (section 8 of `guide.html`, typos
+ * fixed; the volume hint names the sound, as the volume sets the sounds and the music).
  */
 import {
   BlurFilter,
-  ColorMatrixFilter,
   Container,
-  type FederatedWheelEvent,
   Graphics,
   ImageSource,
   Rectangle,
+  type Renderer,
   Sprite,
   Text,
   TextStyle,
@@ -49,7 +49,13 @@ import {
 } from '../engine/swf/BitmapDetail';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
 import { Data } from '../game/Data';
-import { padButtonOf, padGlyph, padLabel } from '../game/gui/PadGlyphs';
+import {
+  type PadButton,
+  padButtonOf,
+  padGlyph,
+  padIconHtml,
+  padLabel,
+} from '../game/gui/PadGlyphs';
 import { DEFAULT_SETTINGS, type PlayerSettings, VOLUME_STEP } from '../game/GameParameters';
 import type { GameResult } from '../game/Loader';
 import {
@@ -63,6 +69,8 @@ import {
 } from '../game/Profile';
 import { INTRO_FPS, INTRO_H, INTRO_W, IntroMovie } from './Intro';
 import type { Lang } from './Language';
+import { fill, h, ICON, svgIcon } from './site/dom';
+import { type Icon, ItemArt } from './site/ItemArt';
 
 /** The game's lang texts the screens reuse. */
 export interface ShellTexts {
@@ -91,12 +99,6 @@ export const TITLE_FILE = 'images/mainTitle.webp';
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
 type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound' | 'controls' | 'intro';
-
-/**
- * An item clip used as an icon: special items below 1000, score items from 1000; `twice` draws
- * two, one behind the other (the two-player Time Attack, as the site's two clocks).
- */
-type Icon = { item: number; twice?: boolean } | { clip: string };
 
 interface ModeEntry {
   /** The site's `$mode`. */
@@ -129,36 +131,6 @@ const MODES: ModeEntry[] = [
   { mode: 'tutorial', icon: { item: 107 }, enabled: true },
 ];
 
-/** Mode cards: two columns. */
-const CARD = { x: [42, 214], y: 138, w: 164, h: 38, gap: 5 };
-/** Top of the area under the cards: the selected mode's options or description. */
-const DETAIL_Y = 309;
-/** The quest and fridge cards. */
-const TAB_Y = 410;
-const TAB_H = 40;
-
-interface TabEntry {
-  screen: 'quests' | 'fridge';
-  icon: Icon;
-}
-
-/** The quest and fridge pages: item 20 (a treasure chest) and item 1018 (strawberry ice). */
-const TABS: TabEntry[] = [
-  { screen: 'quests', icon: { item: 20 } },
-  { screen: 'fridge', icon: { item: 1018 } },
-];
-
-/** What the menu's arrows move through: the modes, each with its options, the tabs, the settings. */
-type MenuEntry =
-  | { kind: 'mode'; mode: ModeEntry }
-  | { kind: 'option'; mode: ModeEntry; oid: string }
-  /** A level set the mode can play (`Profile.runChoices`: the soccer's fields). */
-  | { kind: 'run'; mode: ModeEntry; oid: string }
-  | { kind: 'tab'; tab: TabEntry }
-  /** The site's intro (3.5): the last card of the grid. */
-  | { kind: 'intro' }
-  | { kind: 'settings' };
-
 /**
  * The intro's card, in the grid's free slot after the modes: Tuberculoz, whose plan it tells.
  * The site's home page had an "Intro" button for visitors, beside "Essayer" (the free trial).
@@ -169,40 +141,14 @@ const INTRO_Y = 66;
 /** Most movie frames played in one display frame, after the page was slow or hidden. */
 const INTRO_CATCH_UP = 4;
 
-/**
- * The rows of the settings page, in the guide's order, then the HD pictures (5.6), the controls
- * page (G.4) and the back button.
- */
-const SETTING_ROWS = [
-  'detail',
-  'shake',
-  'sound',
-  'music',
-  'volume',
-  'hd',
-  'controls',
-  'back',
-] as const;
-type SettingRow = (typeof SETTING_ROWS)[number];
-
 /** The HD pictures row's values, in the order Space and the arrows go through them. */
 const HD_CHOICES: readonly BitmapChoice[] = ['auto', 1, 2, 4];
 
 /**
  * The controls page (G.4): the moves in the order of the SWF's key setup screen (`#910`:
- * `labLeft`, `labRight`, `labJump`, `labDown`, `labFire1`), then the reset and back rows.
+ * `labLeft`, `labRight`, `labJump`, `labDown`, `labFire1`).
  */
 const MOVES: readonly PlayerAction[] = ['left', 'right', 'jump', 'down', 'attack'];
-const CTRL_RESET = MOVES.length;
-const CTRL_BACK = MOVES.length + 1;
-/** The controls page's columns: two keyboard slots and the controller's, as `[x, w]`. */
-const CTRL_COLS: readonly [number, number][] = [
-  [124, 90],
-  [218, 90],
-  [312, 76],
-];
-const CTRL_TOP = 96;
-const CTRL_ROW_H = 42;
 
 /** A slot of the controls page waiting for its key or button, and what the last press was. */
 interface Capture {
@@ -211,18 +157,6 @@ interface Capture {
   /** A press that could not be used: shown under the prompt. */
   note: string | null;
 }
-
-/**
- * The rows of the sound panel opened from the pause (port addition): details and shaking stay
- * on the menu's page, as they change the random draws of the game under way.
- */
-const SOUND_ROWS: readonly SettingRow[] = ['sound', 'music', 'volume', 'back'];
-
-/**
- * The settings button, at the bottom right of the menu's panel: as tall as the action button
- * (36), its right edge on the fridge card's (378).
- */
-const GEAR = { x: 360, y: 478, r: 18 };
 
 /** Center of the pause screen's sound button, under the instructions. */
 const PAUSE_BUTTON_Y = 392;
@@ -368,6 +302,37 @@ const TEXT: Record<Lang, Record<string, string>> = {
     capReserved: 'Cette touche sert déjà au jeu (pause, musique, carte…).',
     capReservedPad: 'Ce bouton sert déjà au jeu (pause, musique, carte…).',
     capUnknown: 'Le jeu ne peut pas lire cette touche.',
+    modesTitle: 'Modes de jeu',
+    introDesc: 'Revoir le film d’introduction du site : le terrible plan de Tuberculoz.',
+    watchIntro: 'Voir l’intro',
+    locked: 'Verrouillé',
+    book: 'Mon carnet',
+    questsNear: 'Quêtes en cours',
+    itemsOf: '{0} / {1} objets',
+    moreItems: '+ {0} autres',
+    all: 'Toutes',
+    fridgeAll: 'Tout',
+    fridgeAlmost: 'Presque',
+    fridgeNever: 'Pas encore trouvés',
+    fridgeEmpty: 'Aucun objet ici pour l’instant.',
+    pageOf: 'Page {0} sur {1}',
+    prevPage: 'Page précédente',
+    nextPage: 'Page suivante',
+    famCount: '{0} / {1} au réfrigérateur',
+    score: 'Score',
+    levelReached: 'Niveau atteint',
+    language: 'Langue',
+    moveHint: 'Se déplacer',
+    pauseHint: 'Pause',
+    toolMap: 'Carte des cavernes',
+    toolFull: 'Plein écran',
+    toolQuit: 'Abandonner la partie',
+    toolQuitSure: 'Encore une fois pour abandonner',
+    tabPlay: 'Jouer',
+    tabFridge: 'Frigo',
+    filter: 'Filtre',
+    lockedOptions: 'Options à débloquer : {0}',
+    runTime: 'Temps',
   },
   en: {
     solo: 'Adventure',
@@ -495,6 +460,37 @@ const TEXT: Record<Lang, Record<string, string>> = {
     capReserved: 'The game already uses this key (pause, music, map…).',
     capReservedPad: 'The game already uses this button (pause, music, map…).',
     capUnknown: 'The game cannot read this key.',
+    modesTitle: 'Game modes',
+    introDesc: 'Watch the site’s intro movie again: Tuberculoz’s terrible plan.',
+    watchIntro: 'Watch the intro',
+    locked: 'Locked',
+    book: 'My notebook',
+    questsNear: 'Quests in progress',
+    itemsOf: '{0} / {1} items',
+    moreItems: '+ {0} more',
+    all: 'All',
+    fridgeAll: 'All',
+    fridgeAlmost: 'Almost',
+    fridgeNever: 'Not found yet',
+    fridgeEmpty: 'No item here yet.',
+    pageOf: 'Page {0} of {1}',
+    prevPage: 'Previous page',
+    nextPage: 'Next page',
+    famCount: '{0} / {1} in the fridge',
+    score: 'Score',
+    levelReached: 'Level reached',
+    language: 'Language',
+    moveHint: 'Move',
+    pauseHint: 'Pause',
+    toolMap: 'Map of the caverns',
+    toolFull: 'Full screen',
+    toolQuit: 'Give up the game',
+    toolQuitSure: 'Once more to give up',
+    tabPlay: 'Play',
+    tabFridge: 'Fridge',
+    filter: 'Filter',
+    lockedOptions: 'Options to unlock: {0}',
+    runTime: 'Time',
   },
   es: {
     solo: 'Aventura',
@@ -626,6 +622,38 @@ const TEXT: Record<Lang, Record<string, string>> = {
     capReserved: 'El juego ya usa esta tecla (pausa, música, mapa…).',
     capReservedPad: 'El juego ya usa este botón (pausa, música, mapa…).',
     capUnknown: 'El juego no puede leer esta tecla.',
+    modesTitle: 'Modos de juego',
+    introDesc:
+      'Vuelve a ver la película de introducción del sitio: el terrible plan de Tuberculoz.',
+    watchIntro: 'Ver la intro',
+    locked: 'Bloqueado',
+    book: 'Mi cuaderno',
+    questsNear: 'Exploraciones en curso',
+    itemsOf: '{0} / {1} objetos',
+    moreItems: '+ {0} más',
+    all: 'Todas',
+    fridgeAll: 'Todo',
+    fridgeAlmost: 'Casi',
+    fridgeNever: 'Aún no encontrados',
+    fridgeEmpty: 'Aún no hay ningún objeto aquí.',
+    pageOf: 'Página {0} de {1}',
+    prevPage: 'Página anterior',
+    nextPage: 'Página siguiente',
+    famCount: '{0} / {1} en el frigorífico',
+    score: 'Puntuación',
+    levelReached: 'Nivel alcanzado',
+    language: 'Idioma',
+    moveHint: 'Moverse',
+    pauseHint: 'Pausa',
+    toolMap: 'Mapa de las cavernas',
+    toolFull: 'Pantalla completa',
+    toolQuit: 'Abandonar la partida',
+    toolQuitSure: 'Otra vez para abandonar',
+    tabPlay: 'Jugar',
+    tabFridge: 'Frigo',
+    filter: 'Filtro',
+    lockedOptions: 'Opciones por desbloquear: {0}',
+    runTime: 'Tiempo',
   },
 };
 
@@ -643,19 +671,12 @@ const BG_BLUR = 5;
 /** Center of the screens' main button, at the bottom of their panel. */
 const BUTTON_Y = 478;
 
-/** Parchment and wood, as the page's help dialog (`src/style.css`). */
+/** Parchment and wood (`src/site.css`), for what is still drawn in the frame. */
 const C = {
-  parchment: 0xf3e2bd,
-  parchmentDark: 0xe6cf9f,
   wood: 0x5f452c,
   woodDark: 0x3f2c1b,
-  ink: '#4a3520',
-  inkSoft: '#7a5f44',
   gold: '#fff3c4',
-  /** Page titles and keycap letters: the wood, as text. */
   heading: '#5f452c',
-  done: '#3f8f1a',
-  progress: '#b8730f',
   todo: '#9a8670',
 };
 
@@ -668,14 +689,57 @@ const FONT = {
 
 type TextKind = keyof typeof FONT;
 
-/** Quest rows shown at once. */
-const QUEST_ROWS = 7;
-/** Fridge grid. */
-const FRIDGE_COLS = 10;
-const FRIDGE_ROWS = 6;
+/** Fridge shelves: items per row and rows per page (the redesign's glass shelves). */
+const FRIDGE_COLS = 8;
+const FRIDGE_ROWS = 3;
 const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
-const FRIDGE_CELL = 34;
 
+/** The rewards' picture: item 8, "Etoile des neiges". */
+const STAR: Icon = { item: 8 };
+
+/**
+ * The home page's layouts (`src/site.css`, after the canvas's note on them): three columns
+ * from 1280 px wide; from 600 to 1279 px, upright, the frame at its own size beside the
+ * notebook and the modes across under them; lying, the frame as tall as the screen beside the
+ * modes, the notebook folded into buttons; under 600 px, the phone's.
+ */
+type HomeLayout = 'wide' | 'tall' | 'short' | 'phone';
+const PHONE_QUERY = '(max-width: 599px)';
+const WIDE_QUERY = '(min-width: 1280px)';
+const UPRIGHT_QUERY = '(orientation: portrait)';
+
+type QuestTab = 'progress' | 'done' | 'all';
+type FridgeFilter = 'all' | 'almost' | 'never';
+
+/** The page elements the site screens fill (`index.html`); absent in tests. */
+interface SiteDom {
+  /** Left of the frame: the modes board (home, wide screens). */
+  modes: HTMLElement;
+  /** Right of the frame: the player's notebook (home, wide screens). */
+  book: HTMLElement;
+  /** Over the frame: the modes on a phone, the sound panel over the paused game. */
+  overlay: HTMLElement;
+  /** Under the frame: the keys (wide screens), the chosen mode (phone). */
+  below: HTMLElement;
+  /** The full pages (quests, fridge, settings, controls, results), in place of the frame. */
+  page: HTMLElement;
+  /** The phone's tab bar. */
+  tabbar: HTMLElement;
+  /** The mode of the game under way, in the top bar. */
+  chips: HTMLElement;
+}
+
+/**
+ * The site around the game frame (UI redesign, after the "HammerFenix UI Redesign" canvas):
+ * the home page (the modes beside the frame, the notebook on the other side), and the quest,
+ * fridge, settings, controls and results pages, as HTML in the parchment and wood of the port.
+ * The frame keeps what the game draws: the village and the title logo behind the home page,
+ * the site's intro, and the sound button of the pause screen.
+ *
+ * Input: the keyboard's arrows, the bomb key and pause, a controller's D-pad, A and B
+ * (`InputController.consumeMenu`) move the focus between the page's elements by where they
+ * are on screen, press the focused one and go back; a click or a tap presses one too.
+ */
 export class Shell {
   readonly root = new Container();
   private readonly lib: SwfLibrary;
@@ -683,8 +747,6 @@ export class Shell {
   private readonly texts: ShellTexts;
   private readonly profile: Profile;
   private title: Texture | null = null;
-  private gameOverArt: Texture | null = null;
-  private readonly grey = new ColorMatrixFilter();
   private screen: Screen | null = null;
   /** When `fadeOut` started (`performance.now()`), while it runs. */
   private fadeFrom: number | null = null;
@@ -696,27 +758,31 @@ export class Shell {
   private record: GameRecord | null = null;
   /** A Time Attack game's time against the best one, for its results page. */
   private time: TimeResult | null = null;
-  /** Index in `menuEntries()`. */
-  private selected = 0;
   /**
-   * The mode chosen on the menu (`$mode`): its options or description show under the cards, and
-   * the action button starts it. The arrows only move the focus (`selected`); confirming a card
-   * chooses it, and confirming the chosen card starts it, as two clicks do.
+   * The mode chosen on the home page (`$mode`, or `intro`): its text and options show under the
+   * modes, and the main button starts it. Pressing a mode chooses it; pressing the chosen one
+   * starts it, as two clicks do.
    */
   private chosen = MODES[0].mode;
-  /** Where each menu entry was drawn (`[x, y, w, h]`), for the arrows. */
-  private readonly navRects = new Map<number, [number, number, number, number]>();
-  private questSel = 0;
-  private questTop = 0;
-  private fridgeSel = 0;
-  private settingSel = 0;
+  /** The mode the menu started, for the top bar while it plays; null for the debug toolbar's. */
+  private playing: string | null = null;
+  /** `data-nav` of the focused element of the page. */
+  private focusKey: string | null = null;
+  /** The focus moved with the arrows: the next render scrolls it into view. */
+  private navMoved = false;
+  private questTab: QuestTab = 'progress';
+  private questId: number | null = null;
+  private fridgeFilter: FridgeFilter = 'all';
+  private fridgePage = 0;
+  private fridgeId: number | null = null;
+  /** The home page shows an option's hint: moving the focus off it redraws the page. */
+  private hintShown = false;
+  /** The give up button was pressed once (`performance.now()`): a second press gives up. */
+  private quitArmed = 0;
   /** The player's settings, as the settings page shows them. */
   settings: PlayerSettings = { ...DEFAULT_SETTINGS };
   /** The player's keys and buttons, as the controls page shows them (G.4). */
   bindings: Bindings = DEFAULT_BINDINGS;
-  /** The controls page's selected row and column. */
-  private ctrlRow = 0;
-  private ctrlCol = 0;
   /** Set while a slot waits for its key or button. */
   private capture: Capture | null = null;
   /** A key or button changed on the controls page. */
@@ -730,11 +796,19 @@ export class Shell {
   private readonly introLayer = new Container();
   /** `performance.now()` of the intro's last frame. */
   private introClock = 0;
+  /** The game's drawings as pictures for the pages, once the page gave a renderer. */
+  private art: ItemArt | null = null;
+  private dom: SiteDom | null = null;
+  private phone: MediaQueryList | null = null;
+  private wide: MediaQueryList | null = null;
+  private upright: MediaQueryList | null = null;
 
   /** "Start game" on Adventure: the site loads the game page with `$mode`. */
   onStart?: (mode: string) => void;
   /** A setting changed on the settings page. */
   onSettings?: (s: PlayerSettings) => void;
+  /** A language chosen on the settings page. */
+  onLang?: (lang: string) => void;
   /** Set while the sound panel shows over the game. */
   private onSoundClose: (() => void) | null = null;
   /**
@@ -752,11 +826,9 @@ export class Shell {
     this.input = input;
     this.texts = texts;
     this.profile = profile;
-    this.grey.desaturate();
     this.root.visible = false;
     this.root.eventMode = 'static';
     this.root.hitArea = new Rectangle(0, 0, W, H);
-    this.root.on('wheel', (e: FederatedWheelEvent) => this.onWheel(e.deltaY));
     // The intro's movie, masked to its stage. A press on it is its button's (`IntroMovie.click`);
     // Flash showed the hand over a button
     this.introLayer.position.set(0, INTRO_Y);
@@ -769,13 +841,39 @@ export class Shell {
     this.introLayer.on('pointerdown', () => this.intro?.click());
   }
 
-  /** Loads the title logo and the game over picture. */
+  /** Loads the title logo. */
   async load(baseUrl: string): Promise<void> {
     this.baseUrl = baseUrl;
-    [this.title, this.gameOverArt] = await Promise.all([
-      loadTexture(`${baseUrl}${TITLE_FILE}`),
-      loadTexture(`${baseUrl}${GAME_OVER_FILE}`),
-    ]);
+    this.title = await loadTexture(`${baseUrl}${TITLE_FILE}`);
+  }
+
+  /**
+   * Gives the shell the page around the frame (`index.html`) and the renderer that draws the
+   * game's clips as pictures for it.
+   */
+  attachPage(renderer: Renderer): void {
+    this.art = new ItemArt(this.lib, renderer);
+    const el = (id: string) => document.getElementById(id) as HTMLElement;
+    const dom: SiteDom = {
+      modes: el('site-modes'),
+      book: el('site-book'),
+      overlay: el('frame-overlay'),
+      below: el('site-below'),
+      page: el('site-page'),
+      tabbar: el('site-tabbar'),
+      chips: el('play-chips'),
+    };
+    this.dom = dom;
+    for (const box of Object.values(dom) as HTMLElement[]) {
+      box.addEventListener('focusin', (e: FocusEvent) => this.onFocusIn(e.target as HTMLElement));
+    }
+    this.phone = window.matchMedia(PHONE_QUERY);
+    this.phone.addEventListener('change', () => this.refresh());
+    this.wide = window.matchMedia(WIDE_QUERY);
+    this.wide.addEventListener('change', () => this.refresh());
+    this.upright = window.matchMedia(UPRIGHT_QUERY);
+    this.upright.addEventListener('change', () => this.refresh());
+    this.showLayout();
   }
 
   get visible(): boolean {
@@ -789,9 +887,10 @@ export class Shell {
 
   showMenu(): void {
     this.screen = 'menu';
-    this.selected = Math.min(this.selected, this.menuEntries().length - 1);
     this.result = null;
     this.record = null;
+    this.playing = null;
+    if (!this.focusKey?.startsWith('mode:')) this.focusKey = `mode:${this.chosen}`;
     this.render();
   }
 
@@ -808,33 +907,40 @@ export class Shell {
     this.result = result;
     this.record = record;
     this.time = time;
+    this.focusKey = 'continue';
     this.render();
   }
 
   showQuests(): void {
     this.screen = 'quests';
-    this.questSel = 0;
-    this.questTop = 0;
+    const p = this.profile.data;
+    const q = this.profile.quests;
+    const any = (s: string) => q.quests.some((x) => q.status(p, x.id) === s);
+    this.questTab = any('progress') ? 'progress' : any('done') ? 'done' : 'progress';
+    this.questId = this.questList()[0] ?? null;
+    this.focusKey = this.questId === null ? `qtab:${this.questTab}` : `q:${this.questId}`;
     this.render();
   }
 
   showFridge(): void {
     this.screen = 'fridge';
-    this.fridgeSel = 0;
+    this.fridgeFilter = 'all';
+    this.fridgePage = 0;
+    this.fridgeId = this.fridgeIds()[0] ?? null;
+    this.focusKey = this.fridgeId === null ? 'ftab:all' : `f:${this.fridgeId}`;
     this.render();
   }
 
   showSettings(): void {
     this.screen = 'settings';
-    this.settingSel = 0;
+    this.focusKey = 'set:detail';
     this.render();
   }
 
   /** The controls page (G.4), from the settings page. */
   showControls(): void {
     this.screen = 'controls';
-    this.ctrlRow = 0;
-    this.ctrlCol = 0;
+    this.focusKey = 'ctl:0:0';
     this.endCapture();
     this.render();
   }
@@ -845,15 +951,15 @@ export class Shell {
    */
   showSound(onClose: () => void): void {
     this.screen = 'sound';
-    this.settingSel = 0;
+    this.focusKey = 'set:sound';
     this.onSoundClose = onClose;
     this.render();
   }
 
   /**
-   * The site's intro (3.5), from the menu's card or on the first launch. It plays in the game
-   * frame and ends at its end, on a click, or with the confirm or back key; the menu then shows
-   * with the Learning mode chosen, the free trial the movie led to (`INTRO_URL`).
+   * The site's intro (3.5), from the home page or on the first launch. It plays in the game
+   * frame and ends at its end, on a click, or with the confirm or back key; the home page then
+   * shows with the Learning mode chosen, the free trial the movie led to (`INTRO_URL`).
    */
   showIntro(): void {
     this.screen = 'intro';
@@ -873,15 +979,11 @@ export class Shell {
     });
   }
 
-  /** The intro is over: back to the menu, the Learning mode chosen. */
+  /** The intro is over: back to the home page, the Learning mode chosen. */
   private endIntro(): void {
     this.dropIntro();
-    const tutorial = MODES.find((m) => m.mode === 'tutorial')!;
-    this.chosen = tutorial.mode;
-    this.selected = Math.max(
-      0,
-      this.menuEntries().findIndex((e) => e.kind === 'mode' && e.mode === tutorial),
-    );
+    this.chosen = 'tutorial';
+    this.focusKey = 'mode:tutorial';
     this.showMenu();
   }
 
@@ -901,12 +1003,14 @@ export class Shell {
     this.root.alpha = 1;
     this.root.eventMode = 'static';
     this.clear();
+    this.showLayout();
   }
 
   /**
    * Fades the screen out over the game starting under it, then hides it. The menu's village
    * is the first level's, so it dissolves into the level. The fade waits until `ready()` says
    * the level is drawn (at most 2 s), so it never shows the black of the level being read.
+   * The page around the frame takes its playing layout at once.
    */
   fadeOut(ready: () => boolean = () => true, ms = 700): void {
     this.screen = null;
@@ -915,11 +1019,20 @@ export class Shell {
     this.fadeAsked = performance.now();
     this.fadeFrom = null;
     this.fadeMs = ms;
+    // The village blurred for the fade, so it does not show that it and the first level are
+    // not drawn at the same place (U.4); the home page shows it sharp
+    if (this.root.visible) {
+      this.clear();
+      this.drawBackground();
+      this.drawTitle(2, 290);
+    }
+    this.showLayout();
   }
 
   /** Redraws the current screen, e.g. after a language change. */
   refresh(): void {
     if (this.screen) this.render();
+    else this.showLayout();
     if (this.pauseDrawn !== null) this.pauseDrawn = '';
   }
 
@@ -996,8 +1109,9 @@ export class Shell {
   }
 
   /**
-   * Keys, once per frame while a screen shows: arrows choose, space confirms. A controller
-   * moves with its D-pad or stick, confirms with A and goes back with B.
+   * Keys, once per frame while a screen shows: the arrows move the focus, the bomb key presses
+   * the focused element, pause goes back. A controller moves with its D-pad or stick, presses
+   * with A and goes back with B.
    */
   update(): void {
     if (this.fadeReady) {
@@ -1027,55 +1141,42 @@ export class Shell {
     const right = inp.consumeMenu('right');
     const ok = inp.consumeMenu('ok');
     const esc = inp.consumeMenu('back');
+    if (this.screen === 'intro') {
+      if (ok || esc) this.endIntro();
+      else this.stepIntro();
+      return;
+    }
+    // A dialog over the page (help) takes the keys
+    if (typeof document !== 'undefined' && document.querySelector('dialog[open]')) return;
+    const key = this.focusKey ?? '';
+    if ((left || right) && key === 'set:volume') {
+      this.setVolume(this.settings.volume + (right ? VOLUME_STEP : -VOLUME_STEP));
+    } else if ((left || right) && key === 'set:hd') {
+      this.stepHd(right ? 1 : -1);
+    } else {
+      if (up) this.moveFocus(0, -1);
+      if (down) this.moveFocus(0, 1);
+      if (left) this.moveFocus(-1, 0);
+      if (right) this.moveFocus(1, 0);
+    }
+    if (ok) this.focusedElement()?.click();
+    if (esc) this.back();
+  }
+
+  /** Pause, Escape or B: the page's way back. */
+  private back(): void {
     switch (this.screen) {
-      case 'intro':
-        if (ok || esc) this.endIntro();
-        else this.stepIntro();
-        break;
-      case 'menu':
-        if (up) this.navigate(0, -1);
-        if (down) this.navigate(0, 1);
-        if (left) this.navigate(-1, 0);
-        if (right) this.navigate(1, 0);
-        if (ok) this.confirm();
-        break;
       case 'result':
-        if (ok || up || esc) this.showMenu();
-        break;
       case 'quests':
-        if (up) this.selectQuest(this.questSel - 1);
-        if (down) this.selectQuest(this.questSel + 1);
-        if (ok || esc) this.showMenu();
-        break;
       case 'fridge':
-        if (left) this.selectItem(this.fridgeSel - 1);
-        if (right) this.selectItem(this.fridgeSel + 1);
-        if (up) this.selectItem(this.fridgeSel - FRIDGE_COLS);
-        if (down) this.selectItem(this.fridgeSel + FRIDGE_COLS);
-        if (ok || esc) this.showMenu();
+        this.showMenu();
         break;
       case 'settings':
       case 'sound':
-        if (up) this.selectSetting(this.settingSel - 1);
-        if (down) this.selectSetting(this.settingSel + 1);
-        if (this.settingRows[this.settingSel] === 'volume') {
-          if (left) this.setVolume(this.settings.volume - VOLUME_STEP);
-          if (right) this.setVolume(this.settings.volume + VOLUME_STEP);
-        }
-        if (this.settingRows[this.settingSel] === 'hd') {
-          if (left) this.stepHd(-1);
-          if (right) this.stepHd(1);
-        }
-        if (ok) this.confirmSetting();
-        if (esc) this.leaveSettings();
+        this.leaveSettings();
         break;
       case 'controls':
-        if (up) this.selectControl(this.ctrlRow - 1, this.ctrlCol);
-        if (down) this.selectControl(this.ctrlRow + 1, this.ctrlCol);
-        if (left && this.ctrlRow < CTRL_RESET) this.selectControl(this.ctrlRow, this.ctrlCol - 1);
-        if (right && this.ctrlRow < CTRL_RESET) this.selectControl(this.ctrlRow, this.ctrlCol + 1);
-        if (ok) this.confirmControl();
-        if (esc) this.leaveControls();
+        this.leaveControls();
         break;
     }
   }
@@ -1096,32 +1197,165 @@ export class Shell {
     if (movie.ended) this.endIntro();
   }
 
-  private onWheel(dy: number): void {
-    if (dy === 0) return;
-    const d = Math.sign(dy);
-    if (this.screen === 'quests') this.selectQuest(this.questSel + d);
-    else if (this.screen === 'fridge') {
-      const page = Math.floor(this.fridgeSel / FRIDGE_PAGE) + d;
-      if (page >= 0 && page * FRIDGE_PAGE < this.profile.quests.itemIds.length) {
-        this.selectItem(page * FRIDGE_PAGE);
-      }
-    }
+  // ------------------------------------------------------------ focus
+
+  /** The page's elements the focus can go to, as laid out (hidden ones left out). */
+  private navElements(): HTMLElement[] {
+    const d = this.dom;
+    if (!d) return [];
+    const boxes = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    return boxes.flatMap((b) =>
+      [...b.querySelectorAll<HTMLElement>('[data-nav]')].filter(
+        (el) => el.getClientRects().length > 0 && !el.closest('[hidden]'),
+      ),
+    );
   }
 
-  /** The modes, the options of each enabled mode (locked ones too, for their hint), the tabs. */
-  private menuEntries(): MenuEntry[] {
-    const out: MenuEntry[] = [];
-    for (const mode of MODES) {
-      out.push({ kind: 'mode', mode });
-      if (!mode.enabled || this.isLocked(mode)) continue;
-      for (const oid of this.modeOptions(mode)) out.push({ kind: 'option', mode, oid });
-      for (const oid of this.profile.runChoices(mode.mode)) out.push({ kind: 'run', mode, oid });
-    }
-    out.push({ kind: 'intro' });
-    for (const tab of TABS) out.push({ kind: 'tab', tab });
-    out.push({ kind: 'settings' });
-    return out;
+  private focusedElement(): HTMLElement | null {
+    if (!this.focusKey) return null;
+    return this.navElements().find((el) => el.dataset.nav === this.focusKey) ?? null;
   }
+
+  /**
+   * The arrows: the nearest element in that direction, as laid out, favoring the same row or
+   * column. Up and down wrap around; left and right stop at the edge, where the fridge turns
+   * its page.
+   */
+  private moveFocus(dx: number, dy: number): void {
+    const els = this.navElements();
+    if (els.length === 0) return;
+    const from = els.find((el) => el.dataset.nav === this.focusKey);
+    if (!from) {
+      this.setFocus(els[0].dataset.nav!);
+      return;
+    }
+    /** How far apart two spans are along one axis (0 when they overlap). */
+    const gap = (a0: number, a1: number, b0: number, b1: number) =>
+      Math.max(0, Math.max(a0, b0) - Math.min(a1, b1));
+    const best = (fr: { left: number; right: number; top: number; bottom: number }) => {
+      const fx = (fr.left + fr.right) / 2;
+      const fy = (fr.top + fr.bottom) / 2;
+      let pick: HTMLElement | null = null;
+      let score = Infinity;
+      for (const el of els) {
+        if (el === from) continue;
+        const r = el.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        const along = dx !== 0 ? (cx - fx) * dx : (cy - fy) * dy;
+        // Sideways: the gap between the two, so a wide element under a narrow one is in line
+        const across =
+          dx !== 0
+            ? gap(fr.top, fr.bottom, r.top, r.bottom)
+            : gap(fr.left, fr.right, r.left, r.right);
+        // Within 60 degrees of the direction: nothing far to the side
+        if (along <= 1 || across > along * 1.75) continue;
+        const sc = along + across * 3;
+        if (sc < score) {
+          score = sc;
+          pick = el;
+        }
+      }
+      return pick;
+    };
+    const fr = from.getBoundingClientRect();
+    let next = best(fr);
+    if (!next && dx !== 0 && this.screen === 'fridge' && from.dataset.nav?.startsWith('f:')) {
+      this.turnFridgePage(dx, from.dataset.nav);
+      return;
+    }
+    // Wrap: as if coming from beyond the other edge
+    if (!next && dy !== 0) {
+      const y = dy > 0 ? -100000 : 100000;
+      next = best({ left: fr.left, right: fr.right, top: y, bottom: y });
+    }
+    if (next) this.setFocus(next.dataset.nav!);
+  }
+
+  /** Moves the focus to the element `key`, and what the focus chooses (quest, item) with it. */
+  private setFocus(key: string): void {
+    this.navMoved = true;
+    this.focusKey = key;
+    if (!this.selectFocused(key)) this.applyFocus();
+  }
+
+  /** The focus came to an element by Tab or a click. */
+  private onFocusIn(el: HTMLElement): void {
+    const key = el.closest<HTMLElement>('[data-nav]')?.dataset.nav;
+    if (!key || key === this.focusKey) return;
+    this.focusKey = key;
+    this.selectFocused(key);
+  }
+
+  /**
+   * On the quest and fridge pages, the focus chooses the quest or item it is on, and the
+   * focused option's hint shows on the home page. Returns whether the page was drawn again.
+   */
+  private selectFocused(key: string): boolean {
+    if (key.startsWith('q:')) {
+      const id = Number(key.slice(2));
+      if (id !== this.questId) {
+        this.questId = id;
+        this.renderKeeping(key);
+        return true;
+      }
+    } else if (key.startsWith('f:')) {
+      const id = Number(key.slice(2));
+      if (id !== this.fridgeId) {
+        this.fridgeId = id;
+        this.renderKeeping(key);
+        return true;
+      }
+    } else if (this.screen === 'menu' && (/^(opt|run):/.test(key) || this.hintShown)) {
+      // The hint under the options follows the focused option. Written in place: a redraw
+      // here would replace the button a click is landing on
+      this.showHint();
+    }
+    return false;
+  }
+
+  /**
+   * Draws the page again with the element `key` where it was on screen: on a phone the quest
+   * that closes above the one pressed would otherwise pull it up.
+   */
+  private renderKeeping(key: string): void {
+    const page = this.dom?.page;
+    const find = () => page?.querySelector<HTMLElement>(`[data-nav="${key}"]`) ?? null;
+    const before = find()?.getBoundingClientRect().top;
+    this.render();
+    const after = find()?.getBoundingClientRect().top;
+    if (page && before !== undefined && after !== undefined) page.scrollTop += after - before;
+  }
+
+  /** The hint of the focused option, under the options of the chosen mode. */
+  private showHint(): void {
+    const mode = MODES.find((m) => m.mode === this.chosen);
+    const hint = mode ? this.optionHint(mode) : '';
+    this.hintShown = hint !== '';
+    this.dom?.modes.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+    this.dom?.below.querySelectorAll('.opt-hint').forEach((el) => (el.textContent = hint));
+  }
+
+  /** Gives the DOM focus to the focused element, unless the page is used by touch. */
+  private applyFocus(): void {
+    if (typeof document === 'undefined') return;
+    const el = this.focusedElement();
+    const scroll = this.navMoved;
+    this.navMoved = false;
+    if (!el || this.input.device === 'touch') return;
+    const active = document.activeElement;
+    const d = this.dom;
+    const inSite =
+      !active ||
+      active === document.body ||
+      (d !== null &&
+        [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar].some((b) => b.contains(active)));
+    if (!inSite) return;
+    if (active !== el) el.focus({ preventScroll: true });
+    if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  // ------------------------------------------------------------ menu logic
 
   /** A mode the profile does not have yet: a quest gives it (`Profile.hasMode`). */
   private isLocked(mode: ModeEntry): boolean {
@@ -1140,105 +1374,68 @@ export class Shell {
     return list ? [...list, Data.OPT_BOOST] : [];
   }
 
-  private select(i: number): void {
-    const count = this.menuEntries().length;
-    const n = (i + count) % count;
-    if (n === this.selected) return;
-    this.selected = n;
-    this.render();
+  /** A mode card pressed: chosen, or started when it already was. */
+  private pressMode(mode: string): void {
+    this.focusKey = `mode:${mode}`;
+    if (mode !== this.chosen) {
+      this.chosen = mode;
+      this.render();
+      return;
+    }
+    this.startChosen();
   }
 
-  private confirm(): void {
-    const e = this.menuEntries()[this.selected];
-    if (e.kind === 'settings') {
-      this.showSettings();
-    } else if (e.kind === 'intro') {
+  /** The main button: starts the chosen mode, or plays the intro. */
+  private startChosen(): void {
+    if (this.chosen === 'intro') {
       this.showIntro();
-    } else if (e.kind === 'tab') {
-      if (e.tab.screen === 'quests') this.showQuests();
-      else this.showFridge();
-    } else if (e.kind === 'option') {
-      if (e.oid === Data.OPT_BOOST) return; // no box to untick (quest 62)
-      this.profile.toggleOption(e.oid);
-      this.render();
-    } else if (e.kind === 'run') {
-      this.profile.chooseRun(e.mode.mode, e.oid);
-      this.render();
-    } else if (e.mode.mode !== this.chosen) {
-      this.chosen = e.mode.mode;
-      this.render();
-    } else if (e.mode.enabled && !this.isLocked(e.mode)) {
-      this.onStart?.(e.mode.mode);
+      return;
+    }
+    const m = MODES.find((x) => x.mode === this.chosen);
+    if (m && m.enabled && !this.isLocked(m)) {
+      this.playing = m.mode;
+      this.onStart?.(m.mode);
     }
   }
 
-  /**
-   * A click on menu entry `i`: tabs open, options tick and fields are chosen at once; a mode is
-   * chosen, and started when it already was.
-   */
-  private clickEntry(i: number): void {
-    this.selected = i;
-    this.confirm();
-    if (this.screen === 'menu') this.render();
-  }
-
-  private selectQuest(i: number): void {
-    const n = Math.max(0, Math.min(this.questList().length - 1, i));
-    if (n === this.questSel) return;
-    this.questSel = n;
-    if (n < this.questTop) this.questTop = n;
-    if (n >= this.questTop + QUEST_ROWS) this.questTop = n - QUEST_ROWS + 1;
+  private toggleOption(oid: string): void {
+    this.focusKey = `opt:${oid}`;
+    if (oid === Data.OPT_BOOST || !this.profile.hasOption(oid)) {
+      this.render(); // no box to untick (quest 62), or locked: the hint says why
+      return;
+    }
+    this.profile.toggleOption(oid);
     this.render();
   }
 
-  /** The rows of the settings page showing. */
-  private get settingRows(): readonly SettingRow[] {
-    return this.screen === 'sound' ? SOUND_ROWS : SETTING_ROWS;
-  }
-
-  private selectSetting(i: number): void {
-    const count = this.settingRows.length;
-    const n = (i + count) % count;
-    if (n === this.settingSel) return;
-    this.settingSel = n;
+  private chooseRun(mode: string, oid: string): void {
+    this.focusKey = `run:${oid}`;
+    this.profile.chooseRun(mode, oid);
     this.render();
   }
 
-  /** Space or a click on a row: ticks or unticks it; on the volume, the next step (wrapping). */
-  private confirmSetting(): void {
-    const row = this.settingRows[this.settingSel];
-    if (row === 'back') {
-      this.leaveSettings();
-      return;
+  /** The hint of the focused option or field, as the old menu showed it. */
+  private optionHint(mode: ModeEntry): string {
+    const t = this.t;
+    const key = this.focusKey ?? '';
+    if (key.startsWith('opt:')) {
+      const oid = key.slice(4);
+      if (!this.modeOptions(mode).includes(oid)) return '';
+      if (!this.profile.hasOption(oid)) return fmt(t.lockedBy, this.questForOption(oid));
+      if (oid === Data.OPT_BOOST) return t.alwaysOn;
+      return this.profile.isChosen(oid) ? t.optionOn : t.optionOff;
     }
-    if (row === 'controls') {
-      this.showControls();
-      return;
+    if (key.startsWith('run:')) {
+      const oid = key.slice(4);
+      const runs = this.profile.runChoices(mode.mode);
+      const k = runs.indexOf(oid);
+      if (k < 0) return '';
+      return this.fieldHint(k, oid === this.profile.runOption(mode.mode));
     }
-    if (row === 'volume') {
-      const v = this.settings.volume;
-      this.setVolume(v >= 100 ? 0 : v + VOLUME_STEP);
-      return;
-    }
-    if (row === 'hd') {
-      this.stepHd(1);
-      return;
-    }
-    this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
+    return '';
   }
 
-  /** The next (`1`) or previous (`-1`) HD pictures choice, wrapping; kept at once. */
-  private stepHd(dir: number): void {
-    const i = HD_CHOICES.indexOf(savedBitmapChoice());
-    const n = HD_CHOICES.length;
-    saveBitmapChoice(HD_CHOICES[(i + dir + n) % n]);
-    this.render();
-  }
-
-  /**
-   * Back to the menu, with Adventure selected again (the gear is only a way in); or, from the
-   * sound panel, back to the paused game.
-   */
+  /** Back to the home page, or from the sound panel, back to the paused game. */
   private leaveSettings(): void {
     if (this.screen === 'sound') {
       const close = this.onSoundClose;
@@ -1255,45 +1452,45 @@ export class Shell {
       window.location.replace(url.toString());
       return;
     }
-    this.selected = 0;
     this.showMenu();
+  }
+
+  /** The next (`1`) or previous (`-1`) HD pictures choice, wrapping; kept at once. */
+  private stepHd(dir: number): void {
+    const i = HD_CHOICES.indexOf(savedBitmapChoice());
+    const n = HD_CHOICES.length;
+    saveBitmapChoice(HD_CHOICES[(i + dir + n) % n]);
+    this.focusKey = 'set:hd';
+    this.render();
   }
 
   private setVolume(v: number): void {
     const vol = Math.max(0, Math.min(100, Math.round(v / VOLUME_STEP) * VOLUME_STEP));
+    this.focusKey = 'set:volume';
     if (vol !== this.settings.volume) this.changeSettings({ volume: vol });
+  }
+
+  /** The settings page's rows that tick: the guide's four checkboxes. */
+  private toggleSetting(row: 'detail' | 'shake' | 'sound' | 'music'): void {
+    this.focusKey = `set:${row}`;
+    this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
   }
 
   // ---------------------------------------------------------- controls (G.4)
 
-  private selectControl(row: number, col: number): void {
-    const rows = CTRL_BACK + 1;
-    const r = (row + rows) % rows;
-    const c = Math.max(0, Math.min(CTRL_COLS.length - 1, col));
-    if (r === this.ctrlRow && c === this.ctrlCol) return;
-    this.ctrlRow = r;
-    this.ctrlCol = c;
+  /** A slot pressed: it waits for its key or button. */
+  private startCapture(row: number, col: number): void {
+    this.focusKey = `ctl:${row}:${col}`;
+    this.capture = { row, col, note: null };
+    this.input.startCapture();
     this.render();
   }
 
-  /** Space, A or a click: a slot waits for its key or button; the other rows act. */
-  private confirmControl(): void {
-    if (this.ctrlRow === CTRL_BACK) {
-      this.leaveControls();
-    } else if (this.ctrlRow === CTRL_RESET) {
-      this.changeBindings(DEFAULT_BINDINGS);
-    } else {
-      this.capture = { row: this.ctrlRow, col: this.ctrlCol, note: null };
-      this.input.startCapture();
-      this.render();
-    }
-  }
-
-  /** Back to the settings page, on its controls row. */
+  /** Back to the settings page, on its controls button. */
   private leaveControls(): void {
     this.endCapture();
     this.screen = 'settings';
-    this.settingSel = SETTING_ROWS.indexOf('controls');
+    this.focusKey = 'set:controls';
     this.render();
   }
 
@@ -1355,13 +1552,6 @@ export class Shell {
     this.render();
   }
 
-  private selectItem(i: number): void {
-    const n = Math.max(0, Math.min(this.profile.quests.itemIds.length - 1, i));
-    if (n === this.fridgeSel) return;
-    this.fridgeSel = n;
-    this.render();
-  }
-
   private get lang(): Lang {
     const l = this.texts.langId;
     return l === 'en' || l === 'es' ? l : 'fr';
@@ -1370,6 +1560,8 @@ export class Shell {
   private get t(): Record<string, string> {
     return TEXT[this.lang];
   }
+
+  // ------------------------------------------------------------ drawing
 
   private clear(): void {
     for (const c of this.root.removeChildren()) {
@@ -1389,29 +1581,24 @@ export class Shell {
       // Over the paused game
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.45 }));
     } else if (this.screen === 'intro') {
-      // The movie's background color
+      // The movie's background color, the movie and the site page's link to skip it
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill(0x000000));
+      this.root.addChild(this.introLayer);
+      this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
     } else {
-      this.drawBackground(
-        this.screen === 'quests' ||
-          this.screen === 'fridge' ||
-          this.screen === 'settings' ||
-          this.screen === 'controls',
-      );
+      // The village and the logo: the home page's frame, and what the frame shows if a page
+      // leaves it on screen
+      this.drawBackground();
+      this.drawTitle(2, 290);
     }
-    if (this.screen === 'intro') this.drawIntro();
-    else if (this.screen === 'menu') this.drawMenu();
-    else if (this.screen === 'settings' || this.screen === 'sound') this.drawSettings();
-    else if (this.screen === 'controls') this.drawControls();
-    else if (this.screen === 'quests') this.drawQuests();
-    else if (this.screen === 'fridge') this.drawFridge();
-    else if (this.result) this.drawResult(this.result);
+    this.renderPage();
   }
 
-  // ------------------------------------------------------------ drawing kit
-
-  /** The village of the first level (`menu`, vector), dimmed under the full-page panels. */
-  private drawBackground(dim: boolean): void {
+  /**
+   * The village of the first level (`menu`, vector): the home page's frame, sharp now that no
+   * panel covers it, and blurred for the fade into the first level (`fadeOut`).
+   */
+  private drawBackground(): void {
     const bg = this.lib.attach('menu');
     const b = bg.getLocalBounds();
     // Blurred, so the menu reads as a backdrop and its fade into the first level does not show
@@ -1424,14 +1611,14 @@ export class Shell {
     // Not clipped to the screen: Pixi clips a filter to the screen's size in pixels divided by
     // the target's resolution, which inside the 1.5x cache below cuts the picture short when
     // the canvas is drawn at resolution 1 (a small frame on a phone), leaving it partly black
-    bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4, clipToViewport: false })];
+    if (this.screen !== 'menu') {
+      bg.filters = [new BlurFilter({ strength: BG_BLUR, quality: 4, clipToViewport: false })];
+    }
     // Drawn once into a texture: a blurred picture needs no more than the frame's resolution
     const layer = new Container();
     layer.addChild(bg);
     layer.cacheAsTexture({ resolution: 1.5 });
     this.root.addChild(layer);
-    if (dim)
-      this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.35 }));
   }
 
   /** The game's title logo, `w` px wide, its top at `y`. */
@@ -1452,27 +1639,16 @@ export class Shell {
     this.root.addChild(shade, s);
   }
 
-  /** A parchment panel in a wood frame. */
-  private panel(x: number, y: number, w: number, h: number): void {
-    const g = new Graphics();
-    g.roundRect(x + 2, y + 5, w, h, 14).fill({ color: 0x0b1530, alpha: 0.35 });
-    g.roundRect(x, y, w, h, 14).fill(C.parchment).stroke({ color: C.wood, width: 3 });
-    g.roundRect(x + 5, y + 5, w - 10, h - 10, 10).stroke({ color: C.wood, width: 1, alpha: 0.25 });
-    this.root.addChild(g);
-  }
-
   private text(
     s: string,
     kind: TextKind,
     x: number,
     y: number,
     opts: {
-      width?: number;
       align?: 'left' | 'center' | 'right';
       size?: number;
       color?: string;
       shadow?: boolean;
-      italic?: boolean;
       parent?: Container;
     } = {},
   ): Text {
@@ -1483,12 +1659,8 @@ export class Shell {
       style: new TextStyle({
         fontFamily: FONT[kind],
         fontSize: size,
-        fontStyle: opts.italic ? 'italic' : 'normal',
-        fill: opts.color ?? C.ink,
+        fill: opts.color ?? C.heading,
         align,
-        lineHeight: kind === 'body' ? Math.round(size * 1.35) : undefined,
-        wordWrap: opts.width !== undefined,
-        wordWrapWidth: opts.width ?? 0,
         dropShadow: opts.shadow
           ? { color: '#0b1530', alpha: 0.8, blur: 2, distance: 1.5, angle: Math.PI / 2 }
           : undefined,
@@ -1501,87 +1673,30 @@ export class Shell {
   }
 
   /**
-   * An item count on a wood pill whose bottom right corner is (`right`, `bottom`), so it reads
-   * over any item.
+   * The intro's skip button: a wood button at the bottom of the frame, with the space bar's
+   * keycap or the controller's A button.
    */
-  private countBadge(s: string, right: number, bottom: number, parent = this.root): void {
-    const padX = 4;
-    const h = 13;
-    const c = this.text(s, 'label', 0, 0, { align: 'right', size: 10, color: C.gold, parent });
-    const w = c.width + padX * 2;
-    c.position.set(right - padX, bottom - h / 2 - c.height / 2);
-    const pill = new Graphics()
-      .roundRect(right - w, bottom - h, w, h, h / 2)
-      .fill({ color: C.wood, alpha: 0.9 })
-      .stroke({ color: 0x3f2c1b, alpha: 0.5, width: 1 });
-    parent.addChildAt(pill, parent.getChildIndex(c));
-  }
-
-  /**
-   * A clickable area (`x`, `y`, `w`, `h`) holding its children: wood when selected, a light
-   * wash under the pointer.
-   */
-  private button(
-    rect: [number, number, number, number],
-    action: () => void,
-    selected = false,
-    radius = 8,
-  ): Container {
-    const [x, y, w, h] = rect;
-    const c = new Container();
-    c.eventMode = 'static';
-    c.cursor = 'pointer';
-    c.hitArea = new Rectangle(x, y, w, h);
-    const bg = new Graphics().roundRect(x, y, w, h, radius);
-    if (selected) bg.fill({ color: C.wood, alpha: 0.92 });
-    else bg.fill({ color: C.wood, alpha: 0.12 });
-    bg.alpha = selected ? 1 : 0;
-    c.addChild(bg);
-    if (!selected) {
-      c.on('pointerover', () => (bg.alpha = 1));
-      c.on('pointerout', () => (bg.alpha = 0));
-    }
-    c.on('pointertap', action);
-    this.root.addChild(c);
-    return c;
-  }
-
-  /**
-   * The screen's main action: a wood button at the bottom of the panel, centered on `cy`, as
-   * the help dialog's (`.parchment-btn`). With a keyboard, a keycap says the space bar does it
-   * too (not with `cap` 'pad', where space does something else); with a controller, its A
-   * button (B for `back`). `action` null draws it disabled.
-   */
-  private actionButton(
-    label: string,
-    cy: number,
-    action: (() => void) | null,
-    w = 220,
-    back = false,
-    capMode: 'auto' | 'pad' = 'auto',
-  ): void {
+  private actionButton(label: string, cy: number, action: () => void, w = 220): void {
     const h = 36;
     const x = W / 2 - w / 2;
     const y = cy - h / 2;
     const c = new Container();
     const face = new Container();
-    const on = action !== null;
-    c.addChild(new Graphics().roundRect(x, y + 3, w, h, h / 2).fill(on ? C.woodDark : 0xc9b48c));
-    face.addChild(new Graphics().roundRect(x, y, w, h, h / 2).fill(on ? C.wood : 0xd8c59c));
+    c.addChild(new Graphics().roundRect(x, y + 3, w, h, h / 2).fill(C.woodDark));
+    face.addChild(new Graphics().roundRect(x, y, w, h, h / 2).fill(C.wood));
     const glow = new Graphics().roundRect(x, y, w, h, h / 2).fill({ color: 0xffffff, alpha: 0.12 });
     glow.visible = false;
     face.addChild(glow);
     const lbl = this.text(label, 'label', 0, 0, {
       align: 'left',
       size: 17,
-      color: on ? C.gold : C.todo,
+      color: C.gold,
       parent: face,
     });
-    // The keycap, sized to its text, or the controller's button
     let capW = 0;
     const cap = new Container();
     const device = this.input.device;
-    if (on && device === 'keyboard' && capMode === 'auto') {
+    if (device === 'keyboard') {
       const k = this.text(this.texts.getStatic(10) || 'SPACE', 'label', 0, 0, {
         align: 'left',
         size: 9,
@@ -1599,8 +1714,8 @@ export class Shell {
       );
       k.position.set(6, (18 - k.height) / 2);
       face.addChild(cap);
-    } else if (on && device === 'gamepad') {
-      const g = padGlyph(back ? 'b' : 'a', this.input.padLayout, 18, 'onDark');
+    } else if (device === 'gamepad') {
+      const g = padGlyph('a', this.input.padLayout, 18, 'onDark');
       g.position.set(g.width / 2, 9);
       cap.addChild(g);
       capW = g.width;
@@ -1611,321 +1726,609 @@ export class Shell {
     lbl.position.set(left, cy - lbl.height / 2);
     cap.position.set(left + lbl.width + gap, cy - 9);
     c.addChild(face);
-    if (on) {
-      c.eventMode = 'static';
-      c.cursor = 'pointer';
-      c.hitArea = new Rectangle(x, y, w, h + 3);
-      c.on('pointerover', () => (glow.visible = true));
-      c.on('pointerout', () => {
-        glow.visible = false;
-        face.y = 0;
-      });
-      c.on('pointerdown', () => (face.y = 2));
-      c.on('pointerup', () => (face.y = 0));
-      c.on('pointertap', action);
-    }
+    c.eventMode = 'static';
+    c.cursor = 'pointer';
+    c.hitArea = new Rectangle(x, y, w, h + 3);
+    c.on('pointerover', () => (glow.visible = true));
+    c.on('pointerout', () => {
+      glow.visible = false;
+      face.y = 0;
+    });
+    c.on('pointerdown', () => (face.y = 2));
+    c.on('pointerup', () => (face.y = 0));
+    c.on('pointertap', action);
     this.root.addChild(c);
   }
 
-  /** An item or other clip fitted in a `size` px cell centered on (x, y). */
-  private icon(icon: Icon, x: number, y: number, size: number, parent?: Container): Container {
+  // ------------------------------------------------------------ the page
+
+  /** Which layout the page takes (`body[data-page]`, `src/site.css`). */
+  private pageKind(): string {
+    switch (this.screen) {
+      case null:
+        return 'playing';
+      case 'menu':
+        return 'home';
+      case 'intro':
+        return 'intro';
+      case 'sound':
+        return 'playing'; // over the paused game, which keeps its layout
+      default:
+        return 'page';
+    }
+  }
+
+  /** Sets the page's layout and empties what the current screen does not use. */
+  private showLayout(): void {
+    if (typeof document === 'undefined') return;
+    const body = document.body;
+    body.dataset.page = this.pageKind();
+    body.dataset.screen = this.screen ?? 'playing';
+    const d = this.dom;
+    if (!d) return;
+    if (this.screen === null) {
+      for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) fill(b);
+    }
+    if (this.screen === null || this.screen === 'sound') this.fillChips();
+    else fill(d.chips);
+  }
+
+  private get isPhone(): boolean {
+    return this.phone?.matches ?? false;
+  }
+
+  /** The home page's layout for the window's size and orientation. */
+  private get homeLayout(): HomeLayout {
+    if (this.isPhone) return 'phone';
+    if (this.wide?.matches ?? true) return 'wide';
+    return this.upright?.matches ? 'tall' : 'short';
+  }
+
+  /** Builds the page of the current screen around (or over) the frame. */
+  private renderPage(): void {
+    this.showLayout();
+    const d = this.dom;
+    if (!d || !this.screen) return;
+    const empty = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    for (const b of empty) fill(b);
+    switch (this.screen) {
+      case 'menu':
+        this.pageHome(d);
+        break;
+      case 'quests':
+        fill(d.page, this.pageQuests());
+        break;
+      case 'fridge':
+        fill(d.page, this.pageFridge());
+        break;
+      case 'settings':
+        fill(d.page, this.pageSettings());
+        break;
+      case 'controls':
+        fill(d.page, this.pageControls());
+        break;
+      case 'result':
+        fill(d.page, this.time ? this.pageTimeResult(this.time) : this.pageResult());
+        break;
+      case 'sound':
+        fill(d.overlay, this.panelSound());
+        break;
+    }
+    if (this.screen !== 'sound' && this.screen !== 'intro' && this.isPhone) {
+      fill(d.tabbar, this.tabbar());
+    }
+    if (this.screen === 'quests' || this.screen === 'fridge' || this.screen === 'settings') {
+      if (d.page.dataset.screen !== this.screen) d.page.scrollTop = 0;
+    }
+    d.page.dataset.screen = this.screen;
+    this.applyFocus();
+  }
+
+  /** A picture of the game's clip, sized by CSS. */
+  private img(icon: Icon, cls = '', alt = ''): HTMLElement {
     if ('item' in icon && icon.twice) {
-      const pair = new Container();
       const one = { item: icon.item };
-      this.icon(one, x - size * 0.18, y - size * 0.12, size * 0.8, pair).alpha = 0.8;
-      this.icon(one, x + size * 0.14, y + size * 0.1, size * 0.8, pair);
-      (parent ?? this.root).addChild(pair);
-      return pair;
+      return h('span', { class: `art twice ${cls}` }, this.img(one, 'a'), this.img(one, 'b'));
     }
-    let mc;
-    if ('item' in icon) {
-      const id = icon.item;
-      mc = this.lib.attach(id >= 1000 ? 'hammer_item_score' : 'hammer_item_special');
-      mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
-    } else {
-      mc = this.lib.attach(icon.clip);
-      mc.gotoAndStop('1');
-    }
-    const b = mc.getLocalBounds();
-    const fit = Math.min(1.6, size / Math.max(b.width, b.height, 1));
-    mc.scale.set(fit);
-    mc.position.set(x - (b.x + b.width / 2) * fit, y - (b.y + b.height / 2) * fit);
-    (parent ?? this.root).addChild(mc);
-    return mc;
+    return h('img', {
+      class: `art ${cls}`,
+      src: this.art?.url(icon) ?? '',
+      alt,
+      draggable: 'false',
+    });
   }
 
-  /** Item `id` as a dark silhouette: one not found yet. */
-  private silhouette(id: number, x: number, y: number, size: number, parent?: Container): void {
-    const mc = this.icon({ item: id }, x, y, size, parent);
-    mc.tint = 0x3f2c1b;
-    mc.alpha = 0.2;
+  /** An item as the player knows it: in color, grey (found, not enough), or a silhouette. */
+  private itemImg(id: number, state: 'in' | 'part' | 'never', cls = ''): HTMLElement {
+    return this.img({ item: id }, `${cls} is-${state}`);
   }
 
-  /** Item `id` greyed out: found, but not enough times for the fridge. */
-  private greyed(id: number, x: number, y: number, size: number, parent?: Container): void {
-    const mc = this.icon({ item: id }, x, y, size, parent);
-    mc.filters = [this.grey];
-    mc.alpha = 0.75;
+  /** The device's confirm button after a label: the space bar's keycap, or the controller's A. */
+  private confirmCap(): HTMLElement | null {
+    const dev = this.input.device;
+    if (dev === 'keyboard') {
+      return h('kbd', { class: 'cap' }, this.texts.getStatic(10) || 'SPACE');
+    }
+    if (dev === 'gamepad') return this.padCap('a');
+    return null;
+  }
+
+  private padCap(b: PadButton): HTMLElement {
+    const html = padIconHtml(b, this.input.padLayout, 22);
+    const el = h('kbd', { class: 'cap pad', title: padLabel(b, this.input.padLayout) });
+    if (html) el.innerHTML = html;
+    else el.textContent = padLabel(b, this.input.padLayout);
+    return el;
+  }
+
+  /** A title plank over the top edge of a board: the game's picture and the page's name. */
+  private plank(title: string, icon: Icon | null, id: string, tilt = -1.5, level = 1): HTMLElement {
+    const heading = level === 1 ? h('h1', { id }, title) : h('h2', { id }, title);
+    return h(
+      'div',
+      { class: 'plank', style: `--tilt: ${tilt}deg` },
+      icon ? this.img(icon, 'plank-art') : null,
+      heading,
+    );
+  }
+
+  /** The way back to the home page, at the top left of a page. */
+  private backButton(action: () => void): HTMLElement {
+    return h(
+      'button',
+      { type: 'button', class: 'btn-wood btn-back', 'data-nav': 'back', onclick: action },
+      svgIcon(ICON.back, { size: 18 }),
+      this.t.back,
+    );
   }
 
   /** A progress bar, `f` from 0 to 1. */
-  private bar(x: number, y: number, w: number, h: number, f: number, color: string): void {
-    const g = new Graphics()
-      .roundRect(x, y, w, h, h / 2)
-      .fill({ color: C.wood, alpha: 0.18 })
-      .roundRect(x, y, Math.max(h, w * Math.min(1, f)), h, h / 2)
-      .fill(f > 0 ? color : 'rgba(0,0,0,0)');
-    this.root.addChild(g);
+  private bar(f: number, color: 'done' | 'progress' | 'fridge', cls = ''): HTMLElement {
+    const w = Math.round(Math.max(0, Math.min(1, f)) * 100);
+    return h(
+      'span',
+      { class: `bar ${cls}`, role: 'presentation' },
+      h('span', { class: `bar-fill is-${color}`, style: `width: ${w}%` }),
+    );
   }
 
-  /** A small closed padlock, its top left at (x, y). */
-  private padlock(x: number, y: number, parent: Container, color: string): void {
-    const g = new Graphics()
-      .roundRect(x + 1.5, y, 6, 7, 3)
-      .stroke({ color, width: 1.4 })
-      .roundRect(x, y + 4, 9, 7, 1.5)
-      .fill(color);
-    parent.addChild(g);
+  private lockIcon(): SVGSVGElement {
+    const svg = svgIcon(ICON.lock, { size: 14 });
+    svg.classList.add('lock');
+    return svg;
   }
 
-  // ------------------------------------------------------------------ menu
+  // ------------------------------------------------------------ home
 
-  private drawMenu(): void {
+  /** The home page: the modes and the notebook beside the frame; on a phone, over and under it. */
+  private pageHome(d: SiteDom): void {
     const t = this.t;
-    const entries = this.menuEntries();
-    const cur = entries[this.selected];
-    this.navRects.clear();
-    this.drawTitle(2, 290);
-    const top = 124;
-    this.panel(26, top, 368, H - 8 - top);
-
-    MODES.forEach((m, i) => this.drawModeCard(m, i, entries));
-    this.drawIntroCard(MODES.length, entries);
-
-    // Under the cards: the options of the chosen mode, else its description
-    const shown = MODES.find((m) => m.mode === this.chosen) ?? MODES[0];
-    const canStart = shown.enabled && !this.isLocked(shown);
-    if (canStart && this.modeOptions(shown).length > 0) {
-      this.drawOptions(shown, entries, DETAIL_Y);
-    } else {
-      const desc = this.text(t[shown.mode + 'Desc'], 'body', W / 2, DETAIL_Y + 4, {
-        width: 320,
-        color: C.inkSoft,
-      });
-      const note = !shown.enabled
-        ? t.soonNote
-        : canStart
-          ? ''
-          : shown.mode === 'multitime'
-            ? fmt(t.modeLockedBy2, this.questForMode('timeattack'), this.questForMode('multicoop'))
-            : fmt(t.modeLockedBy, this.questForMode(shown.mode));
-      if (note) {
-        this.text(note, 'body', W / 2, desc.y + desc.height + 6, {
-          width: 320,
-          size: 11,
-          italic: true,
-          color: C.inkSoft,
-        });
-      }
-      // The Time Attack modes: the best time of the run they play
-      const run = canStart ? this.runOf(shown.mode) : null;
-      if (run !== null) {
-        const best = this.profile.bestTime(shown.mode, run);
-        this.text(
-          best === null ? t.noTime : fmt(t.bestTime, formatRunTime(best)),
-          'label',
-          W / 2,
-          desc.y + desc.height + 10,
-          { size: best === null ? 13 : 16, color: best === null ? C.inkSoft : C.heading },
-        );
-      }
-    }
-
-    // The quest and fridge pages
-    const counts = this.counts();
-    TABS.forEach((tb, i) => {
-      const n = entries.findIndex((e) => e.kind === 'tab' && e.tab === tb);
-      const sel = n === this.selected;
-      const x = CARD.x[i];
-      const y = TAB_Y;
-      const btn = this.button([x, y, CARD.w, TAB_H], () => this.clickEntry(n), sel, 10);
-      this.navRects.set(n, [x, y, CARD.w, TAB_H]);
-      if (!sel) {
-        btn.addChildAt(
-          new Graphics()
-            .roundRect(x, y, CARD.w, TAB_H, 10)
-            .stroke({ color: C.wood, width: 1, alpha: 0.35 }),
-          1,
-        );
-      }
-      this.icon(tb.icon, x + 24, y + TAB_H / 2, 28, btn);
-      this.text(t[tb.screen], 'label', x + 46, y + 4, {
-        align: 'left',
-        size: 15,
-        color: sel ? C.gold : C.ink,
-        parent: btn,
-      });
-      const [have, all] = tb.screen === 'quests' ? counts.quests : counts.fridge;
-      this.text(`${have} / ${all}`, 'body', x + 46, y + 23, {
-        align: 'left',
-        size: 11,
-        color: sel ? C.gold : C.inkSoft,
-        parent: btn,
-      });
-    });
-
-    this.drawGear(entries);
-
-    if (cur.kind === 'tab') this.actionButton(t[cur.tab.screen], BUTTON_Y, () => this.confirm());
-    else if (cur.kind === 'intro') this.actionButton(t.intro, BUTTON_Y, () => this.confirm());
-    else if (cur.kind === 'settings') this.actionButton(t.settings, BUTTON_Y, () => this.confirm());
-    else if (canStart) this.actionButton(t.start, BUTTON_Y, () => this.onStart?.(shown.mode));
-    else this.actionButton(t.start, BUTTON_Y, null);
-  }
-
-  /**
-   * Mode card `i` of the grid: its icon, name and short text, a padlock while a quest has yet to
-   * give it, "Soon" for a mode not ported yet. Wood when focused; the chosen one has a darker
-   * frame.
-   */
-  private drawModeCard(m: ModeEntry, i: number, entries: MenuEntry[]): void {
-    const t = this.t;
-    const x = CARD.x[i % 2];
-    const y = CARD.y + Math.floor(i / 2) * (CARD.h + CARD.gap);
-    const n = entries.findIndex((e) => e.kind === 'mode' && e.mode === m);
-    const sel = n === this.selected;
-    const chosen = m.mode === this.chosen;
-    const locked = m.enabled && this.isLocked(m);
-    const open = m.enabled && !locked;
-    const card = this.button([x, y, CARD.w, CARD.h], () => this.clickEntry(n), sel, 8);
-    this.navRects.set(n, [x, y, CARD.w, CARD.h]);
-    if (!sel) {
-      const b = chosen ? 2 : 1;
-      card.addChildAt(
-        new Graphics()
-          .roundRect(x + b / 2, y + b / 2, CARD.w - b, CARD.h - b, 8)
-          .fill({ color: C.wood, alpha: chosen ? 0.14 : 0.05 })
-          .stroke({ color: C.wood, width: b, alpha: chosen ? 0.9 : 0.35 }),
-        1,
+    this.hintShown = false;
+    const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
+    if (this.isPhone) {
+      fill(
+        d.overlay,
+        h(
+          'section',
+          { class: 'board board-phone-modes', 'aria-label': t.modesTitle },
+          h(
+            'div',
+            { class: 'mode-grid', role: 'radiogroup', 'aria-label': t.modesTitle },
+            this.modeCards(true),
+          ),
+        ),
       );
-    }
-    const ic = this.icon(m.icon, x + 20, y + CARD.h / 2, 26, card);
-    if (!open) ic.alpha = 0.45;
-    const textX = x + 38;
-    // Room for the text, and for the padlock beside the name
-    const room = x + CARD.w - 6 - textX;
-    const name = this.text(t[m.mode], 'label', textX, y + 4, {
-      align: 'left',
-      size: 14,
-      color: sel ? C.gold : open ? C.ink : C.todo,
-      parent: card,
-    });
-    fitWidth(name, locked ? room - 14 : room);
-    if (locked) this.padlock(x + CARD.w - 15, y + 6, card, sel ? C.gold : C.inkSoft);
-    const line = this.text(m.enabled ? t[m.mode + 'Short'] : t.soon, 'body', textX, y + 21, {
-      align: 'left',
-      size: 10,
-      italic: !m.enabled,
-      color: sel ? C.gold : open ? C.inkSoft : C.todo,
-      parent: card,
-    });
-    fitWidth(line, room);
-  }
-
-  /** The intro's card, slot `i` of the grid: it plays the intro at once, as a tab opens. */
-  private drawIntroCard(i: number, entries: MenuEntry[]): void {
-    const t = this.t;
-    const x = CARD.x[i % 2];
-    const y = CARD.y + Math.floor(i / 2) * (CARD.h + CARD.gap);
-    const n = entries.findIndex((e) => e.kind === 'intro');
-    const sel = n === this.selected;
-    const card = this.button([x, y, CARD.w, CARD.h], () => this.clickEntry(n), sel, 8);
-    this.navRects.set(n, [x, y, CARD.w, CARD.h]);
-    if (!sel) {
-      card.addChildAt(
-        new Graphics()
-          .roundRect(x + 0.5, y + 0.5, CARD.w - 1, CARD.h - 1, 8)
-          .fill({ color: C.wood, alpha: 0.05 })
-          .stroke({ color: C.wood, width: 1, alpha: 0.35 }),
-        1,
+      fill(
+        d.below,
+        h(
+          'section',
+          { class: 'board board-detail', 'aria-live': 'polite' },
+          this.modeDetail(shown, true),
+        ),
       );
-    }
-    this.icon(INTRO_ICON, x + 20, y + CARD.h / 2, 26, card);
-    const textX = x + 38;
-    const room = x + CARD.w - 6 - textX;
-    const name = this.text(t.intro, 'label', textX, y + 4, {
-      align: 'left',
-      size: 14,
-      color: sel ? C.gold : C.ink,
-      parent: card,
-    });
-    fitWidth(name, room);
-    const line = this.text(t.introShort, 'body', textX, y + 21, {
-      align: 'left',
-      size: 10,
-      color: sel ? C.gold : C.inkSoft,
-      parent: card,
-    });
-    fitWidth(line, room);
-  }
-
-  /** The intro's screen: the movie on black, and the site page's link to skip it, as a button. */
-  private drawIntro(): void {
-    this.root.addChild(this.introLayer);
-    this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
-  }
-
-  /**
-   * Arrows on the menu: the nearest entry in that direction, as drawn (cards, options, tabs,
-   * gear), favoring the same row or column. Up and down wrap around; left and right stop at
-   * the edge.
-   */
-  private navigate(dx: number, dy: number): void {
-    const from = this.navRects.get(this.selected);
-    if (!from) {
-      this.select(0);
       return;
     }
-    const center = ([x, y, w, h]: [number, number, number, number]) => [x + w / 2, y + h / 2];
-    const best = (fx: number, fy: number): number => {
-      let pick = -1;
-      let score = Infinity;
-      for (const [n, r] of this.navRects) {
-        if (n === this.selected) continue;
-        const [cx, cy] = center(r);
-        const along = dx !== 0 ? (cx - fx) * dx : (cy - fy) * dy;
-        const across = dx !== 0 ? Math.abs(cy - fy) : Math.abs(cx - fx);
-        // Within 60 degrees of the direction: nothing far to the side
-        if (along <= 1 || across > along * 1.75) continue;
-        const sc = along + across * 3;
-        if (sc < score) {
-          score = sc;
-          pick = n;
-        }
-      }
-      return pick;
-    };
-    const [fx, fy] = center(from);
-    let n = best(fx, fy);
-    // Wrap: as if coming from beyond the other edge
-    if (n < 0 && dy !== 0) n = best(fx, dy > 0 ? -1000 : H + 1000);
-    if (n >= 0) this.select(n);
+    fill(
+      d.modes,
+      h(
+        'section',
+        { class: 'board board-modes', 'aria-labelledby': 'modes-h' },
+        this.plank(t.modesTitle, null, 'modes-h', -1.5, 2),
+        h(
+          'div',
+          { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
+          this.modeCards(false),
+        ),
+        h('div', { class: 'mode-detail', 'aria-live': 'polite' }, this.modeDetail(shown, false)),
+        this.img({ clip: 'hammer_player' }, 'igor-peek'),
+      ),
+    );
+    // Lying screens under 1280 px: the notebook folds into buttons under the modes, and the
+    // keys are left to the help dialog ("?")
+    const layout = this.homeLayout;
+    fill(d.book, layout === 'short' ? this.notebookFolded() : this.notebook());
+    if (layout === 'wide') fill(d.below, this.keysStrip());
   }
 
-  /** The settings button: a gear on a round wood button, as the tabs when selected. */
-  private drawGear(entries: MenuEntry[]): void {
-    const n = entries.findIndex((e) => e.kind === 'settings');
-    const sel = n === this.selected;
-    const { x, y, r } = GEAR;
-    const btn = this.button([x - r, y - r, 2 * r, 2 * r], () => this.clickEntry(n), sel, r);
-    this.navRects.set(n, [x - r, y - r, 2 * r, 2 * r]);
-    if (!sel) {
-      btn.addChildAt(
-        new Graphics().circle(x, y, r - 0.5).stroke({ color: C.wood, width: 1, alpha: 0.35 }),
-        1,
+  /** The modes and the intro, as cards: icon, name, short text (not on a phone), padlock. */
+  private modeCards(phone: boolean): HTMLElement[] {
+    const t = this.t;
+    const cards = MODES.map((m) => {
+      const locked = m.enabled && this.isLocked(m);
+      const on = m.mode === this.chosen;
+      return h(
+        'button',
+        {
+          type: 'button',
+          role: 'radio',
+          'aria-checked': String(on),
+          class: `mode-card${on ? ' is-chosen' : ''}${locked || !m.enabled ? ' is-locked' : ''}`,
+          'data-nav': `mode:${m.mode}`,
+          onclick: () => this.pressMode(m.mode),
+        },
+        h('span', { class: 'mode-icon' }, this.img(m.icon)),
+        h(
+          'span',
+          { class: 'mode-text' },
+          h('span', { class: 'mode-name' }, t[m.mode]),
+          phone
+            ? null
+            : h('span', { class: 'mode-short' }, m.enabled ? t[m.mode + 'Short'] : t.soon),
+        ),
+        locked ? this.lockIcon() : null,
+      );
+    });
+    const on = this.chosen === 'intro';
+    cards.push(
+      h(
+        'button',
+        {
+          type: 'button',
+          role: 'radio',
+          'aria-checked': String(on),
+          class: `mode-card${on ? ' is-chosen' : ''}`,
+          'data-nav': 'mode:intro',
+          onclick: () => this.pressMode('intro'),
+        },
+        h('span', { class: 'mode-icon' }, this.img(INTRO_ICON)),
+        h(
+          'span',
+          { class: 'mode-text' },
+          h('span', { class: 'mode-name' }, t.intro),
+          phone ? null : h('span', { class: 'mode-short' }, t.introShort),
+        ),
+      ),
+    );
+    return cards;
+  }
+
+  /**
+   * The chosen mode: its text, the quest that unlocks it, its best time, its options (the
+   * site's `.mopt` box) and fields, and the main button.
+   */
+  private modeDetail(mode: ModeEntry | null, phone: boolean): HTMLElement[] {
+    const t = this.t;
+    const out: HTMLElement[] = [];
+    if (phone) {
+      const name = mode ? t[mode.mode] : t.intro;
+      const short = mode ? t[mode.mode + 'Short'] : t.introShort;
+      out.push(
+        h(
+          'div',
+          { class: 'detail-head' },
+          h('span', { class: 'detail-name' }, name),
+          h('span', { class: 'detail-short' }, short),
+        ),
       );
     }
-    btn.addChild(gear(x, y, r * 0.62, sel ? C.gold : C.wood));
+    if (!mode) {
+      out.push(h('p', { class: 'mode-desc' }, t.introDesc));
+      out.push(this.startButton(t.watchIntro, true));
+      return out;
+    }
+    const canStart = mode.enabled && !this.isLocked(mode);
+    out.push(h('p', { class: 'mode-desc' }, t[mode.mode + 'Desc']));
+    const note = !mode.enabled
+      ? t.soonNote
+      : canStart
+        ? ''
+        : mode.mode === 'multitime'
+          ? fmt(t.modeLockedBy2, this.questForMode('timeattack'), this.questForMode('multicoop'))
+          : fmt(t.modeLockedBy, this.questForMode(mode.mode));
+    if (note) out.push(h('p', { class: 'lock-note' }, this.lockIcon(), note));
+    // The Time Attack modes: the best time of the run they play
+    const run = canStart ? this.runOf(mode.mode) : null;
+    if (run !== null) {
+      const best = this.profile.bestTime(mode.mode, run);
+      out.push(
+        h(
+          'p',
+          { class: `best-time${best === null ? ' is-none' : ''}` },
+          best === null ? t.noTime : fmt(t.bestTime, formatRunTime(best)),
+        ),
+      );
+    }
+    const all = canStart ? this.modeOptions(mode) : [];
+    // On a phone the locked options fold into one line, so the main button stays in view
+    const opts = phone ? all.filter((oid) => this.profile.hasOption(oid)) : all;
+    const folded = all.length - opts.length;
+    const runs = canStart ? this.profile.runChoices(mode.mode) : [];
+    if (opts.length > 0 || runs.length > 0 || folded > 0) {
+      const box = h('div', { class: 'mode-options' });
+      if (opts.length > 0) {
+        box.append(
+          h('span', { class: 'opt-title' }, t.options),
+          h(
+            'div',
+            { class: 'opt-grid' },
+            opts.map((oid) => {
+              const unlocked = this.profile.hasOption(oid);
+              const fixed = oid === Data.OPT_BOOST;
+              const ticked = unlocked && (fixed || this.profile.isChosen(oid));
+              return h(
+                'button',
+                {
+                  type: 'button',
+                  role: 'checkbox',
+                  'aria-checked': String(ticked),
+                  'aria-disabled': unlocked && !fixed ? false : 'true',
+                  class: `opt${ticked ? ' is-on' : ''}${unlocked ? '' : ' is-locked'}`,
+                  'data-nav': `opt:${oid}`,
+                  onclick: () => this.toggleOption(oid),
+                },
+                h(
+                  'span',
+                  { class: 'box' },
+                  unlocked ? (ticked ? svgIcon(ICON.check, { size: 14 }) : null) : this.lockIcon(),
+                ),
+                t[oid],
+              );
+            }),
+          ),
+        );
+      }
+      if (runs.length > 0) {
+        const chosen = this.profile.runOption(mode.mode);
+        box.append(
+          h(
+            'div',
+            { class: 'field-row', role: 'radiogroup', 'aria-label': t.field },
+            h('span', { class: 'opt-title' }, t.field),
+            runs.map((oid, k) =>
+              h(
+                'button',
+                {
+                  type: 'button',
+                  role: 'radio',
+                  'aria-checked': String(oid === chosen),
+                  class: `field-btn${oid === chosen ? ' is-on' : ''}`,
+                  'data-nav': `run:${oid}`,
+                  onclick: () => this.chooseRun(mode.mode, oid),
+                },
+                String(k + 1),
+              ),
+            ),
+          ),
+        );
+      }
+      if (folded > 0) {
+        box.append(h('p', { class: 'opt-folded' }, this.lockIcon(), fmt(t.lockedOptions, folded)));
+      }
+      const hint = this.optionHint(mode);
+      this.hintShown = hint !== '';
+      box.append(h('p', { class: 'opt-hint' }, hint));
+      out.push(box);
+    }
+    out.push(this.startButton(canStart ? t.start : t.locked, canStart));
+    return out;
+  }
+
+  private startButton(label: string, on: boolean): HTMLElement {
+    return h(
+      'button',
+      {
+        type: 'button',
+        class: `btn-wood btn-start${on ? '' : ' is-off'}`,
+        'aria-disabled': on ? false : 'true',
+        'data-nav': 'start',
+        onclick: () => {
+          this.focusKey = 'start';
+          if (on) this.startChosen();
+        },
+      },
+      on ? null : this.lockIcon(),
+      h('span', null, label),
+      on ? this.confirmCap() : null,
+    );
+  }
+
+  /** The notebook: quests and fridge, the quests closest to done, the settings. */
+  private notebook(): HTMLElement {
+    const t = this.t;
+    const c = this.counts();
+    const tile = (screen: 'quests' | 'fridge', icon: Icon, [have, all]: [number, number]) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'book-tile',
+          'data-nav': `tab:${screen}`,
+          onclick: () => (screen === 'quests' ? this.showQuests() : this.showFridge()),
+        },
+        this.img(icon, 'tile-art'),
+        h('span', { class: 'tile-name' }, t[screen]),
+        h('span', { class: 'tile-count' }, `${have} / ${all}`),
+        this.bar(all > 0 ? have / all : 0, screen === 'quests' ? 'progress' : 'fridge'),
+      );
+    return h(
+      'section',
+      { class: 'board board-book', 'aria-labelledby': 'book-h' },
+      this.plank(t.book, null, 'book-h', 1.2, 2),
+      h(
+        'div',
+        { class: 'book-tiles' },
+        tile('quests', { item: 20 }, c.quests),
+        tile('fridge', { item: 1018 }, c.fridge),
+      ),
+      this.nearQuests(),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-ghost btn-settings',
+          'data-nav': 'settings',
+          onclick: () => this.showSettings(),
+        },
+        svgIcon(ICON.gear, { size: 20 }),
+        t.settings,
+      ),
+    );
+  }
+
+  /** The notebook folded: a button each for the quests and the fridge, and the settings. */
+  private notebookFolded(): HTMLElement {
+    const t = this.t;
+    const c = this.counts();
+    const btn = (screen: 'quests' | 'fridge', icon: Icon, [have, all]: [number, number]) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'fold-btn',
+          'data-nav': `tab:${screen}`,
+          onclick: () => (screen === 'quests' ? this.showQuests() : this.showFridge()),
+        },
+        this.img(icon, 'fold-art'),
+        h(
+          'span',
+          { class: 'fold-text' },
+          h('span', { class: 'tile-name' }, t[screen]),
+          h(
+            'span',
+            { class: 'fold-count' },
+            this.bar(all > 0 ? have / all : 0, screen === 'quests' ? 'progress' : 'fridge'),
+            h('span', null, `${have} / ${all}`),
+          ),
+        ),
+      );
+    return h(
+      'nav',
+      { class: 'book-fold', 'aria-label': t.book },
+      btn('quests', { item: 20 }, c.quests),
+      btn('fridge', { item: 1018 }, c.fridge),
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-round fold-gear',
+          'aria-label': t.settings,
+          title: t.settings,
+          'data-nav': 'settings',
+          onclick: () => this.showSettings(),
+        },
+        svgIcon(ICON.gear, { size: 22 }),
+      ),
+    );
+  }
+
+  /** The two quests in progress closest to done, with their first items. */
+  private nearQuests(): HTMLElement | null {
+    const t = this.t;
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const ids = q.quests.map((x) => x.id).filter((id) => q.status(p, id) === 'progress');
+    if (ids.length === 0) return null;
+    const frac = (id: number) => {
+      const reqs = q.requirements(id);
+      const need = reqs.reduce((a, r) => a + r.qty, 0);
+      const have = reqs.reduce((a, r) => a + Math.min(p.items[r.item] ?? 0, r.qty), 0);
+      return need > 0 ? have / need : 0;
+    };
+    const near = [...ids].sort((a, b) => frac(b) - frac(a)).slice(0, 2);
+    return h(
+      'div',
+      { class: 'near' },
+      h('h3', { class: 'near-title' }, t.questsNear),
+      near.map((id) => {
+        const reqs = q.requirements(id);
+        const ok = reqs.filter((r) => (p.items[r.item] ?? 0) >= r.qty).length;
+        const shown = reqs.slice(0, 3);
+        return h(
+          'button',
+          {
+            type: 'button',
+            class: 'near-quest',
+            'data-nav': `near:${id}`,
+            onclick: () => {
+              this.showQuests();
+              this.questTab = 'progress';
+              this.questId = id;
+              this.focusKey = `q:${id}`;
+              this.render();
+            },
+          },
+          h(
+            'span',
+            { class: 'near-head' },
+            h('span', { class: 'near-name' }, this.texts.getQuestName(id)),
+            h('span', { class: 'near-count' }, fmt(t.itemsOf, ok, reqs.length)),
+          ),
+          h(
+            'span',
+            { class: 'near-items' },
+            shown.map((r) => {
+              const have = p.items[r.item] ?? 0;
+              const done = have >= r.qty;
+              return h(
+                'span',
+                { class: 'near-item' },
+                this.itemImg(r.item, have >= r.qty ? 'in' : have > 0 ? 'part' : 'never'),
+                h(
+                  'span',
+                  { class: `tag${done ? ' is-done' : ''}` },
+                  done ? '✓' : `${have}/${r.qty}`,
+                ),
+              );
+            }),
+            reqs.length > shown.length
+              ? h('span', { class: 'near-more' }, fmt(t.moreItems, reqs.length - shown.length))
+              : null,
+          ),
+        );
+      }),
+    );
+  }
+
+  /** Under the frame: the moves' keys (or buttons), as the help dialog lists them. */
+  private keysStrip(): HTMLElement | null {
+    const dev = this.input.device;
+    if (dev === 'touch') return null;
+    const t = this.t;
+    const b = this.bindings;
+    const caps = (action: PlayerAction): HTMLElement[] => {
+      if (dev === 'gamepad') {
+        const p = padButtonOf(b.pad[action][0] ?? -1);
+        return p ? [this.padCap(p)] : [];
+      }
+      const kc = b.keys[action][0]?.[0];
+      if (kc === undefined) return [];
+      const name =
+        kc === 32 ? this.texts.getStatic(10) || 'SPACE' : (keyName(kc, this.lang) ?? '?');
+      return [h('kbd', { class: `cap${name.length > 2 ? ' wide' : ''}` }, name)];
+    };
+    const item = (keys: HTMLElement[], label: string) =>
+      h('span', { class: 'keys-item' }, keys, h('span', null, label));
+    return h(
+      'div',
+      { class: 'keys-strip', 'aria-label': t.controlsTitle },
+      item([...caps('left'), ...caps('right')], t.moveHint),
+      item(caps('jump'), t.mv_jump),
+      item(caps('attack'), t.mv_attack),
+      item(
+        dev === 'gamepad' ? [this.padCap('start')] : [h('kbd', { class: 'cap' }, 'P')],
+        t.pauseHint,
+      ),
+    );
   }
 
   /** Quests done and items in the fridge, each out of all. */
@@ -1939,100 +2342,38 @@ export class Shell {
     };
   }
 
-  /**
-   * The mode's options (the site's `.mopt` box): a checkbox each, a padlock while locked. The
-   * selected one says what it does, or which quest unlocks it. The Tornade boost has no box to
-   * untick: once unlocked it applies to every game (quest 62).
-   */
-  private drawOptions(mode: ModeEntry, entries: MenuEntry[], y0: number): void {
+  /** The phone's tab bar: play, quests, fridge, settings, each with the game's picture. */
+  private tabbar(): HTMLElement {
     const t = this.t;
-    this.text(t.options.toUpperCase(), 'label', W / 2, y0, { size: 11, color: C.inkSoft });
-    const list = this.modeOptions(mode);
-    let hint = '';
-    list.forEach((oid, k) => {
-      const x = k < 3 ? 52 : 222;
-      const y = y0 + 18 + (k % 3) * 20;
-      const unlocked = this.profile.hasOption(oid);
-      const fixed = oid === Data.OPT_BOOST;
-      const ticked = fixed ? unlocked : this.profile.isChosen(oid);
-      const n = entries.findIndex((e) => e.kind === 'option' && e.oid === oid);
-      const sel = n === this.selected;
-      const row = this.button([x - 8, y - 2, 162, 19], () => this.clickEntry(n), sel, 5);
-      this.navRects.set(n, [x - 8, y - 2, 162, 19]);
-      const ink = sel ? C.gold : unlocked ? C.ink : C.todo;
-      if (unlocked) {
-        const box = new Graphics()
-          .roundRect(x, y + 2, 11, 11, 2)
-          .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
-          .stroke({ color: sel ? C.gold : C.wood, width: 1.4 });
-        if (ticked) {
-          box
-            .moveTo(x + 2.5, y + 7.5)
-            .lineTo(x + 5, y + 10)
-            .lineTo(x + 9.5, y + 4)
-            .stroke({ color: sel ? C.gold : C.wood, width: 2 });
-        }
-        row.addChild(box);
-      } else {
-        this.padlock(x + 1, y + 2, row, sel ? C.gold : C.inkSoft);
-      }
-      this.text(t[oid], 'label', x + 18, y + 1, {
-        align: 'left',
-        size: 13,
-        color: ink,
-        parent: row,
-      });
-      if (sel) {
-        if (!unlocked) hint = fmt(t.lockedBy, this.questForOption(oid));
-        else if (fixed) hint = t.alwaysOn;
-        else hint = ticked ? t.optionOn : t.optionOff;
-      }
-    });
-
-    // The fields to choose from (the site's select): a numbered button each, in the right column
-    const runs = this.profile.runChoices(mode.mode);
-    if (runs.length > 0) {
-      const x = 222;
-      this.text(t.field, 'label', x, y0 + 19, { align: 'left', size: 13, color: C.ink });
-      const chosen = this.profile.runOption(mode.mode);
-      runs.forEach((oid, k) => {
-        const rect: [number, number, number, number] = [x - 8 + k * 41, y0 + 38, 36, 20];
-        const n = entries.findIndex((e) => e.kind === 'run' && e.oid === oid);
-        const sel = n === this.selected;
-        const on = oid === chosen;
-        const btn = this.button(rect, () => this.clickEntry(n), sel, 5);
-        this.navRects.set(n, rect);
-        if (!sel) {
-          const b = on ? 2 : 1;
-          btn.addChildAt(
-            new Graphics()
-              .roundRect(rect[0] + b / 2, rect[1] + b / 2, rect[2] - b, rect[3] - b, 5)
-              .fill({ color: C.wood, alpha: on ? 0.14 : 0.05 })
-              .stroke({ color: C.wood, width: b, alpha: on ? 0.9 : 0.35 }),
-            1,
-          );
-        }
-        this.text(String(k + 1), 'label', rect[0] + rect[2] / 2, rect[1] + 2, {
-          size: 13,
-          color: sel ? C.gold : on ? C.ink : C.inkSoft,
-          parent: btn,
-        });
-        if (sel) hint = this.fieldHint(k, on);
-      });
-    }
-
-    if (hint) this.text(hint, 'body', W / 2, y0 + 80, { size: 10, italic: true, color: C.inkSoft });
-  }
-
-  /**
-   * What a soccer field button says: whether it is the field of the next match; for the third,
-   * the text its level script shows instead (`Lang` 130, "dedicated to VolleyFest", without its
-   * `*` marks).
-   */
-  private fieldHint(k: number, chosen: boolean): string {
-    const volley = k === 2 ? this.texts.getStatic(130).replace(/\*/g, '') : '';
-    if (volley) return volley;
-    return chosen ? this.t.fieldOn : this.t.fieldOff;
+    const cur =
+      this.screen === 'quests'
+        ? 'quests'
+        : this.screen === 'fridge'
+          ? 'fridge'
+          : this.screen === 'settings' || this.screen === 'controls'
+            ? 'settings'
+            : 'play';
+    const tab = (id: string, label: string, icon: Icon, go: () => void) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: `tab${cur === id ? ' is-current' : ''}`,
+          'aria-current': cur === id ? 'page' : false,
+          'data-nav': `nav:${id}`,
+          onclick: go,
+        },
+        this.img(icon, 'tab-art'),
+        h('span', null, label),
+      );
+    return h(
+      'div',
+      { class: 'tabbar-inner' },
+      tab('play', t.tabPlay, { clip: 'hammer_player' }, () => this.showMenu()),
+      tab('quests', t.quests, { item: 20 }, () => this.showQuests()),
+      tab('fridge', t.tabFridge, { item: 1018 }, () => this.showFridge()),
+      tab('settings', t.options, { item: 1208 }, () => this.showSettings()),
+    );
   }
 
   /**
@@ -2060,753 +2401,978 @@ export class Shell {
     return q ? this.texts.getQuestName(q.id) : '?';
   }
 
-  // -------------------------------------------------------------- settings
-
   /**
-   * The settings page: a checkbox each for details, shaking, sound and music, a gauge for the
-   * volume. The selected row shows the guide's text for it.
+   * What a soccer field button says: whether it is the field of the next match; for the third,
+   * the text its level script shows instead (`Lang` 130, "dedicated to VolleyFest", without its
+   * `*` marks).
    */
-  private drawSettings(): void {
-    const t = this.t;
-    const st = this.settings;
-    const rows = this.settingRows;
-    // The sound panel is smaller, over the game
-    const inGame = this.screen === 'sound';
-    const y0 = inGame ? 50 : 12;
-    const buttonY = inGame ? 414 : BUTTON_Y;
-    this.panel(12, y0, 396, inGame ? 400 : H - 20);
-    this.text(t.settings, 'title', W / 2, y0 + 10, { size: 26, color: C.heading });
-    this.gearAt(W / 2, y0 + 62);
+  private fieldHint(k: number, chosen: boolean): string {
+    const volley = k === 2 ? this.texts.getStatic(130).replace(/\*/g, '') : '';
+    if (volley) return volley;
+    return chosen ? this.t.fieldOn : this.t.fieldOff;
+  }
 
-    const top = y0 + 98;
-    const rowH = inGame ? 46 : 38;
-    const count = rows.length - 1;
-    rows.forEach((row, i) => {
-      if (row === 'back') return;
-      const y = top + i * rowH;
-      const sel = i === this.settingSel;
-      const btn = this.button(
-        [40, y, 340, rowH - 6],
-        () => {
-          this.settingSel = i;
-          if (row !== 'volume') this.confirmSetting();
-          else this.render();
-        },
-        sel,
-        8,
-      );
-      const ink = sel ? C.gold : C.ink;
-      const cy = y + (rowH - 6) / 2;
-      const label = this.text(t[row], 'label', 82, cy - 9, {
-        align: 'left',
-        size: 15,
-        color: ink,
-        parent: btn,
-      });
-      if (row === 'volume') {
-        btn.addChild(speaker(56, cy, st.volume > 0, sel ? C.gold : C.wood));
-        this.volumeGauge(btn, cy, sel, label.x + label.width);
-        return;
-      }
-      if (row === 'hd') {
-        // A screen, and the choice on the right (auto says which set it gives here)
-        const color = sel ? C.gold : C.wood;
-        btn.addChild(
-          new Graphics()
-            .roundRect(56, cy - 7, 15, 10, 1.5)
-            .stroke({ color, width: 1.6 })
-            .moveTo(63.5, cy + 3)
-            .lineTo(63.5, cy + 6)
-            .moveTo(59.5, cy + 7)
-            .lineTo(67.5, cy + 7)
-            .stroke({ color, width: 1.6 }),
-        );
-        const choice = savedBitmapChoice();
-        const value =
-          choice === 'auto'
-            ? `${t.hdAuto} (${bitmapScaleOf('auto')}×)`
-            : choice === 1
-              ? t.hdOff
-              : `${choice}×`;
-        this.text(value, 'label', 372, cy - 8, {
-          align: 'right',
-          size: 13,
-          color: sel ? C.gold : C.inkSoft,
-          parent: btn,
-        });
-        return;
-      }
-      if (row === 'controls') {
-        // The device in use, and a chevron: the row opens a page
-        const color = sel ? C.gold : C.heading;
-        if (this.input.device === 'gamepad') {
-          const g = padGlyph('a', this.input.padLayout, 16, sel ? 'onDark' : 'onLight');
-          g.position.set(63, cy);
-          btn.addChild(g);
-        } else {
-          btn.addChild(keycapIcon(63, cy, color));
-        }
-        this.text('›', 'label', 368, cy - 15, { align: 'right', size: 26, color, parent: btn });
-        return;
-      }
-      const x = 56;
-      const box = new Graphics()
-        .roundRect(x, cy - 7, 14, 14, 3)
-        .fill({ color: 0xffffff, alpha: sel ? 0.15 : 0.6 })
-        .stroke({ color: sel ? C.gold : C.wood, width: 1.6 });
-      if (st[row]) {
-        box
-          .moveTo(x + 3, cy)
-          .lineTo(x + 6.5, cy + 3.5)
-          .lineTo(x + 12, cy - 4)
-          .stroke({ color: sel ? C.gold : C.wood, width: 2.4 });
-      }
-      btn.addChild(box);
-    });
+  // ------------------------------------------------------------ the game under way
 
-    const row = rows[this.settingSel];
-    const hintY = top + count * rowH + 10;
-    if (row !== 'back') {
-      this.text(t[row + 'Hint'], 'body', W / 2, hintY, {
-        width: 330,
-        size: 11,
-        italic: true,
-        color: C.inkSoft,
-      });
+  /** The top bar while a game the menu started plays: its mode and the options it uses. */
+  private fillChips(): void {
+    const d = this.dom;
+    if (!d) return;
+    const mode = MODES.find((m) => m.mode === this.playing);
+    if (!mode) {
+      fill(d.chips);
+      return;
     }
-    this.text(inGame ? t.soundNote : t.settingsNote, 'body', W / 2, buttonY - (inGame ? 62 : 46), {
-      width: 330,
-      size: 10,
-      color: C.todo,
-    });
-
-    // Back: space only when it is the selected row, as space ticks the others
-    const back = row === 'back';
-    this.actionButton(
-      t.back,
-      buttonY,
-      () => this.leaveSettings(),
-      170,
-      true,
-      back ? 'auto' : 'pad',
-    );
-  }
-
-  /**
-   * The volume: a gauge in steps of `VOLUME_STEP`, set by a click at its place, with the
-   * value. Left and right change it when its row is selected.
-   */
-  private volumeGauge(parent: Container, cy: number, sel: boolean, labelRight: number): void {
-    // After the label (and its knob's room), up to the value
-    const x0 = Math.max(214, labelRight + 16);
-    const w = 326 - x0;
-    const v = this.settings.volume;
-    const g = new Graphics()
-      .roundRect(x0, cy - 4, w, 8, 4)
-      .fill({ color: sel ? C.gold : C.wood, alpha: sel ? 0.3 : 0.18 })
-      .roundRect(x0, cy - 4, Math.max(8, (w * v) / 100), 8, 4)
-      .fill(v > 0 ? (sel ? C.gold : C.progress) : 'rgba(0,0,0,0)')
-      .circle(x0 + (w * v) / 100, cy, 7)
-      .fill(sel ? C.gold : C.wood);
-    const track = new Container();
-    track.eventMode = 'static';
-    track.cursor = 'pointer';
-    track.hitArea = new Rectangle(x0 - 10, cy - 14, w + 20, 28);
-    track.on('pointertap', (e) => {
-      e.stopPropagation();
-      this.settingSel = this.settingRows.indexOf('volume');
-      this.setVolume((100 * (track.toLocal(e.global).x - x0)) / w);
-      this.render();
-    });
-    track.addChild(g);
-    parent.addChild(track);
-    this.text(`${v} %`, 'label', 372, cy - 8, {
-      align: 'right',
-      size: 13,
-      color: sel ? C.gold : C.inkSoft,
-      parent,
-    });
-  }
-
-  /**
-   * The controls page (G.4): each move's two keyboard slots and controller slot, as the SWF's
-   * key setup screen (`#910`) has a key per move; then the default keys and back. A slot that
-   * waits shows the SWF's prompt instead of the help, and the page under it waits too (a
-   * click anywhere cancels).
-   */
-  private drawControls(): void {
     const t = this.t;
-    const b = this.bindings;
-    const cap = this.capture;
-    this.panel(12, 12, 396, H - 20);
-    this.text(t.controlsTitle, 'title', W / 2, 22, { size: 26, color: C.heading });
-
-    // Column heads
-    const headY = CTRL_TOP - 24;
-    const [k0] = CTRL_COLS[0];
-    const [k1, kw] = CTRL_COLS[1];
-    const [px, pw] = CTRL_COLS[2];
-    this.text(t.keyboard, 'label', (k0 + k1 + kw) / 2, headY, { size: 12, color: C.inkSoft });
-    this.text(t.pad, 'label', px + pw / 2, headY, { size: 12, color: C.inkSoft });
-
-    MOVES.forEach((action, row) => {
-      const y = CTRL_TOP + row * CTRL_ROW_H;
-      const h = CTRL_ROW_H - 6;
-      const cy = y + h / 2;
-      const rowSel = row === this.ctrlRow;
-      this.text(t[`mv_${action}`], 'label', 36, cy - 9, {
-        align: 'left',
-        size: 15,
-        color: rowSel ? C.heading : C.ink,
-      });
-      CTRL_COLS.forEach(([x, w], col) => {
-        const sel = rowSel && col === this.ctrlCol;
-        const waiting = cap?.row === row && cap.col === col;
-        const btn = this.button(
-          [x, y, w - 4, h],
-          () => {
-            this.ctrlRow = row;
-            this.ctrlCol = col;
-            this.confirmControl();
-          },
-          sel || waiting,
-          8,
-        );
-        if (!sel && !waiting) {
-          // An empty well, so the slots read as boxes
-          btn.addChildAt(
-            new Graphics()
-              .roundRect(x, y, w - 4, h, 8)
-              .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
-            0,
+    const opts =
+      mode.mode === 'tutorial'
+        ? []
+        : this.modeOptions(mode).filter(
+            (oid) =>
+              this.profile.hasOption(oid) && (oid === Data.OPT_BOOST || this.profile.isChosen(oid)),
           );
-        }
-        const mid = x + (w - 4) / 2;
-        if (waiting) {
-          this.text('…', 'label', mid, cy - 11, { size: 18, color: C.gold, parent: btn });
-          return;
-        }
-        if (col < 2) this.keySlot(btn, b.keys[action][col], mid, cy, sel);
-        else this.padSlot(btn, b.pad[action], mid, cy, sel);
-      });
-    });
-
-    // The default keys, a smaller row
-    const resetY = CTRL_TOP + MOVES.length * CTRL_ROW_H + 2;
-    const resetSel = this.ctrlRow === CTRL_RESET;
-    const reset = this.button(
-      [W / 2 - 90, resetY, 180, 30],
-      () => {
-        this.ctrlRow = CTRL_RESET;
-        this.confirmControl();
-      },
-      resetSel,
-      15,
+    fill(
+      d.chips,
+      h('span', { class: 'chip' }, t[mode.mode]),
+      opts.map((oid) => h('span', { class: 'chip is-on' }, t[oid])),
     );
-    this.text(t.resetKeys, 'label', W / 2, resetY + 7, {
-      size: 13,
-      color: resetSel ? C.gold : C.heading,
-      parent: reset,
-    });
-
-    // The help, or the prompt of a slot that waits
-    const helpY = resetY + 46;
-    if (cap) {
-      const onPad = cap.col === 2;
-      this.text(onPad ? t.capPad : t.capKey, 'label', W / 2, helpY, {
-        size: 16,
-        color: C.heading,
-      });
-      const cancel = onPad
-        ? t.capPadCancel.replace('{0}', padLabel('start', this.input.padLayout))
-        : t.capKeyCancel;
-      this.text(cancel, 'label', W / 2, helpY + 24, { size: 12, color: C.inkSoft });
-      if (cap.note) {
-        this.text(cap.note, 'body', W / 2, helpY + 46, {
-          width: 330,
-          size: 11,
-          italic: true,
-          color: C.progress,
-        });
-      }
-    } else {
-      this.text(t.controlsHelp, 'body', W / 2, helpY, {
-        width: 330,
-        size: 11,
-        italic: true,
-        color: C.inkSoft,
-      });
-    }
-    this.text(t.controlsNote, 'body', W / 2, BUTTON_Y - 58, {
-      width: 330,
-      size: 10,
-      color: C.todo,
-    });
-
-    const backSel = this.ctrlRow === CTRL_BACK;
-    this.actionButton(
-      t.back,
-      BUTTON_Y,
-      () => this.leaveControls(),
-      170,
-      true,
-      backSel ? 'auto' : 'pad',
-    );
-
-    if (cap) {
-      // Over the page: a click cancels the wait
-      const veil = new Container();
-      veil.eventMode = 'static';
-      veil.hitArea = new Rectangle(0, 0, W, H);
-      veil.on('pointertap', () => this.stopCapture());
-      this.root.addChild(veil);
-    }
   }
 
-  /** A keyboard slot's keys, as keycaps side by side, or a dash. */
-  private keySlot(
-    parent: Container,
-    codes: readonly number[],
-    cx: number,
-    cy: number,
-    sel: boolean,
-  ): void {
-    if (codes.length === 0) {
-      this.text('—', 'label', cx, cy - 9, { size: 14, color: sel ? C.gold : C.todo, parent });
-      return;
+  /**
+   * The give up button of the playing toolbar: the first press arms it for 3 s (its label says
+   * to press again), the second gives up, as Ctrl Shift K does.
+   */
+  armQuit(): boolean {
+    const now = performance.now();
+    if (now - this.quitArmed < 3000) {
+      this.quitArmed = 0;
+      return true;
     }
-    const caps = codes.map((kc) => {
-      const c = new Container();
-      const k = this.text(keyName(kc, this.lang) ?? '?', 'label', 0, 0, {
-        align: 'left',
-        size: 10,
-        color: C.heading,
-        parent: c,
-      });
-      const w = Math.max(18, k.width + 10);
-      c.addChildAt(
-        new Graphics()
-          .roundRect(0, 1.5, w, 18, 4)
-          .fill(0xc8a878)
-          .roundRect(0, 0, w, 18, 4)
-          .fill(0xfffaf0),
-        0,
-      );
-      k.position.set((w - k.width) / 2, (18 - k.height) / 2);
-      return { c, w };
-    });
-    const gap = 4;
-    let x = cx - (caps.reduce((n, k) => n + k.w, 0) + gap * (caps.length - 1)) / 2;
-    for (const k of caps) {
-      k.c.position.set(x, cy - 10);
-      parent.addChild(k.c);
-      x += k.w + gap;
-    }
+    this.quitArmed = now;
+    return false;
   }
 
-  /** A controller slot's buttons, as the controller in use shows them, or a dash. */
-  private padSlot(
-    parent: Container,
-    buttons: readonly number[],
-    cx: number,
-    cy: number,
-    sel: boolean,
-  ): void {
-    const glyphs = buttons
-      .map((i) => padButtonOf(i))
-      .filter((p) => p !== null)
-      .map((p) => padGlyph(p, this.input.padLayout, 17, sel ? 'onDark' : 'onLight'));
-    if (glyphs.length === 0) {
-      this.text('—', 'label', cx, cy - 9, { size: 14, color: sel ? C.gold : C.todo, parent });
-      return;
-    }
-    const gap = 4;
-    let x = cx - (glyphs.reduce((n, g) => n + g.width, 0) + gap * (glyphs.length - 1)) / 2;
-    for (const g of glyphs) {
-      g.position.set(x + g.width / 2, cy);
-      parent.addChild(g);
-      x += g.width + gap;
-    }
+  /** The playing toolbar's labels, in the current language. */
+  get toolLabels(): Record<string, string> {
+    const t = this.t;
+    return {
+      pause: t.pauseHint,
+      map: t.toolMap,
+      music: t.music,
+      full: t.toolFull,
+      quit: t.toolQuit,
+      quitSure: t.toolQuitSure,
+    };
   }
 
-  /** A big gear under the settings title. */
-  private gearAt(x: number, y: number): void {
-    const g = gear(x, y, 13, C.wood);
-    g.alpha = 0.55;
-    this.root.addChild(g);
-  }
+  // ------------------------------------------------------------ quests
 
-  // ---------------------------------------------------------------- quests
-
-  /** Quests in progress, then quests done, each in id order. */
+  /** The quests of the tab showing: in progress, done, or both, each in id order. */
   private questList(): number[] {
     const q = this.profile.quests;
     const p = this.profile.data;
     const ids = q.quests.map((x) => x.id);
-    return [
-      ...ids.filter((id) => q.status(p, id) === 'progress'),
-      ...ids.filter((id) => q.status(p, id) === 'done'),
-    ];
+    const of = (s: string) => ids.filter((id) => q.status(p, id) === s);
+    if (this.questTab === 'progress') return of('progress');
+    if (this.questTab === 'done') return of('done');
+    return [...of('progress'), ...of('done')];
   }
 
-  private drawQuests(): void {
+  /** Items gathered out of all the quest needs, and how many of its items are complete. */
+  private questProgress(id: number): { f: number; ok: number; all: number } {
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const reqs = q.requirements(id);
+    const need = reqs.reduce((a, r) => a + r.qty, 0);
+    const have = reqs.reduce((a, r) => a + Math.min(p.items[r.item] ?? 0, r.qty), 0);
+    return {
+      f: need > 0 ? have / need : 1,
+      ok: reqs.filter((r) => (p.items[r.item] ?? 0) >= r.qty).length,
+      all: reqs.length,
+    };
+  }
+
+  private pageQuests(): HTMLElement {
     const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
-    this.panel(12, 12, 396, H - 20);
-    this.text(t.quests, 'title', W / 2, 22, { size: 26, color: C.heading });
-
-    // The three states, counted
     const ids = q.quests.map((x) => x.id);
     const count = (s: string) => ids.filter((id) => q.status(p, id) === s).length;
-    const chips: [string, number, string][] = [
-      [t.progress, count('progress'), C.progress],
-      [t.done, count('done'), C.done],
-      [t.todo, count('none'), C.todo],
+    const tabs: [QuestTab, string, number][] = [
+      ['progress', t.progress, count('progress')],
+      ['done', t.done, count('done')],
+      ['all', t.all, count('progress') + count('done')],
     ];
-    chips.forEach(([label, n, color], i) => {
-      const cx = W / 2 + (i - 1) * 124;
-      this.root.addChild(new Graphics().circle(cx - 46, 66, 4.5).fill(color));
-      const sep = this.lang === 'fr' ? '\u00a0: ' : ': ';
-      this.text(`${label}${sep}${n}`, 'label', cx - 38, 59, {
-        align: 'left',
-        size: 12,
-        color: C.ink,
-      });
-    });
-
     const list = this.questList();
-    const listTop = 84;
-    if (list.length === 0) {
-      this.text(t.noQuest, 'body', W / 2, listTop + 30, { width: 320, size: 12 });
-    }
-    list.slice(this.questTop, this.questTop + QUEST_ROWS).forEach((id, k) => {
-      const i = this.questTop + k;
-      const y = listTop + k * 24;
-      const sel = i === this.questSel;
-      const row = this.button([24, y, 372, 22], () => this.selectQuest(i), sel, 6);
-      const done = q.status(p, id) === 'done';
-      row.addChild(new Graphics().circle(36, y + 11, 4).fill(done ? C.done : C.progress));
-      this.text(this.texts.getQuestName(id), 'label', 48, y + 3, {
-        align: 'left',
-        size: 13,
-        color: sel ? C.gold : C.ink,
-        parent: row,
-      });
-      if (done) {
-        this.text('✓', 'label', 384, y + 2, {
-          align: 'right',
-          size: 14,
-          color: sel ? C.gold : C.done,
-          parent: row,
-        });
-      } else {
-        // Items gathered out of all the quest needs
-        const reqs = q.requirements(id);
-        const need = reqs.reduce((a, r) => a + r.qty, 0);
-        const have = reqs.reduce((a, r) => a + Math.min(p.items[r.item] ?? 0, r.qty), 0);
-        this.text(`${have}/${need}`, 'body', 384, y + 4, {
-          align: 'right',
-          size: 11,
-          color: sel ? C.gold : C.inkSoft,
-          parent: row,
-        });
-        row.addChild(
-          new Graphics()
-            .roundRect(296, y + 9, 50, 4, 2)
-            .fill({ color: sel ? C.gold : C.wood, alpha: 0.25 })
-            .roundRect(296, y + 9, Math.max(4, (50 * have) / need), 4, 2)
-            .fill(sel ? C.gold : C.progress),
-        );
-      }
-    });
-    const listBottom = listTop + QUEST_ROWS * 24;
-    // Scroll bar when the list is longer than the rows
-    if (list.length > QUEST_ROWS) {
-      const trackH = QUEST_ROWS * 24 - 2;
-      const thumbH = Math.max(16, (trackH * QUEST_ROWS) / list.length);
-      const thumbY = listTop + ((trackH - thumbH) * this.questTop) / (list.length - QUEST_ROWS);
-      this.root.addChild(
-        new Graphics()
-          .roundRect(400, listTop, 3, trackH, 1.5)
-          .fill({ color: C.wood, alpha: 0.15 })
-          .roundRect(400, thumbY, 3, thumbH, 1.5)
-          .fill({ color: C.wood, alpha: 0.6 }),
-      );
-    }
+    if (this.questId === null || !list.includes(this.questId)) this.questId = list[0] ?? null;
+    const phone = this.isPhone;
     const none = count('none');
-    if (list.length > 0 && none > 0) {
-      const shownRows = Math.min(list.length, QUEST_ROWS);
-      this.text(fmt(t.moreQuests, none), 'body', W / 2, listTop + shownRows * 24 + 6, {
-        width: 360,
-        size: 10,
-        italic: true,
-        color: C.inkSoft,
-      });
-    }
-
-    const sepY = listBottom + 36;
-    this.root.addChild(
-      new Graphics()
-        .moveTo(36, sepY)
-        .lineTo(384, sepY)
-        .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
+    return h(
+      'section',
+      { class: 'board board-page', 'aria-labelledby': 'q-h' },
+      this.plank(t.quests, { item: 20 }, 'q-h'),
+      h(
+        'div',
+        { class: 'page-bar' },
+        this.backButton(() => this.showMenu()),
+        h(
+          'div',
+          { class: 'tabs', role: 'tablist', 'aria-label': t.filter },
+          tabs.map(([id, label, n]) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                role: 'tab',
+                'aria-selected': String(id === this.questTab),
+                'aria-controls': 'q-list',
+                class: `tab-btn is-${id}${id === this.questTab ? ' is-on' : ''}`,
+                'data-nav': `qtab:${id}`,
+                onclick: () => {
+                  this.questTab = id;
+                  this.questId = this.questList()[0] ?? null;
+                  this.focusKey = `qtab:${id}`;
+                  this.render();
+                },
+              },
+              h('span', { class: 'dot' }),
+              label,
+              h('span', { class: 'count' }, String(n)),
+            ),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'split' },
+        h(
+          'div',
+          { class: 'quest-list', id: 'q-list', role: 'tabpanel' },
+          list.length === 0 ? h('p', { class: 'empty' }, t.noQuest) : null,
+          list.map((id) => {
+            const done = q.status(p, id) === 'done';
+            const pr = this.questProgress(id);
+            const on = id === this.questId;
+            const row = h(
+              'button',
+              {
+                type: 'button',
+                class: `quest-row${on ? ' is-on' : ''}`,
+                'aria-pressed': String(on),
+                'data-nav': `q:${id}`,
+                onclick: () => this.setFocus(`q:${id}`),
+              },
+              h(
+                'span',
+                { class: `seal${done ? ' is-done' : ''}` },
+                done ? '✓' : `${Math.floor(pr.f * 100)}%`,
+              ),
+              h(
+                'span',
+                { class: 'quest-main' },
+                h(
+                  'span',
+                  { class: 'quest-head' },
+                  h('span', { class: 'quest-name' }, this.texts.getQuestName(id)),
+                  h('span', { class: 'quest-count' }, done ? t.done : `${pr.ok} / ${pr.all}`),
+                ),
+                this.bar(done ? 1 : pr.f, done ? 'done' : 'progress'),
+              ),
+            );
+            // On a phone the chosen quest opens under its row
+            return on && phone ? [row, this.questDetail(id)] : row;
+          }),
+          none > 0 && list.length > 0 ? h('p', { class: 'note' }, fmt(t.moreQuests, none)) : null,
+        ),
+        this.questId === null || phone ? null : this.questDetail(this.questId),
+      ),
+      h('p', { class: 'note' }, t.questRule),
     );
-    const id = list[this.questSel];
-    if (id !== undefined) this.drawQuestDetail(id, sepY + 8);
-    else
-      this.text(t.questRule, 'body', W / 2, sepY + 20, { width: 340, size: 11, color: C.inkSoft });
-
-    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true);
   }
 
-  /** The selected quest: its items with "found / needed", and its reward once done. */
-  private drawQuestDetail(id: number, y0: number): void {
+  /** The chosen quest: its items with "found / needed", and its reward once done. */
+  private questDetail(id: number): HTMLElement {
     const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
     const done = q.status(p, id) === 'done';
-    this.text(this.texts.getQuestName(id), 'label', W / 2, y0, { size: 16 });
-    this.text(t.needed.toUpperCase(), 'label', W / 2, y0 + 22, { size: 10, color: C.inkSoft });
-
     const reqs = q.requirements(id);
-    const cell = Math.min(40, 356 / reqs.length);
-    const x0 = W / 2 - (reqs.length * cell) / 2;
-    const y = y0 + 54;
-    reqs.forEach((r, i) => {
-      const x = x0 + i * cell + cell / 2;
-      const have = p.items[r.item] ?? 0;
-      const size = Math.min(28, cell - 8);
-      if (have >= r.qty) this.icon({ item: r.item }, x, y, size);
-      else if (have > 0) this.greyed(r.item, x, y, size);
-      else this.silhouette(r.item, x, y, size);
-      this.text(`${Math.min(have, r.qty)}/${r.qty}`, 'body', x, y + 17, {
-        size: 9,
-        color: have >= r.qty ? C.done : C.inkSoft,
-      });
-    });
-
-    const ry = y0 + 92;
-    this.text(t.reward.toUpperCase(), 'label', W / 2, ry, { size: 10, color: C.inkSoft });
-    if (done)
-      this.text(this.texts.getQuestDesc(id), 'body', W / 2, ry + 15, { width: 350, size: 11 });
-    else
-      this.text(t.rewardHidden, 'body', W / 2, ry + 15, {
-        width: 350,
-        size: 11,
-        italic: true,
-        color: C.inkSoft,
-      });
+    return h(
+      'div',
+      { class: 'inset quest-detail', 'aria-live': 'polite' },
+      h(
+        'div',
+        { class: 'detail-title' },
+        h('h2', null, this.texts.getQuestName(id)),
+        h('span', { class: `state-chip${done ? ' is-done' : ''}` }, done ? t.done : t.progress),
+      ),
+      h('h3', { class: 'sub-title' }, t.needed),
+      h(
+        'div',
+        { class: 'need-grid' },
+        reqs.map((r) => {
+          const have = p.items[r.item] ?? 0;
+          const ok = have >= r.qty;
+          return h(
+            'div',
+            { class: `need${ok ? ' is-done' : ''}` },
+            h(
+              'span',
+              { class: 'need-art' },
+              have > 0
+                ? this.itemImg(r.item, ok ? 'in' : 'part')
+                : h('span', { class: 'unknown' }, '?'),
+            ),
+            h(
+              'span',
+              { class: 'need-name' },
+              have > 0 ? this.texts.getItemName(r.item) : t.unknown,
+            ),
+            this.bar(Math.min(have, r.qty) / r.qty, ok ? 'done' : 'progress'),
+            h('span', { class: 'need-count' }, `${Math.min(have, r.qty)} / ${r.qty}`),
+          );
+        }),
+      ),
+      h(
+        'div',
+        { class: 'reward' },
+        this.img(STAR, 'reward-art'),
+        h(
+          'div',
+          null,
+          h('h3', { class: 'sub-title' }, t.reward),
+          h(
+            'p',
+            { class: done ? '' : 'is-hidden' },
+            done ? this.texts.getQuestDesc(id) : t.rewardHidden,
+          ),
+        ),
+      ),
+    );
   }
 
-  // ---------------------------------------------------------------- fridge
+  // ------------------------------------------------------------ fridge
 
-  private drawFridge(): void {
+  /** The items the fridge's filter shows, in id order. */
+  private fridgeIds(): number[] {
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    return q.itemIds.filter((id) => {
+      const n = p.items[id] ?? 0;
+      if (this.fridgeFilter === 'almost') return n > 0 && !q.inFridge(p, id);
+      if (this.fridgeFilter === 'never') return n === 0;
+      return true;
+    });
+  }
+
+  private itemState(id: number): 'in' | 'part' | 'never' {
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    if (q.inFridge(p, id)) return 'in';
+    return (p.items[id] ?? 0) > 0 ? 'part' : 'never';
+  }
+
+  /** Left or right past the shelf's edge: the next page, on the same shelf. */
+  private turnFridgePage(dx: number, key: string): void {
+    const ids = this.fridgeIds();
+    const i = ids.indexOf(Number(key.slice(2)));
+    const pages = Math.ceil(ids.length / FRIDGE_PAGE);
+    const page = this.fridgePage + dx;
+    if (i < 0 || page < 0 || page >= pages) return;
+    const row = Math.floor((i % FRIDGE_PAGE) / FRIDGE_COLS);
+    const col = dx > 0 ? 0 : FRIDGE_COLS - 1;
+    const n = Math.min(ids.length - 1, page * FRIDGE_PAGE + row * FRIDGE_COLS + col);
+    this.fridgePage = page;
+    this.setFocus(`f:${ids[n]}`);
+  }
+
+  private goFridgePage(page: number): void {
+    const ids = this.fridgeIds();
+    this.fridgePage = page;
+    this.fridgeId = ids[page * FRIDGE_PAGE] ?? null;
+    this.render();
+  }
+
+  private pageFridge(): HTMLElement {
     const t = this.t;
     const q = this.profile.quests;
     const p = this.profile.data;
-    const ids = q.itemIds;
-    this.panel(12, 12, 396, H - 20);
-    this.text(t.fridge, 'title', W / 2, 22, { size: 26, color: C.heading });
     const [have, all] = this.counts().fridge;
-    this.text(fmt(t.fridgeCount, have, all), 'label', W / 2, 56, { size: 13 });
-    this.bar(110, 75, 200, 6, have / all, C.done);
-    this.text(t.fridgeRule, 'body', W / 2, 88, { width: 360, size: 10, color: C.inkSoft });
-
-    const page = Math.floor(this.fridgeSel / FRIDGE_PAGE);
-    const pages = Math.ceil(ids.length / FRIDGE_PAGE);
-    const x0 = W / 2 - (FRIDGE_COLS * FRIDGE_CELL) / 2;
-    const y0 = 122;
-    ids.slice(page * FRIDGE_PAGE, (page + 1) * FRIDGE_PAGE).forEach((id, k) => {
-      const i = page * FRIDGE_PAGE + k;
-      const cx = x0 + (k % FRIDGE_COLS) * FRIDGE_CELL;
-      const cy = y0 + Math.floor(k / FRIDGE_COLS) * FRIDGE_CELL;
-      const sel = i === this.fridgeSel;
-      const cellBtn = this.button(
-        [cx + 1, cy + 1, FRIDGE_CELL - 2, FRIDGE_CELL - 2],
-        () => this.selectItem(i),
-        sel,
-        6,
-      );
-      const mx = cx + FRIDGE_CELL / 2;
-      const my = cy + FRIDGE_CELL / 2;
-      const n = p.items[id] ?? 0;
-      if (q.inFridge(p, id)) {
-        this.icon({ item: id }, mx, my, FRIDGE_CELL - 10, cellBtn);
-        if (n > 1) this.countBadge(`${n}`, cx + FRIDGE_CELL - 2, cy + FRIDGE_CELL - 2, cellBtn);
-      } else if (n > 0) {
-        this.greyed(id, mx, my, FRIDGE_CELL - 12, cellBtn);
-        const f = n / q.unlockCount(id);
-        cellBtn.addChild(
-          new Graphics()
-            .roundRect(cx + 6, cy + FRIDGE_CELL - 6, FRIDGE_CELL - 12, 3, 1.5)
-            .fill({ color: C.wood, alpha: 0.2 })
-            .roundRect(cx + 6, cy + FRIDGE_CELL - 6, (FRIDGE_CELL - 12) * f, 3, 1.5)
-            .fill(C.progress),
-        );
-      } else {
-        this.silhouette(id, mx, my, FRIDGE_CELL - 12, cellBtn);
-      }
-    });
-
-    // Pages
-    const py = y0 + FRIDGE_ROWS * FRIDGE_CELL + 6;
-    this.text(`${page + 1} / ${pages}`, 'label', W / 2, py, { size: 13, color: C.inkSoft });
-    if (page > 0) {
-      const b = this.button(
-        [W / 2 - 92, py - 4, 44, 24],
-        () => this.selectItem((page - 1) * FRIDGE_PAGE),
-        false,
-        6,
-      );
-      this.text('◀', 'label', W / 2 - 70, py, { size: 13, parent: b });
+    const ids = this.fridgeIds();
+    const pages = Math.max(1, Math.ceil(ids.length / FRIDGE_PAGE));
+    if (this.fridgeId !== null && ids.includes(this.fridgeId)) {
+      this.fridgePage = Math.floor(ids.indexOf(this.fridgeId) / FRIDGE_PAGE);
     }
-    if (page < pages - 1) {
-      const b = this.button(
-        [W / 2 + 48, py - 4, 44, 24],
-        () => this.selectItem((page + 1) * FRIDGE_PAGE),
-        false,
-        6,
+    this.fridgePage = Math.max(0, Math.min(pages - 1, this.fridgePage));
+    const shown = ids.slice(this.fridgePage * FRIDGE_PAGE, (this.fridgePage + 1) * FRIDGE_PAGE);
+    if (this.fridgeId === null || !ids.includes(this.fridgeId)) this.fridgeId = shown[0] ?? null;
+    const filters: [FridgeFilter, string][] = [
+      ['all', t.fridgeAll],
+      ['almost', t.fridgeAlmost],
+      ['never', t.fridgeNever],
+    ];
+    const shelves: HTMLElement[] = [];
+    for (let r = 0; r < FRIDGE_ROWS; r++) {
+      const row = shown.slice(r * FRIDGE_COLS, (r + 1) * FRIDGE_COLS);
+      if (row.length === 0 && r > 0) break;
+      shelves.push(
+        h(
+          'div',
+          { class: 'shelf' },
+          h(
+            'div',
+            { class: 'shelf-row' },
+            row.map((id) => {
+              const n = p.items[id] ?? 0;
+              const state = this.itemState(id);
+              const need = q.unlockCount(id);
+              const on = id === this.fridgeId;
+              return h(
+                'button',
+                {
+                  type: 'button',
+                  class: `cell${on ? ' is-on' : ''}`,
+                  'aria-pressed': String(on),
+                  'aria-label': n > 0 ? this.texts.getItemName(id) : t.unknown,
+                  'data-nav': `f:${id}`,
+                  onclick: () => this.setFocus(`f:${id}`),
+                },
+                this.itemImg(id, state),
+                state === 'never'
+                  ? null
+                  : h(
+                      'span',
+                      { class: `badge is-${state}` },
+                      state === 'in' ? `×${n}` : `${n}/${need}`,
+                    ),
+                state === 'part' ? this.bar(n / need, 'progress', 'cell-bar') : null,
+              );
+            }),
+          ),
+          h('div', { class: 'glass', 'aria-hidden': 'true' }),
+        ),
       );
-      this.text('▶', 'label', W / 2 + 70, py, { size: 13, parent: b });
     }
-
-    // The selected item: picture, name, family and how far it is from the fridge
-    const sepY = py + 28;
-    this.root.addChild(
-      new Graphics()
-        .moveTo(36, sepY)
-        .lineTo(384, sepY)
-        .stroke({ color: C.wood, width: 1, alpha: 0.25 }),
+    return h(
+      'section',
+      { class: 'board board-page board-fridge', 'aria-labelledby': 'f-h' },
+      this.plank(t.fridge, { item: 1018 }, 'f-h', 1.2),
+      h(
+        'div',
+        { class: 'page-bar' },
+        this.backButton(() => this.showMenu()),
+        h(
+          'div',
+          { class: 'fridge-count' },
+          h('span', null, fmt(t.fridgeCount, have, all)),
+          this.bar(all > 0 ? have / all : 0, 'done', 'wide'),
+        ),
+        h(
+          'div',
+          { class: 'tabs', role: 'tablist', 'aria-label': t.filter },
+          filters.map(([id, label]) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                role: 'tab',
+                'aria-selected': String(id === this.fridgeFilter),
+                'aria-controls': 'f-shelves',
+                class: `tab-btn${id === this.fridgeFilter ? ' is-on' : ''}`,
+                'data-nav': `ftab:${id}`,
+                onclick: () => {
+                  this.fridgeFilter = id;
+                  this.fridgePage = 0;
+                  this.fridgeId = this.fridgeIds()[0] ?? null;
+                  this.focusKey = `ftab:${id}`;
+                  this.render();
+                },
+              },
+              label,
+            ),
+          ),
+        ),
+      ),
+      h(
+        'div',
+        { class: 'split' },
+        h(
+          'div',
+          { class: 'fridge-main', id: 'f-shelves', role: 'tabpanel' },
+          h(
+            'div',
+            { class: 'fridge-inside' },
+            shown.length === 0 ? h('p', { class: 'empty' }, t.fridgeEmpty) : shelves,
+          ),
+          h(
+            'div',
+            { class: 'pager' },
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'btn-round',
+                'aria-label': t.prevPage,
+                'aria-disabled': this.fridgePage > 0 ? false : 'true',
+                'data-nav': 'fprev',
+                onclick: () => {
+                  this.focusKey = 'fprev';
+                  if (this.fridgePage > 0) this.goFridgePage(this.fridgePage - 1);
+                },
+              },
+              svgIcon(ICON.prev, { size: 18 }),
+            ),
+            h('span', { class: 'pager-text' }, fmt(t.pageOf, this.fridgePage + 1, pages)),
+            h(
+              'button',
+              {
+                type: 'button',
+                class: 'btn-round',
+                'aria-label': t.nextPage,
+                'aria-disabled': this.fridgePage < pages - 1 ? false : 'true',
+                'data-nav': 'fnext',
+                onclick: () => {
+                  this.focusKey = 'fnext';
+                  if (this.fridgePage < pages - 1) this.goFridgePage(this.fridgePage + 1);
+                },
+              },
+              svgIcon(ICON.next, { size: 18 }),
+            ),
+          ),
+        ),
+        this.fridgeId === null ? null : this.itemCard(this.fridgeId),
+      ),
+      h('p', { class: 'note' }, t.fridgeRule),
     );
-    const id = ids[this.fridgeSel];
-    const n = p.items[id] ?? 0;
-    const need = q.unlockCount(id);
-    const known = q.inFridge(p, id);
-    const dy = sepY + 12;
-    if (known) this.icon({ item: id }, 64, dy + 30, 46);
-    else if (n > 0) this.greyed(id, 64, dy + 30, 46);
-    else this.silhouette(id, 64, dy + 30, 46);
-    this.text(n > 0 ? this.texts.getItemName(id) : t.unknown, 'label', 104, dy, {
-      align: 'left',
-      size: 16,
-      width: 280,
-    });
-    const fid = q.familyOf(id);
-    if (fid !== undefined) {
-      const fam = q.itemsOf(fid);
-      const famHave = fam.filter((x) => q.inFridge(p, x)).length;
-      this.text(
-        `${this.texts.getFamilyName(fid)} (${famHave}/${fam.length})`,
-        'body',
-        104,
-        dy + 24,
-        {
-          align: 'left',
-          size: 11,
-          color: C.inkSoft,
-        },
-      );
-    }
-    const status = known ? fmt(t.inFridge, n) : n > 0 ? fmt(t.partial, n, need, need - n) : t.never;
-    this.text(status, 'body', 104, dy + 42, {
-      align: 'left',
-      size: 11,
-      width: 280,
-      color: known ? C.done : n > 0 ? C.progress : C.inkSoft,
-    });
-    if (!known && n > 0) this.bar(104, dy + 60, 160, 5, n / need, C.progress);
-
-    this.actionButton(t.back, BUTTON_Y, () => this.showMenu(), 170, true);
   }
 
-  // --------------------------------------------------------------- results
+  /** The chosen item: picture, name, how far it is from the fridge, and its family. */
+  private itemCard(id: number): HTMLElement {
+    const t = this.t;
+    const q = this.profile.quests;
+    const p = this.profile.data;
+    const n = p.items[id] ?? 0;
+    const need = q.unlockCount(id);
+    const state = this.itemState(id);
+    const status =
+      state === 'in'
+        ? fmt(t.inFridge, n)
+        : state === 'part'
+          ? fmt(t.partial, n, need, need - n)
+          : t.never;
+    const fid = q.familyOf(id);
+    let family: HTMLElement | null = null;
+    if (fid !== undefined) {
+      const fam = q.itemsOf(fid);
+      const famIn = fam.filter((x) => q.inFridge(p, x)).length;
+      family = h(
+        'div',
+        { class: 'family' },
+        h(
+          'div',
+          { class: 'family-head' },
+          h('span', { class: 'family-name' }, this.texts.getFamilyName(fid)),
+          h('span', { class: 'family-count' }, fmt(t.famCount, famIn, fam.length)),
+        ),
+        h(
+          'div',
+          { class: 'family-grid' },
+          fam.map((x) => {
+            const s = this.itemState(x);
+            const known = (p.items[x] ?? 0) > 0;
+            return h(
+              'span',
+              {
+                class: `fam-cell is-${s}${x === id ? ' is-on' : ''}`,
+                title: known ? this.texts.getItemName(x) : t.unknown,
+              },
+              known ? this.itemImg(x, s) : h('span', { class: 'unknown' }, '?'),
+            );
+          }),
+        ),
+      );
+    }
+    return h(
+      'aside',
+      { class: 'inset item-card', 'aria-live': 'polite' },
+      h('div', { class: 'item-disc' }, this.itemImg(id, state)),
+      h('h2', null, n > 0 ? this.texts.getItemName(id) : t.unknown),
+      h('p', { class: `item-status is-${state}` }, status),
+      state === 'never'
+        ? null
+        : this.bar(state === 'in' ? 1 : n / need, state === 'in' ? 'done' : 'progress'),
+      family,
+    );
+  }
+
+  // ------------------------------------------------------------ settings
+
+  /**
+   * The settings page (the site's "Options"): the guide's four checkboxes with their texts, the
+   * volume, the HD pictures (5.6), the controls page (G.4) and the language.
+   */
+  private pageSettings(): HTMLElement {
+    const t = this.t;
+    const choice = savedBitmapChoice();
+    const hdValue =
+      choice === 'auto'
+        ? `${t.hdAuto} (${bitmapScaleOf('auto')}×)`
+        : choice === 1
+          ? t.hdOff
+          : `${choice}×`;
+    return h(
+      'section',
+      { class: 'board board-page board-settings', 'aria-labelledby': 'o-h' },
+      this.plank(t.settings, null, 'o-h', -1.2),
+      h(
+        'div',
+        { class: 'page-bar' },
+        this.backButton(() => this.leaveSettings()),
+      ),
+      h(
+        'div',
+        { class: 'check-grid' },
+        (['detail', 'shake', 'sound', 'music'] as const).map((row) => this.checkCard(row)),
+      ),
+      this.volumeRow(),
+      h(
+        'div',
+        { class: 'inset set-row' },
+        h('span', { class: 'set-label', id: 'hd-l' }, t.hd),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn-ghost hd-btn',
+            'aria-describedby': 'hd-h',
+            'aria-labelledby': 'hd-l hd-v',
+            'data-nav': 'set:hd',
+            onclick: () => this.stepHd(1),
+          },
+          h('span', { id: 'hd-v' }, hdValue),
+        ),
+        h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
+      ),
+      h(
+        'div',
+        { class: 'set-foot' },
+        h(
+          'div',
+          { class: 'tabs', role: 'radiogroup', 'aria-label': t.language },
+          (
+            [
+              ['fr', 'Français'],
+              ['en', 'English'],
+              ['es', 'Español'],
+            ] as const
+          ).map(([id, label]) =>
+            h(
+              'button',
+              {
+                type: 'button',
+                role: 'radio',
+                lang: id,
+                'aria-checked': String(id === this.lang),
+                class: `tab-btn${id === this.lang ? ' is-on' : ''}`,
+                'data-nav': `lang:${id}`,
+                onclick: () => {
+                  this.focusKey = `lang:${id}`;
+                  if (id !== this.lang) this.onLang?.(id);
+                },
+              },
+              label,
+            ),
+          ),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn-ghost',
+            'data-nav': 'set:controls',
+            onclick: () => this.showControls(),
+          },
+          t.controls,
+        ),
+      ),
+      h('p', { class: 'note center' }, t.settingsNote),
+    );
+  }
+
+  /** A setting's checkbox, with the guide's text for it. */
+  private checkCard(row: 'detail' | 'shake' | 'sound' | 'music'): HTMLElement {
+    const t = this.t;
+    const on = !!this.settings[row];
+    return h(
+      'button',
+      {
+        type: 'button',
+        role: 'checkbox',
+        'aria-checked': String(on),
+        class: `check-card${on ? ' is-on' : ''}`,
+        'data-nav': `set:${row}`,
+        onclick: () => this.toggleSetting(row),
+      },
+      h('span', { class: 'box' }, on ? svgIcon(ICON.check, { size: 18 }) : null),
+      h(
+        'span',
+        { class: 'check-text' },
+        h('span', { class: 'check-name' }, t[row]),
+        h('span', { class: 'check-hint' }, t[row + 'Hint']),
+      ),
+    );
+  }
+
+  /**
+   * The volume: a gauge in steps of `VOLUME_STEP`, set by a click or a drag at its place, or by
+   * left and right while focused.
+   */
+  private volumeRow(): HTMLElement {
+    const t = this.t;
+    const v = this.settings.volume;
+    const track = h(
+      'span',
+      { class: 'slider-track' },
+      h('span', { class: 'slider-fill', style: `width: ${v}%` }),
+    );
+    const knob = h('span', { class: 'slider-knob', style: `left: ${v}%` });
+    const slider = h(
+      'span',
+      {
+        class: 'slider',
+        role: 'slider',
+        tabindex: '0',
+        'aria-labelledby': 'vol-l',
+        'aria-valuemin': '0',
+        'aria-valuemax': '100',
+        'aria-valuenow': String(v),
+        'aria-valuetext': `${v} %`,
+        'data-nav': 'set:volume',
+      },
+      track,
+      knob,
+    );
+    const value = h('span', { class: 'set-value' }, `${v} %`);
+    // While dragging, the gauge moves in place: a redraw would drop the pointer capture
+    const at = (e: PointerEvent) => {
+      const r = track.getBoundingClientRect();
+      const raw = (100 * (e.clientX - r.left)) / Math.max(1, r.width);
+      const vol = Math.max(0, Math.min(100, Math.round(raw / VOLUME_STEP) * VOLUME_STEP));
+      this.focusKey = 'set:volume';
+      if (vol === this.settings.volume) return;
+      this.settings = { ...this.settings, volume: vol };
+      this.onSettings?.(this.settings);
+      (track.firstElementChild as HTMLElement).style.width = `${vol}%`;
+      knob.style.left = `${vol}%`;
+      slider.setAttribute('aria-valuenow', String(vol));
+      slider.setAttribute('aria-valuetext', `${vol} %`);
+      value.textContent = `${vol} %`;
+    };
+    slider.addEventListener('pointerdown', (e) => {
+      try {
+        slider.setPointerCapture(e.pointerId);
+      } catch {
+        // a scripted event
+      }
+      at(e);
+    });
+    slider.addEventListener('pointermove', (e) => {
+      if (slider.hasPointerCapture?.(e.pointerId)) at(e);
+    });
+    slider.addEventListener('lostpointercapture', () => this.render());
+    return h(
+      'div',
+      { class: 'inset set-row' },
+      h('span', { class: 'set-label', id: 'vol-l' }, t.volume),
+      slider,
+      value,
+      this.screen === 'sound' ? null : h('p', { class: 'set-hint' }, t.volumeHint),
+    );
+  }
+
+  /** The sound panel over the paused game: sound, music and volume, which apply at once. */
+  private panelSound(): HTMLElement {
+    const t = this.t;
+    return h(
+      'section',
+      { class: 'board board-sound', role: 'dialog', 'aria-labelledby': 's-h' },
+      h('h2', { class: 'sound-title', id: 's-h' }, t.soundKey),
+      h('div', { class: 'sound-rows' }, this.checkCard('sound'), this.checkCard('music')),
+      this.volumeRow(),
+      h('p', { class: 'note center' }, t.soundNote),
+      this.backButton(() => this.leaveSettings()),
+    );
+  }
+
+  // ------------------------------------------------------------ controls (G.4)
+
+  /**
+   * The controls page (G.4): each move's two keyboard slots and controller slot, as the SWF's
+   * key setup screen (`#910`) has a key per move; then the default keys. A slot that waits
+   * shows the SWF's prompt instead of the help, and a click anywhere cancels it.
+   */
+  private pageControls(): HTMLElement {
+    const t = this.t;
+    const b = this.bindings;
+    const cap = this.capture;
+    const rows = MOVES.map((action, row) =>
+      h(
+        'div',
+        { class: 'ctl-row', role: 'row' },
+        h('span', { class: 'ctl-move', role: 'rowheader' }, t[`mv_${action}`]),
+        [0, 1, 2].map((col) => {
+          const waiting = cap?.row === row && cap.col === col;
+          const content: HTMLElement[] = waiting
+            ? [h('span', { class: 'waiting' }, '…')]
+            : col < 2
+              ? this.keyCaps(b.keys[action][col])
+              : this.padCaps(b.pad[action]);
+          return h(
+            'button',
+            {
+              type: 'button',
+              role: 'gridcell',
+              class: `slot${waiting ? ' is-waiting' : ''}`,
+              'aria-label': `${t[`mv_${action}`]}, ${col < 2 ? t.keyboard : t.pad}`,
+              'data-nav': `ctl:${row}:${col}`,
+              onclick: () => this.startCapture(row, col),
+            },
+            content,
+          );
+        }),
+      ),
+    );
+    let help: (HTMLElement | null)[];
+    if (cap) {
+      const onPad = cap.col === 2;
+      help = [
+        h('p', { class: 'prompt' }, onPad ? t.capPad : t.capKey),
+        h(
+          'p',
+          { class: 'prompt-cancel' },
+          onPad
+            ? t.capPadCancel.replace('{0}', padLabel('start', this.input.padLayout))
+            : t.capKeyCancel,
+        ),
+        cap.note ? h('p', { class: 'prompt-note' }, cap.note) : null,
+      ];
+    } else {
+      help = [h('p', { class: 'note' }, t.controlsHelp)];
+    }
+    const page = h(
+      'section',
+      { class: 'board board-page board-controls', 'aria-labelledby': 'c-h' },
+      this.plank(t.controlsTitle, null, 'c-h', 1.2),
+      h(
+        'div',
+        { class: 'page-bar' },
+        this.backButton(() => this.leaveControls()),
+      ),
+      h(
+        'div',
+        { class: 'inset ctl-table', role: 'grid' },
+        h(
+          'div',
+          { class: 'ctl-row ctl-head', role: 'row' },
+          h('span', null),
+          h('span', { class: 'ctl-col2', role: 'columnheader' }, t.keyboard),
+          h('span', { role: 'columnheader' }, t.pad),
+        ),
+        rows,
+      ),
+      h(
+        'div',
+        { class: 'ctl-foot' },
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'btn-ghost',
+            'data-nav': 'reset',
+            onclick: () => {
+              this.focusKey = 'reset';
+              this.changeBindings(DEFAULT_BINDINGS);
+            },
+          },
+          t.resetKeys,
+        ),
+        h('div', { class: 'ctl-help', 'aria-live': 'polite' }, help),
+      ),
+      h('p', { class: 'note' }, t.controlsNote),
+    );
+    if (cap) {
+      // Over the page: a click cancels the wait
+      page.append(h('div', { class: 'veil', onclick: () => this.stopCapture() }));
+    }
+    return page;
+  }
+
+  /** A keyboard slot's keys, as keycaps side by side, or a dash. */
+  private keyCaps(codes: readonly number[]): HTMLElement[] {
+    if (codes.length === 0) return [h('span', { class: 'dash' }, '—')];
+    return codes.map((kc) => h('kbd', { class: 'cap' }, keyName(kc, this.lang) ?? '?'));
+  }
+
+  /** A controller slot's buttons, as the controller in use shows them, or a dash. */
+  private padCaps(buttons: readonly number[]): HTMLElement[] {
+    const caps = buttons
+      .map((i) => padButtonOf(i))
+      .filter((p): p is PadButton => p !== null)
+      .map((p) => this.padCap(p));
+    return caps.length > 0 ? caps : [h('span', { class: 'dash' }, '—')];
+  }
+
+  // ------------------------------------------------------------ results
 
   /**
    * What the game sent the site: the reached level and score for a game over, and the items
    * found. The end of the set sends no score (`GameMode.exitGame`). Then what the game added
    * to the profile: the quests it completed and the new fridge items.
    */
-  private drawResult(r: GameResult): void {
-    if (this.time) {
-      this.drawTimeResult(this.time);
-      return;
-    }
+  private pageResult(): HTMLElement {
     const t = this.t;
-    // A game over shows its picture, which says "GAME OVER", spilling onto the panel; the end
-    // of the set shows the logo and its title
-    const art = r.kind === 'gameOver' ? this.gameOverArt : null;
-    let y: number;
-    if (art) {
-      const top = 150;
-      this.panel(26, top, 368, H - 8 - top);
-      const s = new Sprite(art);
-      s.scale.set(250 / art.width);
-      s.anchor.set(0.5, 0);
-      s.position.set(W / 2, -4);
-      this.root.addChild(s);
-      y = top + 30;
-    } else {
-      this.drawTitle(4, 250);
-      const top = 112;
-      this.panel(26, top, 368, H - 8 - top);
-      this.text(r.kind === 'gameOver' ? t.gameOver : t.endGame, 'title', W / 2, top + 12, {
-        color: C.heading,
-      });
-      y = top + 50;
-    }
+    const r = this.result!;
+    const over = r.kind === 'gameOver';
+    const stats: HTMLElement[] = [];
     if (r.kind === 'gameOver') {
-      const lvl = r.stats.reachedLevel;
-      this.text(`${this.texts.getStatic(1)} ${lvl}`, 'label', W / 2, y, { size: 17 });
-      const sector = this.texts.getSectorName(0, lvl);
-      if (sector) this.text(sector, 'body', W / 2, y + 22, { color: C.inkSoft });
       const data = r.stats.data;
       // Only the Time Attack sends no data, and it has its own page
       if (Array.isArray(data) || data === null) {
-        this.text(`${formatScore(r.score)} pts`, 'label', W / 2, y + 40, {
-          size: 26,
-          color: C.heading,
-        });
+        stats.push(this.stat(t.score, formatScore(r.score)));
       } else {
         // The co-op mode sends no score, only each player's (`MultiCoop.saveScore`)
-        [
-          `Igor : ${formatScore(data.s0 ?? 0)} pts`,
-          `Sandy : ${formatScore(data.s1 ?? 0)} pts`,
-        ].forEach((line, i) => {
-          this.text(line, 'label', W / 2, y + 40 + i * 20, { size: 17, color: C.heading });
-        });
+        stats.push(this.stat('Igor', formatScore(data.s0 ?? 0)));
+        stats.push(this.stat('Sandy', formatScore(data.s1 ?? 0)));
       }
-      y += 82;
+      const lvl = r.stats.reachedLevel;
+      stats.push(this.stat(t.levelReached, String(lvl), this.texts.getSectorName(0, lvl)));
     }
-
-    // Quest lines at the bottom of the panel
-    const lines: { s: string; color: string }[] = [];
     const done = this.record?.quests ?? [];
+    const banners: HTMLElement[] = [];
     for (const id of done.slice(0, done.length > 3 ? 2 : 3)) {
-      lines.push({ s: fmt(t.questDone, this.texts.getQuestName(id)), color: C.done });
+      banners.push(
+        h(
+          'div',
+          { class: 'banner banner-quest stamp' },
+          this.img(STAR, 'banner-art'),
+          h(
+            'span',
+            { class: 'banner-text' },
+            h('span', { class: 'banner-title' }, fmt(t.questDone, this.texts.getQuestName(id))),
+            h('span', { class: 'banner-sub' }, this.texts.getQuestDesc(id)),
+          ),
+        ),
+      );
     }
-    if (done.length > 3) lines.push({ s: fmt(t.moreDone, done.length - 2), color: C.done });
-    const fridge = this.record?.fridge.length ?? 0;
-    if (fridge > 0) {
-      const s = fridge === 1 ? t.newFridge1 : fmt(t.newFridge, fridge);
-      lines.push({ s, color: C.progress });
+    if (done.length > 3) {
+      banners.push(
+        h(
+          'div',
+          { class: 'banner banner-quest' },
+          h('span', { class: 'banner-title' }, fmt(t.moreDone, done.length - 2)),
+        ),
+      );
     }
-    const panelBottom = BUTTON_Y - 24;
-    const linesTop = panelBottom - 16 - lines.length * 18;
-    lines.forEach((l, i) => {
-      this.text(l.s, 'label', W / 2, linesTop + i * 18, { size: 13, color: l.color });
-    });
-
+    const fridge = this.record?.fridge ?? [];
+    if (fridge.length > 0) {
+      banners.push(
+        h(
+          'button',
+          {
+            type: 'button',
+            class: 'banner banner-fridge',
+            'data-nav': 'tab:fridge',
+            onclick: () => this.showFridge(),
+          },
+          this.img({ item: fridge[0] }, 'banner-art'),
+          h(
+            'span',
+            { class: 'banner-text' },
+            h(
+              'span',
+              { class: 'banner-title' },
+              fridge.length === 1 ? t.newFridge1 : fmt(t.newFridge, fridge.length),
+            ),
+            h(
+              'span',
+              { class: 'banner-sub' },
+              fridge
+                .slice(0, 4)
+                .map((id) => this.texts.getItemName(id))
+                .join(', ') + (fridge.length > 4 ? '…' : ''),
+            ),
+          ),
+        ),
+      );
+    }
     const picks = resultPicks(r);
-    this.text((picks.length > 0 ? t.collected : t.none).toUpperCase(), 'label', W / 2, y, {
-      size: 11,
-      color: C.inkSoft,
-    });
-    y += 20;
-    const bottom = lines.length > 0 ? linesTop - 6 : panelBottom - 14;
-    this.drawItems(picks, y, bottom);
+    return h(
+      'div',
+      { class: `result${over ? ' is-over' : ''}` },
+      over
+        ? h('img', { class: 'melted', src: `${this.baseUrl}${GAME_OVER_FILE}`, alt: t.gameOver })
+        : h('img', {
+            class: 'result-logo',
+            src: `${this.baseUrl}${TITLE_FILE}`,
+            alt: 'Hammerfest',
+          }),
+      h(
+        'section',
+        { class: 'board board-page board-result', 'aria-labelledby': 'r-h' },
+        // The game over picture says it already: the title is for screen readers then
+        h(
+          'h1',
+          { class: `result-title${over ? ' sr-only' : ''}`, id: 'r-h' },
+          over ? t.gameOver : t.endGame,
+        ),
+        stats.length > 0 ? h('div', { class: 'stats' }, stats) : null,
+        banners.length > 0 ? h('div', { class: 'banners' }, banners) : null,
+        h(
+          'div',
+          { class: 'found' },
+          h('h2', { class: 'sub-title' }, picks.length > 0 ? t.collected : t.none),
+          picks.length > 0
+            ? h(
+                'div',
+                { class: 'found-grid' },
+                picks.map(([id, n]) =>
+                  h(
+                    'div',
+                    { class: 'found-cell', title: this.texts.getItemName(id) },
+                    this.img({ item: id }, '', this.texts.getItemName(id)),
+                    h('span', { class: 'badge is-wood' }, `×${n}`),
+                  ),
+                ),
+              )
+            : null,
+        ),
+        this.continueButton(),
+      ),
+    );
+  }
 
-    this.actionButton(t.continue, BUTTON_Y, () => this.showMenu());
+  private stat(label: string, value: string, sub = ''): HTMLElement {
+    return h(
+      'div',
+      { class: 'stat' },
+      h('span', { class: 'stat-label' }, label),
+      h('span', { class: 'stat-value' }, value),
+      sub ? h('span', { class: 'stat-sub' }, sub) : null,
+    );
+  }
+
+  private continueButton(): HTMLElement {
+    return h(
+      'button',
+      {
+        type: 'button',
+        class: 'btn-wood btn-start btn-continue',
+        'data-nav': 'continue',
+        onclick: () => this.showMenu(),
+      },
+      h('span', null, this.t.continue),
+      this.confirmCap(),
+    );
   }
 
   /**
@@ -2815,62 +3381,44 @@ export class Shell {
    * the mode's name, and the best time or "new best time"; a lost game shows the game over
    * picture. These games send no items.
    */
-  private drawTimeResult(tr: TimeResult): void {
+  private pageTimeResult(tr: TimeResult): HTMLElement {
     const t = this.t;
     const lost = tr.time >= NO_TIME;
-    const art = lost ? this.gameOverArt : null;
-    let y: number;
-    if (art) {
-      const top = 150;
-      this.panel(26, top, 368, H - 8 - top);
-      const s = new Sprite(art);
-      s.scale.set(250 / art.width);
-      s.anchor.set(0.5, 0);
-      s.position.set(W / 2, -4);
-      this.root.addChild(s);
-      y = top + 30;
-    } else {
-      this.drawTitle(4, 250);
-      const top = 112;
-      this.panel(26, top, 368, H - 8 - top);
-      y = top + 12;
-    }
-    this.text(t[tr.mode], 'title', W / 2, y, { color: C.heading });
-    y += 46;
-    if (lost) {
-      this.text(t.lostRun, 'label', W / 2, y, { size: 17 });
-      y += 30;
-    } else {
-      this.text(formatRunTime(tr.time), 'label', W / 2, y, { size: 34, color: C.heading });
-      y += 50;
-      if (tr.isNew) {
-        this.text(t.newBest, 'label', W / 2, y, { size: 18, color: C.done });
-        y += 30;
-      }
-    }
-    if (tr.best !== null) {
-      this.text(fmt(t.bestTime, formatRunTime(tr.best)), 'body', W / 2, y, {
-        size: 13,
-        color: C.inkSoft,
-      });
-    }
-
-    this.actionButton(t.continue, BUTTON_Y, () => this.showMenu());
-  }
-
-  /** The items in rows, as they look in the game, with their count. */
-  private drawItems(picks: [number, number][], top: number, bottom: number): void {
-    const cols = 8;
-    const cell = 40;
-    const rows = Math.max(1, Math.ceil(picks.length / cols));
-    const size = Math.min(cell, (bottom - top) / rows);
-    const x0 = W / 2 - (Math.min(cols, picks.length) * size) / 2;
-    picks.forEach(([id, n], i) => {
-      const x = x0 + (i % cols) * size + size / 2;
-      const y = top + Math.floor(i / cols) * size + size / 2;
-      this.icon({ item: id }, x, y, size - 8 * (size / cell));
-      if (n > 1) this.countBadge(`x${n}`, x + size / 2, y + size / 2 - 1);
-    });
+    return h(
+      'div',
+      { class: `result${lost ? ' is-over' : ''}` },
+      lost
+        ? h('img', { class: 'melted', src: `${this.baseUrl}${GAME_OVER_FILE}`, alt: t.gameOver })
+        : h('img', {
+            class: 'result-logo',
+            src: `${this.baseUrl}${TITLE_FILE}`,
+            alt: 'Hammerfest',
+          }),
+      h(
+        'section',
+        { class: 'board board-page board-result', 'aria-labelledby': 'r-h' },
+        h('h1', { class: 'result-title', id: 'r-h' }, t[tr.mode]),
+        lost
+          ? h('p', { class: 'lost-run' }, t.lostRun)
+          : h('div', { class: 'stats' }, this.stat(t.runTime, formatRunTime(tr.time))),
+        !lost && tr.isNew
+          ? h(
+              'div',
+              { class: 'banners' },
+              h(
+                'div',
+                { class: 'banner banner-quest stamp' },
+                this.img(STAR, 'banner-art'),
+                h('span', { class: 'banner-title' }, t.newBest),
+              ),
+            )
+          : null,
+        tr.best !== null
+          ? h('p', { class: 'best-time' }, fmt(t.bestTime, formatRunTime(tr.best)))
+          : null,
+        this.continueButton(),
+      ),
+    );
   }
 }
 
@@ -2898,54 +3446,7 @@ function gear(x: number, y: number, r: number, color: number | string): Graphics
     .cut();
 }
 
-/** A small keyboard 18 px wide centered on (`cx`, `cy`): the controls row's icon (G.4). */
-function keycapIcon(cx: number, cy: number, color: number | string): Graphics {
-  const g = new Graphics().roundRect(cx - 9, cy - 6, 18, 12, 2.5).stroke({ color, width: 1.6 });
-  for (const [dx, dy] of [
-    [-5, -2],
-    [-1.5, -2],
-    [2, -2],
-    [5.5, -2],
-  ]) {
-    g.rect(cx + dx - 1, cy + dy - 1, 2, 2);
-  }
-  g.rect(cx - 4, cy + 2, 8, 1.8);
-  return g.fill(color);
-}
-
-/**
- * A speaker 14 px wide, its left edge at `x` and centered on `cy`, in the checkboxes' column;
- * with sound waves unless `on` is false.
- */
-function speaker(x: number, cy: number, on: boolean, color: number | string): Graphics {
-  const g = new Graphics()
-    .rect(x, cy - 3, 4, 6)
-    .fill(color)
-    .poly([x + 3, cy - 3, x + 8, cy - 7, x + 8, cy + 7, x + 3, cy + 3])
-    .fill(color);
-  if (on) {
-    // Each wave starts where its arc does, or the path joins it to the last point
-    for (const r of [3.5, 6.5]) {
-      g.moveTo(x + 8 + r * Math.cos(-0.9), cy + r * Math.sin(-0.9))
-        .arc(x + 8, cy, r, -0.9, 0.9)
-        .stroke({ color, width: 1.6 });
-    }
-  } else {
-    g.moveTo(x + 10, cy - 3)
-      .lineTo(x + 14, cy + 3)
-      .moveTo(x + 14, cy - 3)
-      .lineTo(x + 10, cy + 3)
-      .stroke({ color, width: 1.6 });
-  }
-  return g;
-}
-
 /** Replaces `{0}`, `{1}`... with the arguments. */
-/** Shrinks a one-line text that would be wider than `w`. */
-function fitWidth(t: Text, w: number): void {
-  if (t.width > w) t.scale.set(w / t.width);
-}
-
 function fmt(s: string, ...args: (string | number)[]): string {
   return s.replace(/\{(\d)\}/g, (_, i) => String(args[Number(i)]));
 }
