@@ -25,10 +25,9 @@ export type PlayerAction = 'left' | 'right' | 'jump' | 'down' | 'attack';
  * The keys `GameMode.getControls` reads besides the players' moves, held in player 1's mask:
  * `music` is M, `suicide` Ctrl+Shift+K, `disguise` E and `map` C (the music switch, giving up
  * the game, the next disguise, the world map). The original's disguise key is D, which moves
- * right here (WASD and ZQSD). `sound` (O) opens the sound settings from the pause, a port
- * addition.
+ * right here (WASD and ZQSD).
  */
-export type GameAction = 'pause' | 'music' | 'suicide' | 'disguise' | 'map' | 'sound';
+export type GameAction = 'pause' | 'music' | 'suicide' | 'disguise' | 'map';
 
 export type ControlAction = PlayerAction | GameAction;
 
@@ -85,7 +84,6 @@ const GAME_KEYS: [GameAction, readonly number[]][] = [
   ['music', [code('M')]],
   ['disguise', [code('E')]],
   ['map', [code('C')]],
-  ['sound', [code('O')]],
 ];
 const SUICIDE_KEYS = [Key.CONTROL, Key.SHIFT, code('K')];
 

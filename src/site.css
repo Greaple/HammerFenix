@@ -1301,6 +1301,29 @@ html:not(.touch) body[data-page='playing'] .game-canvas-container {
   }
 }
 
+/* A short and narrow window: the six buttons smaller, clear of the top bar's sound switch */
+@media (max-height: 520px) and (max-width: 760px) {
+  html:not(.touch) body[data-page='playing'] .play-tools {
+    gap: 4px;
+  }
+
+  html:not(.touch) body[data-page='playing'] .tool-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  html:not(.touch) body[data-page='playing'] .tool-btn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* The language and the help wait for the end of the game, as on a phone */
+  html:not(.touch) body[data-page='playing'] .lang-pill,
+  html:not(.touch) body[data-page='playing'] #btn-open-about {
+    display: none;
+  }
+}
+
 /* ========================================================
    Home page
    ======================================================== */
@@ -2609,92 +2632,6 @@ html.touch .pager .btn-round {
   z-index: 2;
 }
 
-/* --- Sound panel, over the paused game --- */
-
-/* Over the paused game, inside the frame; on a short or narrow window (a small frame) a dialog
-   centered under the top bar at its own size instead, as the frame's would be unreadable */
-.board-sound {
-  position: absolute;
-  left: 4%;
-  right: 4%;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 18px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-@media (max-height: 520px), (max-width: 599px) {
-  .board-sound {
-    position: fixed;
-    left: 50%;
-    right: auto;
-    top: calc(50% + 32px);
-    transform: translate(-50%, -50%);
-    box-sizing: border-box;
-    width: min(380px, 100vw - 24px);
-    max-height: calc(100dvh - 72px);
-    z-index: 6;
-  }
-}
-
-/* A very short window: the boxes say what the panel is about */
-@media (max-height: 300px) {
-  .board-sound .sound-title {
-    display: none;
-  }
-}
-
-@media (max-height: 440px) {
-  .board-sound {
-    padding: 10px 12px;
-    gap: 6px;
-  }
-
-  .board-sound .sound-title {
-    font-size: 22px;
-  }
-
-  .board-sound > .note {
-    display: none;
-  }
-
-  .board-sound .check-card {
-    padding: 6px 8px;
-  }
-
-  .board-sound .set-row {
-    padding: 6px 10px;
-  }
-
-  .board-sound .btn-back {
-    height: 34px;
-  }
-}
-
-.sound-title {
-  margin: 0;
-  text-align: center;
-  font: 30px/1 var(--f-title);
-  font-weight: normal;
-  color: var(--wood);
-}
-
-.sound-rows {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.board-sound .check-hint {
-  display: none;
-}
-
-.board-sound .btn-back {
-  align-self: center;
-}
-
 /* --- Results --- */
 
 /* The picture over the board's top edge (`--pic`: the game over picture's width), the board
@@ -3012,6 +2949,34 @@ html.touch .pager .btn-round {
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* A switch that is off (music, sound effects): crossed out, its color faded */
+.tool-btn .slash,
+.tool-btn .slash-gap {
+  display: none;
+}
+
+.tool-btn.is-off {
+  color: rgba(95, 69, 44, 0.55);
+}
+
+.tool-btn.is-off .slash,
+.tool-btn.is-off .slash-gap {
+  display: inline;
+}
+
+.tool-btn.is-off .slash {
+  stroke: var(--wood);
+}
+
+.tool-btn .slash-gap {
+  stroke: var(--cream);
+  stroke-width: 5.5;
+}
+
+.tool-btn:hover .slash-gap {
+  stroke: #fff;
 }
 
 /* The touch controls in parchment and wood */

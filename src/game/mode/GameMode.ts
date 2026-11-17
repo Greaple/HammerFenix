@@ -2142,11 +2142,6 @@ export abstract class GameMode implements IGameContext {
       this.setMusicVolume(this.fl_mute ? 0 : 1);
     }
 
-    // Port addition: the sound panel from the pause (O, or the controller's R1)
-    if (this.input.consumePress('sound') && this.manager.soundMenuAvailable) {
-      this.manager.onSoundMenu?.();
-    }
-
     // Suicide (Ctrl+Shift+K): the way to give up a game. The original also waits for
     // `fl_switch`, which only `ModeSwitcher` sets (never in the Adventure).
     if (this.input.isDown('suicide')) {
@@ -2395,11 +2390,6 @@ export abstract class GameMode implements IGameContext {
   }
 
   // ------------------------------------------------------------ Port glue
-
-  /** The pause screen is up (not the world map): the sound panel may open over it. */
-  get pauseScreenShown(): boolean {
-    return this.fl_pause && this.pauseMC !== null;
-  }
 
   /**
    * Port addition: the sound settings changed during the game (the pause's sound panel).

@@ -7,8 +7,8 @@
  * Flash Player plays at most 32 sounds at once and drops new ones past that (Ruffle's
  * `AudioManager.MAX_SOUNDS`). Volumes are Flash's, 0 to 100 (100 = full).
  *
- * Port additions: the page's sound switch (`setMuted`) and the pause of a hidden tab
- * (`setSuspended`). Files are fetched by `preload` (Flash had them in the SWF, and the Loader
+ * Port additions: the game's sound effects switch (`setEffectsMuted`, the toolbar's and the
+ * header's) and the pause of a hidden tab (`setSuspended`). Files are fetched by `preload` (Flash had them in the SWF, and the Loader
  * downloaded the musics before the game) and decoded once a user gesture unlocks the audio.
  */
 export class AudioEngine {
@@ -18,6 +18,8 @@ export class AudioEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  /** Every channel goes through it: the sound effects switch. */
+  private effectsGain: GainNode | null = null;
   /** One gain per channel: the channel clip's `vol_ctrl` sound. */
   private readonly channelGains = new Map<number, GainNode>();
 
@@ -31,7 +33,7 @@ export class AudioEngine {
   private musicSource: AudioBufferSourceNode | null = null;
   private currentMusicName: string | null = null;
 
-  private muted = false;
+  private effectsOff = false;
   /** `unlock` started decoding the files. */
   private decoding = false;
   /** `SoundManagerChannel.vol`: 100 until `setVolume`. */
@@ -45,21 +47,16 @@ export class AudioEngine {
     }
   }
 
-  get isMuted(): boolean {
-    return this.muted;
+  get effectsMuted(): boolean {
+    return this.effectsOff;
   }
 
-  /** The page's sound switch (port addition): silences everything. */
-  setMuted(m: boolean): void {
-    this.muted = m;
-    if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(m ? 0 : 1, this.ctx.currentTime);
+  /** The sound effects switch (port addition): every channel, not the music. */
+  setEffectsMuted(m: boolean): void {
+    this.effectsOff = m;
+    if (this.effectsGain && this.ctx) {
+      this.effectsGain.gain.setValueAtTime(m ? 0 : 1, this.ctx.currentTime);
     }
-  }
-
-  toggleMute(): boolean {
-    this.setMuted(!this.muted);
-    return this.muted;
   }
 
   /** `SoundManager.setVolume`: the volume (0 to 100) of every sound of a channel. */
@@ -178,8 +175,11 @@ export class AudioEngine {
     this.ctx = new AudioContext();
     this.ctx.addEventListener?.('statechange', () => this.onStateChange());
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = this.muted ? 0 : 1;
     this.masterGain.connect(this.ctx.destination);
+
+    this.effectsGain = this.ctx.createGain();
+    this.effectsGain.gain.value = this.effectsOff ? 0 : 1;
+    this.effectsGain.connect(this.masterGain);
 
     this.musicGain = this.ctx.createGain();
     this.musicGain.gain.value = this.musicVolume / 100;
@@ -189,12 +189,12 @@ export class AudioEngine {
 
   /** `SoundManager.getChannel`: the channel's gain, made on first use at volume 100. */
   private getChannel(chan: number): GainNode | null {
-    if (!this.ctx || !this.masterGain) return null;
+    if (!this.ctx || !this.effectsGain) return null;
     let g = this.channelGains.get(chan);
     if (!g) {
       g = this.ctx.createGain();
       g.gain.value = (this.channelVolumes.get(chan) ?? 100) / 100;
-      g.connect(this.masterGain);
+      g.connect(this.effectsGain);
       this.channelGains.set(chan, g);
     }
     return g;

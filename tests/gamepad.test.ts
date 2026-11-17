@@ -70,7 +70,6 @@ describe('controller mapping (G.1)', () => {
       [PAD.BACK, 'music'],
       [PAD.Y, 'disguise'],
       [PAD.L1, 'map'],
-      [PAD.R1, 'sound'],
     ];
     for (const [button, action] of cases) {
       pad.press(button);
@@ -78,8 +77,8 @@ describe('controller mapping (G.1)', () => {
       pad.press(button, false);
       expect(poll(input).isDown(action as never)).toBe(false);
     }
-    // The other buttons (L2, the sticks' clicks) do nothing
-    for (const b of [6, 10, 11]) pad.press(b);
+    // The other buttons (L2, R1, the sticks' clicks) do nothing
+    for (const b of [5, 6, 10, 11]) pad.press(b);
     poll(input);
     for (const [, action] of cases) expect(input.isDown(action as never)).toBe(false);
   });

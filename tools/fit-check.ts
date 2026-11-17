@@ -366,7 +366,6 @@ function scenes(): Scene[] {
   });
   out.push({ name: 'settings', open: () => s.showSettings() });
   out.push({ name: 'controls', open: () => s.showControls() });
-  out.push({ name: 'sound', open: () => s.showSound(() => s.showMenu()) });
   out.push({
     name: 'result',
     open: () => {

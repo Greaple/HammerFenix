@@ -173,8 +173,6 @@ export class GameSession {
   onLevelChange?: (levelId: number, levelSet: string) => void;
   onScoreChange?: (score: number) => void;
   onStateChange?: (state: { isOver: boolean; isPaused: boolean }) => void;
-  /** Opens the sound panel over the paused game (port addition). */
-  onSoundMenu?: () => void;
 
   /** The level sets must be loaded (`loadSets`) before the first game: use `create`. */
   constructor(
@@ -194,6 +192,14 @@ export class GameSession {
 
     this.savedData = this.loadSave();
     this.highScore = this.savedData.highScore;
+    // The settings page no longer has the Sound and Music boxes (port addition: the header's
+    // switch and the toolbar's replace them). Both off before: the header's switch starts on.
+    const { sound, music } = this.settings;
+    if (sound === 0 || music === 0) {
+      if (sound === 0 && music === 0) this.savedData.muted = true;
+      this.settings = { ...this.settings, sound: 1, music: 1 };
+      saveSettings(this.settings);
+    }
 
     // The root every mode puts its clip in
     this.gameRoot = lib.createEmptyClip();
@@ -276,16 +282,61 @@ export class GameSession {
     }
   }
 
-  /** Whether the last session left the sound off. */
-  get savedMuted(): boolean {
+  /**
+   * Port addition: the header's sound switch, saved. On, each new game starts with its music
+   * and its sound effects off; it follows the two switches during the game (`syncMuted`).
+   */
+  get muted(): boolean {
     return this.savedData.muted === true;
+  }
+
+  /** The header's switch: the running game's music and effects follow it. */
+  setMuted(m: boolean): void {
+    this.savedData.muted = m;
+    if (this.modeAlive) {
+      this.setMusicOn(!m);
+      this.setEffectsOn(!m);
+    }
+    this.saveSettings();
+  }
+
+  /** The game's music switch (port addition: the toolbar's; M does the same, `fl_mute`). */
+  get musicOn(): boolean {
+    return !this.modeAlive || !this.game.fl_mute;
+  }
+
+  setMusicOn(on: boolean): void {
+    if (!this.modeAlive) return;
+    const g = this.game;
+    g.fl_mute = !on;
+    g.setMusicVolume(on ? (g.fl_pause ? 0.5 : 1) : 0);
+  }
+
+  /** The game's sound effects switch (port addition: the toolbar's). */
+  get effectsOn(): boolean {
+    return !this.audio.effectsMuted;
+  }
+
+  setEffectsOn(on: boolean): void {
+    this.audio.setEffectsMuted(!on);
+  }
+
+  /**
+   * The header's switch follows the game's two: on when both are off. Called every frame, as
+   * M changes the music in the game. Saves when it changes.
+   */
+  syncMuted(): void {
+    if (!this.modeAlive) return;
+    const m = !this.musicOn && !this.effectsOn;
+    if (m === this.muted) return;
+    this.savedData.muted = m;
+    this.saveSettings();
   }
 
   /** Saves the current language and sound switch as the next session's. */
   saveSettings(): void {
     try {
       this.savedData.preferredLang = this.dataStore.langId;
-      this.savedData.muted = this.audio.isMuted;
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.savedData));
     } catch {
       // ignore storage quota / sandbox write errors
@@ -317,7 +368,6 @@ export class GameSession {
         this.game.world.currentId,
       );
       this.savedData.preferredLang = this.dataStore.langId;
-      this.savedData.muted = this.audio.isMuted;
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.savedData));
     } catch {
       // ignore storage quota / sandbox write errors
@@ -356,6 +406,8 @@ export class GameSession {
     // Every player back on `PlayerController`'s own keys
     this.input.resetKeys();
 
+    // Port addition: the game's music and effects switches start from the header's
+    this.audio.setEffectsMuted(this.muted);
     this.startGameMode(this.createMode(startLevelId));
   }
 
@@ -433,6 +485,8 @@ export class GameSession {
    */
   startGameMode(next: GameMode): void {
     const prev = this.modeAlive ? this.game : null;
+    // Port addition: the music switch, from the header for a new game, or from the mode before
+    next.fl_mute = prev ? prev.fl_mute : this.muted;
     this.game = next;
     this.modeAlive = true;
     next.init();
@@ -455,8 +509,8 @@ export class GameSession {
 
   /**
    * Changes the player's settings (the settings screen); the next game uses them. During a game
-   * (the sound panel of the pause, a port addition) the volumes, sound and music apply at once,
-   * and the details and shaking wait for the next game.
+   * the volumes, sound and music apply at once, and the details and shaking wait for the next
+   * game.
    */
   setSettings(s: PlayerSettings): void {
     this.settings = { ...s };
@@ -473,19 +527,6 @@ export class GameSession {
     this.config.setSound(this.settings);
     this.initSoundChannels();
     this.game.onSoundSettings(hadMusic);
-  }
-
-  /**
-   * The sound panel can open: on the pause screen, and not while recording or replaying (it is
-   * not in the original, and its keys would reach the game).
-   */
-  get soundMenuAvailable(): boolean {
-    return (
-      this.loader.gameRunning &&
-      this.game.pauseScreenShown &&
-      !this.recorder &&
-      !this.input.replaying
-    );
   }
 
   /**

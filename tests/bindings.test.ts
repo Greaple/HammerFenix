@@ -102,7 +102,7 @@ describe('bindings model (G.4)', () => {
     expect(keyName(97)).toBe('1');
     expect(keyName(Key.LEFT)).toBe('←');
     expect(keyName(112)).toBeNull(); // F1: the game cannot read it
-    for (const kc of [80, 27, 77, 69, 67, 79]) expect(isBindableKey(kc)).toBe(false); // P Esc M E C O
+    for (const kc of [80, 27, 77, 69, 67]) expect(isBindableKey(kc)).toBe(false); // P Esc M E C O
     expect(isBindableKey(L)).toBe(true);
   });
 

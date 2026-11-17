@@ -143,7 +143,7 @@ describe('what the settings turn off in a game', () => {
   });
 });
 
-describe('sound panel from the pause (port addition)', () => {
+describe('sound during a game (port additions)', () => {
   let s: GameSession;
   beforeAll(async () => {
     s = await createHeadlessSession();
@@ -156,35 +156,12 @@ describe('sound panel from the pause (port addition)', () => {
     for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
   }
 
-  function tap(action: 'sound' | 'music'): void {
+  function tap(action: 'music'): void {
     s.input.setTouch(action, true);
     s.gameLoop.stepSingleFrame();
     s.input.setTouch(action, false);
     s.gameLoop.stepSingleFrame();
   }
-
-  it('opens with O (or R1) on the pause screen only, never while recording', () => {
-    start();
-    let opened = 0;
-    s.onSoundMenu = () => opened++;
-    expect(s.soundMenuAvailable).toBe(false);
-    tap('sound');
-    expect(opened).toBe(0);
-    s.game.onPause();
-    expect(s.soundMenuAvailable).toBe(true);
-    tap('sound');
-    expect(opened).toBe(1);
-    s.game.onUnpause();
-
-    s.startRecording(1);
-    for (let i = 0; i < 60; i++) s.gameLoop.stepSingleFrame();
-    s.game.onPause();
-    expect(s.soundMenuAvailable).toBe(false);
-    tap('sound');
-    expect(opened).toBe(1);
-    s.stopRecording();
-    s.onSoundMenu = undefined;
-  });
 
   it('applies the volume and the sound at once, details and shaking at the next game', () => {
     start();
@@ -231,5 +208,52 @@ describe('sound panel from the pause (port addition)', () => {
     expect(s.game.fl_mute).toBe(false);
     expect(musicVol).toHaveBeenLastCalledWith(33);
     musicVol.mockRestore();
+  });
+
+  it('the top bar switch sets both of the game switches, and follows them', () => {
+    start();
+    s.setMuted(false);
+    const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
+    s.setMuted(true);
+    expect([s.game.fl_mute, s.audio.effectsMuted]).toEqual([true, true]);
+    expect(musicVol).toHaveBeenLastCalledWith(0);
+    s.setMuted(false);
+    expect([s.musicOn, s.effectsOn]).toEqual([true, true]);
+    expect(musicVol).toHaveBeenLastCalledWith(33);
+    // The toolbar's two switches: muted once both are off
+    s.setMusicOn(false);
+    s.syncMuted();
+    expect(s.muted).toBe(false);
+    s.setEffectsOn(false);
+    s.syncMuted();
+    expect(s.muted).toBe(true);
+    // M turns the music back on: no longer muted
+    tap('music');
+    s.syncMuted();
+    expect([s.musicOn, s.muted]).toEqual([true, false]);
+    musicVol.mockRestore();
+    s.setMuted(false);
+  });
+
+  it('the toolbar music switch works on the pause screen, at half volume', () => {
+    start();
+    s.game.onPause();
+    const musicVol = vi.spyOn(s.audio, 'setMusicVolume');
+    s.setMusicOn(false);
+    expect(musicVol).toHaveBeenLastCalledWith(0);
+    s.setMusicOn(true);
+    expect(musicVol).toHaveBeenLastCalledWith(16);
+    musicVol.mockRestore();
+  });
+
+  it('a new game starts from the top bar switch, not from the last game switches', () => {
+    s.setMuted(true);
+    start();
+    expect([s.game.fl_mute, s.audio.effectsMuted]).toEqual([true, true]);
+    s.setMuted(false);
+    s.setMusicOn(false);
+    s.syncMuted();
+    start();
+    expect([s.game.fl_mute, s.audio.effectsMuted]).toEqual([false, false]);
   });
 });

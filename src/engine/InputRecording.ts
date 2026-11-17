@@ -12,7 +12,7 @@ export const ACTION_BITS: Record<ControlAction, number> = {
   suicide: 1 << 7,
   disguise: 1 << 8,
   map: 1 << 9,
-  sound: 1 << 10,
+  // 1 << 10 was `sound` (O, the sound panel, removed): kept free for the old recordings
 };
 
 /** A run-length encoded list of input masks: `[mask, ticks]` pairs. */

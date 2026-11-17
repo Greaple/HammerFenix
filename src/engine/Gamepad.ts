@@ -110,7 +110,6 @@ class Pad {
     if (btn(PAD.BACK)) actions.add('music');
     if (btn(PAD.Y)) actions.add('disguise');
     if (btn(PAD.L1)) actions.add('map');
-    if (btn(PAD.R1)) actions.add('sound');
 
     const menu = new Set<MenuAction>();
     if (left) menu.add('left');

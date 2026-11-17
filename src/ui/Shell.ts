@@ -1,13 +1,13 @@
 /**
  * The screens that replace the hammerfest.fr site (roadmap 3.1 and 3.2d, UI redesign of
  * 2026-11-16): the home page with the modes, the results page after a game, the quests, the
- * fridge, the settings and controls pages, and the sound panel over a paused game. They are
+ * fridge, the settings and controls pages. They are
  * HTML pages around the game frame, as the original's were web pages around the game, in the
  * port's parchment and wood (`src/site.css`) with the game's own drawings: item clips drawn as
  * pictures (`site/ItemArt.ts`), the game's fonts (Satans titles, Franklin Gothic Heavy labels,
  * extracted from `_gfx.swf` by `tools/build-fonts.ts`), the title logo and the game over
  * picture. The frame keeps what the game draws: the village scene (`menu`, vector) and the
- * logo behind the home page, the site's intro, and the pause screen's sound button.
+ * logo behind the home page, and the site's intro.
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
@@ -15,7 +15,9 @@
  * collection with its "found N times" rule. The chosen mode's options are checkboxes under its
  * text, the locked ones with the quest that unlocks them (3.3). The settings page is the site's
  * "Options" link (2C.5): the settings with the guide's texts (section 8 of `guide.html`, typos
- * fixed; the volume hint names the sound, as the volume sets the sounds and the music).
+ * fixed; the volume hint names the sound, as the volume sets the sounds and the music), but for
+ * the sound and music boxes: the top bar's sound switch and the playing toolbar's music and
+ * sound effects switches replace them.
  */
 import {
   BlurFilter,
@@ -95,7 +97,7 @@ export const TITLE_FILE = 'images/mainTitle.webp';
  */
 export const GAME_OVER_FILE = 'images/gameOver.webp';
 
-type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'sound' | 'controls' | 'intro';
+type Screen = 'menu' | 'result' | 'quests' | 'fridge' | 'settings' | 'controls' | 'intro';
 
 interface ModeEntry {
   /** The site's `$mode`. */
@@ -154,9 +156,6 @@ interface Capture {
   /** A press that could not be used: shown under the prompt. */
   note: string | null;
 }
-
-/** Center of the pause screen's sound button, under the instructions. */
-const PAUSE_BUTTON_Y = 392;
 
 /**
  * Texts. The names and descriptions of the Adventure and Learning, "Quêtes" and "Réfrigérateur"
@@ -259,18 +258,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     fieldOff: 'Choisissez ce terrain pour vos prochains matchs',
     settings: 'Options de jeu',
     settingsNote: 'Les réglages s’appliquent à la prochaine partie.',
-    soundNote: 'Les détails et les vibrations se règlent depuis le menu, entre deux parties.',
-    soundKey: 'Son',
     detail: 'Détails graphiques élevés',
     detailHint: 'Pour améliorer la rapidité du jeu, décochez la case.',
     shake: 'Vibrations fréquentes',
     shakeHint:
       'Si vous trouvez que les vibrations pendant le jeu sont saccadées, décochez cette case.',
-    sound: 'Son',
-    soundHint:
-      'Les effets de son (les sauts, les explosions) sont activés si vous cochez cette case.',
-    music: 'Musique',
-    musicHint: 'Cochez cette case pour écouter la musique du jeu pendant votre aventure.',
     volume: 'Volume sonore',
     volumeHint: 'Réglez l’intensité du volume sonore avec cette option.',
     hd: 'Images HD',
@@ -322,6 +314,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     moveHint: 'Se déplacer',
     pauseHint: 'Pause',
     toolMap: 'Carte des cavernes',
+    toolMusicOff: 'Couper la musique (M)',
+    toolMusicOn: 'Remettre la musique (M)',
+    toolSfxOff: 'Couper les bruitages',
+    toolSfxOn: 'Remettre les bruitages',
     toolFull: 'Plein écran',
     toolQuit: 'Abandonner la partie',
     toolQuitSure: 'Encore une fois pour abandonner',
@@ -420,16 +416,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     fieldOff: 'Choose this field for your next matches',
     settings: 'Game options',
     settingsNote: 'The settings apply to the next game.',
-    soundNote: 'Details and vibrations are set from the menu, between games.',
-    soundKey: 'Sound',
     detail: 'High quality graphics',
     detailHint: 'To get a better game performance, disable the box.',
     shake: 'Frequent vibrations',
     shakeHint: 'If you think the vibrations are slowing down the game, disable this box.',
-    sound: 'Sound',
-    soundHint: 'Sound effects (jumps, explosions, etc.) are activated if you enable this box.',
-    music: 'Music',
-    musicHint: 'Enable this box to listen to the music of the game during your adventure.',
     volume: 'Volume',
     volumeHint: 'Turn up or down the volume with this option.',
     hd: 'HD pictures',
@@ -480,6 +470,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     moveHint: 'Move',
     pauseHint: 'Pause',
     toolMap: 'Map of the caverns',
+    toolMusicOff: 'Mute the music (M)',
+    toolMusicOn: 'Turn the music on (M)',
+    toolSfxOff: 'Mute the sound effects',
+    toolSfxOn: 'Turn the sound effects on',
     toolFull: 'Full screen',
     toolQuit: 'Give up the game',
     toolQuitSure: 'Once more to give up',
@@ -579,18 +573,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     fieldOff: 'Elige este terreno para tus próximos partidos',
     settings: 'Opciones de juego',
     settingsNote: 'Los ajustes se aplican a la próxima partida.',
-    soundNote: 'Los detalles y las vibraciones se ajustan desde el menú, entre partidas.',
-    soundKey: 'Sonido',
     detail: 'Detalles gráficos elevados',
     detailHint: 'Para mejorar la rapidez del juego, desactiva la casilla.',
     shake: 'Vibraciones frecuentes',
     shakeHint:
       'Si te parece que las vibraciones en el juego entorpecen tu juego, desactiva esta casilla.',
-    sound: 'Sonido',
-    soundHint:
-      'Los efectos de sonido (los saltos, las explosiones, etc.) están activados si activas esta casilla.',
-    music: 'Música',
-    musicHint: 'Activa esta casilla para escuchar la música del juego durante tu aventura.',
     volume: 'Volumen del sonido',
     volumeHint: 'Puedes cambiar el volumen del sonido con esta opción.',
     hd: 'Imágenes HD',
@@ -643,6 +630,10 @@ const TEXT: Record<Lang, Record<string, string>> = {
     moveHint: 'Moverse',
     pauseHint: 'Pausa',
     toolMap: 'Mapa de las cavernas',
+    toolMusicOff: 'Quitar la música (M)',
+    toolMusicOn: 'Activar la música (M)',
+    toolSfxOff: 'Quitar los efectos de sonido',
+    toolSfxOn: 'Activar los efectos de sonido',
     toolFull: 'Pantalla completa',
     toolQuit: 'Abandonar la partida',
     toolQuitSure: 'Otra vez para abandonar',
@@ -742,7 +733,7 @@ interface SiteDom {
   modes: HTMLElement;
   /** Right of the frame: the player's notebook (home, wide screens). */
   book: HTMLElement;
-  /** Over the frame: the whole site inside it (`framed`), the sound panel over the paused game. */
+  /** Over the frame: the whole site inside it (`framed`). */
   overlay: HTMLElement;
   /** Under the frame: the keys (wide screens). */
   below: HTMLElement;
@@ -756,8 +747,7 @@ interface SiteDom {
  * The site around the game frame (UI redesign, after the "HammerFenix UI Redesign" canvas):
  * the home page (the modes beside the frame, the notebook on the other side), and the quest,
  * fridge, settings, controls and results pages, as HTML in the parchment and wood of the port.
- * The frame keeps what the game draws: the village and the title logo behind the home page,
- * the site's intro, and the sound button of the pause screen.
+ * The frame keeps what the game draws: the village behind the home page and the site's intro.
  *
  * Input: the keyboard's arrows, the bomb key and pause, a controller's D-pad, A and B
  * (`InputController.consumeMenu`) move the focus between the page's elements by where they
@@ -833,17 +823,6 @@ export class Shell {
   onSettings?: (s: PlayerSettings) => void;
   /** A language chosen on the settings page. */
   onLang?: (lang: string) => void;
-  /** Set while the sound panel shows over the game. */
-  private onSoundClose: (() => void) | null = null;
-  /**
-   * The button under the pause screen that opens the sound panel (port addition), above the
-   * game: the page adds it to the stage.
-   */
-  readonly pauseLayer = new Container();
-  /** What the pause button was drawn for (device, layout, language), or null when hidden. */
-  private pauseDrawn: string | null = null;
-  /** The pause button was clicked. */
-  onPauseSound?: () => void;
 
   constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts, profile: Profile) {
     this.lib = lib;
@@ -1007,17 +986,6 @@ export class Shell {
   }
 
   /**
-   * The sound panel over the paused game (port addition): sound, music and volume, which the
-   * game applies at once. `onClose` runs when it closes.
-   */
-  showSound(onClose: () => void): void {
-    this.screen = 'sound';
-    this.focusKey = 'set:sound';
-    this.onSoundClose = onClose;
-    this.render();
-  }
-
-  /**
    * The site's intro (3.5), from the home page or on the first launch. It plays in the game
    * frame and ends at its end, on a click, or with the confirm or back key; the home page then
    * shows with the Learning mode chosen, the free trial the movie led to (`INTRO_URL`).
@@ -1109,79 +1077,6 @@ export class Shell {
   refresh(): void {
     if (this.screen) this.render();
     else this.showLayout();
-    if (this.pauseDrawn !== null) this.pauseDrawn = '';
-  }
-
-  /**
-   * Shows or hides the pause screen's sound button: a wood pill with a gear, "Son" and the key
-   * that opens it too (O, or the controller's R1). Called every frame; redrawn only on a change.
-   */
-  setPauseButton(on: boolean): void {
-    const key = on ? `${this.input.device}:${this.input.padLayout}:${this.lang}` : null;
-    if (key === this.pauseDrawn) return;
-    this.pauseDrawn = key;
-    for (const c of this.pauseLayer.removeChildren()) c.destroy({ children: true });
-    if (!on) return;
-    const cx = W / 2;
-    const cy = PAUSE_BUTTON_Y;
-    const h = 30;
-    const face = new Container();
-    const lbl = this.text(this.t.soundKey, 'label', 0, 0, {
-      align: 'left',
-      size: 15,
-      color: C.gold,
-      parent: face,
-    });
-    const cap = new Container();
-    let capW = 0;
-    if (this.input.device === 'keyboard') {
-      const k = this.text('O', 'label', 0, 0, {
-        align: 'left',
-        size: 10,
-        color: '#5f452c',
-        parent: cap,
-      });
-      capW = Math.max(17, k.width + 10);
-      cap.addChildAt(
-        new Graphics()
-          .roundRect(0, 1.5, capW, 17, 4)
-          .fill(0xc8a878)
-          .roundRect(0, 0, capW, 17, 4)
-          .fill(0xfffaf0),
-        0,
-      );
-      k.position.set((capW - k.width) / 2, (17 - k.height) / 2);
-    } else if (this.input.device === 'gamepad') {
-      const g = padGlyph('r1', this.input.padLayout, 18, 'onDark');
-      g.position.set(g.width / 2, 9);
-      cap.addChild(g);
-      capW = g.width;
-    }
-    face.addChild(cap);
-    const gearR = 8;
-    const gap = 8;
-    const w = 14 + gearR * 2 + gap + lbl.width + (capW > 0 ? gap + capW : 0) + 14;
-    const x = cx - w / 2;
-    const y = cy - h / 2;
-    const bg = new Graphics()
-      .roundRect(x, y + 3, w, h, h / 2)
-      .fill(C.woodDark)
-      .roundRect(x, y, w, h, h / 2)
-      .fill(C.wood);
-    const glow = new Graphics().roundRect(x, y, w, h, h / 2).fill({ color: 0xffffff, alpha: 0.12 });
-    glow.visible = false;
-    face.addChildAt(gear(x + 14 + gearR, cy, gearR, C.gold), 0);
-    lbl.position.set(x + 14 + gearR * 2 + gap, cy - lbl.height / 2);
-    cap.position.set(lbl.x + lbl.width + gap, cy - 9);
-    const btn = new Container();
-    btn.addChild(bg, glow, face);
-    btn.eventMode = 'static';
-    btn.cursor = 'pointer';
-    btn.hitArea = new Rectangle(x, y, w, h + 3);
-    btn.on('pointerover', () => (glow.visible = true));
-    btn.on('pointerout', () => (glow.visible = false));
-    btn.on('pointertap', () => this.onPauseSound?.());
-    this.pauseLayer.addChild(btn);
   }
 
   /**
@@ -1251,7 +1146,6 @@ export class Shell {
         this.showMenu();
         break;
       case 'settings':
-      case 'sound':
         this.leaveSettings();
         break;
       case 'controls':
@@ -1523,15 +1417,8 @@ export class Shell {
     return '';
   }
 
-  /** Back to the home page, or from the sound panel, back to the paused game. */
+  /** Back to the home page. */
   private leaveSettings(): void {
-    if (this.screen === 'sound') {
-      const close = this.onSoundClose;
-      this.onSoundClose = null;
-      this.hide();
-      close?.();
-      return;
-    }
     // The library holds one bitmap set: a new one needs the page loaded again (without a
     // `?hd=` that would override the choice)
     if (bitmapScaleOf(savedBitmapChoice()) !== loadedBitmapScale()) {
@@ -1558,8 +1445,8 @@ export class Shell {
     if (vol !== this.settings.volume) this.changeSettings({ volume: vol });
   }
 
-  /** The settings page's rows that tick: the guide's four checkboxes. */
-  private toggleSetting(row: 'detail' | 'shake' | 'sound' | 'music'): void {
+  /** The settings page's rows that tick: the guide's details and shaking checkboxes. */
+  private toggleSetting(row: 'detail' | 'shake'): void {
     this.focusKey = `set:${row}`;
     this.changeSettings({ [row]: this.settings[row] ? 0 : 1 });
   }
@@ -1665,10 +1552,7 @@ export class Shell {
     this.root.eventMode = 'static';
     this.root.visible = true;
     this.root.parent?.addChild(this.root); // above the Loader's clip
-    if (this.screen === 'sound') {
-      // Over the paused game
-      this.root.addChild(new Graphics().rect(0, 0, W, H).fill({ color: 0x0b1530, alpha: 0.45 }));
-    } else if (this.screen === 'intro') {
+    if (this.screen === 'intro') {
       // The movie's background color, the movie and the site page's link to skip it
       this.root.addChild(new Graphics().rect(0, 0, W, H).fill(0x000000));
       this.root.addChild(this.introLayer);
@@ -1817,8 +1701,6 @@ export class Shell {
         return 'home';
       case 'intro':
         return 'intro';
-      case 'sound':
-        return 'playing'; // over the paused game, which keeps its layout
       default:
         return 'page';
     }
@@ -1855,7 +1737,7 @@ export class Shell {
       d.overlay.classList.remove('is-fading');
       d.overlay.inert = false;
     }
-    if (this.screen === null || this.screen === 'sound') this.fillChips();
+    if (this.screen === null) this.fillChips();
     else fill(d.chips);
   }
 
@@ -1925,9 +1807,6 @@ export class Shell {
         break;
       case 'result':
         page = this.time ? this.pageTimeResult(this.time) : this.pageResult();
-        break;
-      case 'sound':
-        fill(d.overlay, this.panelSound());
         break;
     }
     if (page && framed) fill(d.overlay, this.frameSite(page));
@@ -2647,7 +2526,10 @@ export class Shell {
     return {
       pause: t.pauseHint,
       map: t.toolMap,
-      music: t.music,
+      music: t.toolMusicOff,
+      musicOff: t.toolMusicOn,
+      sfx: t.toolSfxOff,
+      sfxOff: t.toolSfxOn,
       full: t.toolFull,
       quit: t.toolQuit,
       quitSure: t.toolQuitSure,
@@ -3162,8 +3044,8 @@ export class Shell {
   // ------------------------------------------------------------ settings
 
   /**
-   * The settings page (the site's "Options"): the guide's four checkboxes with their texts, the
-   * volume, the HD pictures (5.6), the controls page (G.4) and the language.
+   * The settings page (the site's "Options"): the guide's details and shaking checkboxes with
+   * their texts, the volume, the HD pictures (5.6), the controls page (G.4) and the language.
    */
   private pageSettings(): HTMLElement {
     const t = this.t;
@@ -3186,7 +3068,7 @@ export class Shell {
       h(
         'div',
         { class: 'check-grid' },
-        (['detail', 'shake', 'sound', 'music'] as const).map((row) => this.checkCard(row)),
+        (['detail', 'shake'] as const).map((row) => this.checkCard(row)),
       ),
       h(
         'div',
@@ -3258,7 +3140,7 @@ export class Shell {
   }
 
   /** A setting's checkbox, with the guide's text for it. */
-  private checkCard(row: 'detail' | 'shake' | 'sound' | 'music'): HTMLElement {
+  private checkCard(row: 'detail' | 'shake'): HTMLElement {
     const t = this.t;
     const on = !!this.settings[row];
     return h(
@@ -3344,21 +3226,7 @@ export class Shell {
       h('span', { class: 'set-label', id: 'vol-l' }, t.volume),
       slider,
       value,
-      this.screen === 'sound' ? null : h('p', { class: 'set-hint' }, t.volumeHint),
-    );
-  }
-
-  /** The sound panel over the paused game: sound, music and volume, which apply at once. */
-  private panelSound(): HTMLElement {
-    const t = this.t;
-    return h(
-      'section',
-      { class: 'board board-sound', role: 'dialog', 'aria-labelledby': 's-h' },
-      h('h2', { class: 'sound-title', id: 's-h' }, t.soundKey),
-      h('div', { class: 'sound-rows' }, this.checkCard('sound'), this.checkCard('music')),
-      this.volumeRow(),
-      h('p', { class: 'note center' }, t.soundNote),
-      this.backButton(() => this.leaveSettings()),
+      h('p', { class: 'set-hint' }, t.volumeHint),
     );
   }
 
@@ -3689,30 +3557,6 @@ export class Shell {
       ),
     );
   }
-}
-
-/** A gear of radius `r` centered on (x, y): 8 teeth and a hole. */
-function gear(x: number, y: number, r: number, color: number | string): Graphics {
-  const teeth = 8;
-  const inner = r * 0.74;
-  const pts: number[] = [];
-  for (let i = 0; i < teeth; i++) {
-    const a = (i / teeth) * Math.PI * 2;
-    const step = Math.PI / teeth;
-    for (const [da, rad] of [
-      [-step * 0.95, inner],
-      [-step * 0.45, r],
-      [step * 0.45, r],
-      [step * 0.95, inner],
-    ] as const) {
-      pts.push(x + Math.cos(a + da) * rad, y + Math.sin(a + da) * rad);
-    }
-  }
-  return new Graphics()
-    .poly(pts)
-    .fill(color)
-    .circle(x, y, r * 0.34)
-    .cut();
 }
 
 /** Replaces `{0}`, `{1}`... with the arguments. */

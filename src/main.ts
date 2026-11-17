@@ -155,7 +155,7 @@ async function main(): Promise<void> {
   const shell = new Shell(lib, input, dataStore, profile);
   await shell.load(baseUrl);
   shell.attachPage(app.renderer);
-  app.stage.addChild(shell.root, shell.pauseLayer);
+  app.stage.addChild(shell.root);
   session.gameRoot.visible = false;
   shell.showMenu();
   // A new player sees the site's intro first (3.5), as its home page offered visitors
@@ -171,7 +171,8 @@ async function main(): Promise<void> {
   });
   app.ticker.add(() => {
     shell.update();
-    shell.setPauseButton(!shell.visible && session.soundMenuAvailable);
+    session.syncMuted();
+    showSound();
     runQueuedFrameActions();
   });
   // Render only when the picture can have changed (port addition, for phones and 120 Hz screens):
@@ -213,21 +214,6 @@ async function main(): Promise<void> {
     applyBindings();
     showDevice();
   };
-  // Port addition: the sound panel over the paused game (the pause's button, O or R1). The game
-  // stops while it shows, and the key that closes it does not reach the game.
-  const openSound = () => {
-    if (shell.visible || !session.soundMenuAvailable) return;
-    const wasRunning = session.gameLoop.isRunning;
-    session.gameLoop.stop();
-    shell.setPauseButton(false);
-    shell.settings = { ...session.settings };
-    shell.showSound(() => {
-      input.lockHeld();
-      if (wasRunning) session.gameLoop.start();
-    });
-  };
-  session.onSoundMenu = openSound;
-  shell.onPauseSound = openSound;
   shell.onStart = (mode) => {
     // The menu dissolves into the first level (no "click to start": `Loader.startNow`)
     shell.fadeOut(() => session.levelShown);
@@ -374,22 +360,43 @@ async function main(): Promise<void> {
     session.game.togglePause();
   });
 
-  /** The page's texts and the sound button, in the current language. */
+  /** The page's texts, in the current language. */
   const lang = () => pickLang(dataStore.langId, []);
-  const showMute = () => {
-    const muted = audio.isMuted;
-    btnMute?.classList.toggle('muted', muted);
-    btnMute?.setAttribute('aria-pressed', String(muted));
-    btnMute?.setAttribute('data-i18n-label', muted ? 'soundOff' : 'soundOn');
-    applyPageText(lang());
+
+  // Port addition: the sound switches. The top bar's is saved and sets both of the game's (music
+  // and sound effects, in the playing toolbar); it shows "muted" when both are off.
+  let soundShown = '';
+  const showSound = (force = false) => {
+    const muted = session.muted;
+    const music = session.musicOn;
+    const sfx = session.effectsOn;
+    const key = `${muted}:${music}:${sfx}:${dataStore.langId}`;
+    if (key === soundShown && !force) return;
+    soundShown = key;
+    if (btnMute) {
+      btnMute.classList.toggle('muted', muted);
+      btnMute.setAttribute('aria-pressed', String(muted));
+      btnMute.setAttribute('data-i18n-label', muted ? 'soundOff' : 'soundOn');
+      applyPageText(lang());
+    }
+    const labels = shell.toolLabels;
+    const toggle = (id: string, on: boolean, onLabel: string, offLabel: string) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.classList.toggle('is-off', !on);
+      btn.setAttribute('aria-pressed', String(!on));
+      const label = on ? labels[onLabel] : labels[offLabel];
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+    };
+    toggle('tool-music', music, 'music', 'musicOff');
+    toggle('tool-sfx', sfx, 'sfx', 'sfxOff');
   };
-  audio.setMuted(session.savedMuted);
-  showMute();
 
   btnMute?.addEventListener('click', () => {
-    audio.toggleMute();
-    session.saveSettings();
-    showMute();
+    btnMute.blur(); // the bomb key must not press it again
+    session.setMuted(!session.muted);
+    showSound();
   });
 
   // Language: the top bar's selector and the settings page's choice
@@ -401,6 +408,7 @@ async function main(): Promise<void> {
     showDevice();
     applyPageText(lang());
     showToolLabels();
+    showSound(true);
     shell.refresh();
   };
   if (langSelect) langSelect.value = dataStore.langId;
@@ -417,6 +425,7 @@ async function main(): Promise<void> {
       btn.title = label;
       btn.classList.remove('is-armed');
     });
+    showSound(true);
   };
   showToolLabels();
   /** A key press of the game's (`ControlAction`) from a button: held long enough for a tick. */
@@ -433,7 +442,8 @@ async function main(): Promise<void> {
     const tool = btn.dataset.tool;
     if (tool === 'pause') pulse('pause');
     else if (tool === 'map') pulse('map');
-    else if (tool === 'music') pulse('music');
+    else if (tool === 'music') session.setMusicOn(!session.musicOn);
+    else if (tool === 'sfx') session.setEffectsOn(!session.effectsOn);
     else if (tool === 'full') {
       if (document.fullscreenElement) void document.exitFullscreen();
       else void document.documentElement.requestFullscreen().catch(() => {});
