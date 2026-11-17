@@ -38,7 +38,11 @@ function label(el: Element): string {
 function visible(el: Element): boolean {
   if (el.closest('.sr-only')) return false;
   const r = rectOf(el);
-  if (r.width === 0 && r.height === 0) return false;
+  // (Inside a 1 px box: text for screen readers only)
+  for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
+    const ar = rectOf(a);
+    if (ar.width <= 1 && ar.height <= 1) return false;
+  }
   const cs = getComputedStyle(el);
   return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0;
 }
@@ -478,8 +482,15 @@ export async function checkPlaying(opts: { touch?: boolean } = {}): Promise<stri
     // (A phone's frame makes room for the touch controls after the fade: not checked there)
     const framed = document.body.dataset.layout === 'framed' && window.innerWidth >= 600;
     s.startChosen();
-    // The fade waits for the level (up to 2 s), then the frame takes its playing size
-    await wait(4500);
+    // The fade waits for the level (up to 2 s), then the frame takes its playing size. A
+    // hidden browser pane hardly runs the page's frames: they are run here until it is over
+    const app = g().pixiApp;
+    for (let i = 0; i < 300 && s.visible; i++) {
+      app?.ticker?.update(performance.now());
+      await wait(30);
+    }
+    // The frame's 0.6 s growth into its playing size (slower in a hidden pane)
+    await wait(1500);
     const out = inspect();
     const after = frame?.getBoundingClientRect();
     // With the site inside the frame, the game starts in the frame as it is (around the frame,

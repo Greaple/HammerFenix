@@ -821,6 +821,21 @@ html[data-input='gamepad'] .touch-controls {
   }
 }
 
+/* A small phone held sideways: smaller controls, so both fit beside the frame */
+@media (orientation: landscape) and (max-height: 520px) and (max-width: 640px) {
+  .touch-controls {
+    --pad-key-w: 56px;
+    --pad-key-h: 64px;
+    --pad-down-h: 34px;
+    --btn-bomb: 54px;
+    --btn-jump: 64px;
+  }
+
+  html.touch .touch-actions {
+    gap: 6px;
+  }
+}
+
 /* A tablet held sideways (the canvas's TabletLandPlay): the frame as tall as the screen, the
    pad and the buttons beside it, hugging the screen's edges at grip height (their foot at
    about 78 % of the height) */

@@ -634,7 +634,8 @@ body[data-page='home'] .site-side > .board {
   transform-origin: top center;
 }
 
-body[data-page='home'] .site-side.is-scrolling {
+body[data-page='home'] .site-side.is-scrolling,
+body[data-page='home'][data-layout] .site-left.is-scrolling {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -943,6 +944,99 @@ body[data-page='home'][data-layout='land'] .board-modes .btn-start {
 body[data-page='home'][data-layout='land'] .book-fold {
   flex-direction: column;
   gap: 8px;
+}
+
+/* The chosen mode's name: the cards have it, except on a narrow window (below) */
+body[data-page='home'][data-layout='land'] .board-modes .detail-head {
+  display: none;
+}
+
+/* A small phone held sideways: the cards keep their picture (their name for screen readers),
+   the chosen mode's name beside them; the notebook's buttons their picture */
+@media (max-width: 699px) {
+  body[data-page='home'][data-layout='land'] .app-main {
+    grid-template-columns: minmax(0, 1fr) 58px;
+    gap: 10px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-card {
+    justify-content: center;
+    min-height: 44px;
+    padding: 3px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-card .lock {
+    right: 2px;
+    top: 2px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-text,
+  body[data-page='home'][data-layout='land'] .book-fold .fold-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .detail-head {
+    display: flex;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .detail-short {
+    display: none;
+  }
+
+  body[data-page='home'][data-layout='land'] .book-fold .fold-btn {
+    justify-content: center;
+    padding: 6px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-desc {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  /* No room for the focused option's hint; the quest that unlocks the mode on two lines */
+  body[data-page='home'][data-layout='land'] .board-modes .opt-hint {
+    display: none;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .lock-note {
+    font-size: 12px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .field-btn {
+    min-height: 34px;
+    min-width: 34px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .btn-start {
+    height: 40px;
+    font-size: 18px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes {
+    padding: 24px 10px 10px;
+  }
+
+  body[data-page='home'][data-layout='land'] .board-modes .mode-detail {
+    gap: 4px;
+  }
 }
 
 body[data-page='home'][data-layout='land'] .book-fold .fold-btn {
@@ -2942,9 +3036,15 @@ html.touch .pager .btn-round {
    a game never resizes it; but a phone gives the menus the whole width (the frame makes room
    for the touch controls after the fade into a game) */
 @media (max-width: 599px) {
-  body[data-page='framed'] {
+  body[data-page='framed'],
+  body[data-page='intro'][data-layout='framed'] {
     --below-frame: 0px;
   }
+}
+
+/* The intro plays in the same frame */
+html:not(.touch) body[data-page='intro'][data-layout='framed'] .game-canvas-container {
+  width: min(760px, 100cqw - 100px, max(240px, var(--frame-h) * 420 / 520));
 }
 
 html:not(.touch) body[data-page='framed'] .game-canvas-container {
@@ -2992,6 +3092,11 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 .frame-scroll {
   flex: 1 1 auto;
   padding: 0 8px 10px;
+}
+
+/* The fridge's item card is pinned at the foot: the focused cell stays above it */
+.frame-scroll:has(.item-card) {
+  scroll-padding-bottom: 104px;
 }
 
 .frame-action {
@@ -3089,11 +3194,6 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 .board-detail .mode-desc {
   font-size: 12px;
   line-height: 1.45;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  overflow: hidden;
 }
 
 .board-detail .opt {
@@ -3128,17 +3228,6 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 .tab-art {
   width: 30px;
   height: 30px;
-}
-
-/* The tab bar leads home: no Back on the pages it reaches (the controls page keeps its own,
-   back to the settings) */
-.frame-site :is(.board-quests, .board-fridge, .board-settings) .btn-back {
-  display: none;
-}
-
-.frame-site :is(.board-quests, .board-fridge, .board-settings) .page-bar:empty,
-.frame-site .board-settings > .page-bar {
-  display: none;
 }
 
 /* Pages in the frame: one column, as tall as their content; the frame's area scrolls */

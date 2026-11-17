@@ -1476,6 +1476,8 @@ export class Shell {
 
   /** The main button: starts the chosen mode, or plays the intro. */
   private startChosen(): void {
+    // Only from the home page (not again while it fades into the game)
+    if (this.screen !== 'menu') return;
     if (this.chosen === 'intro') {
       this.showIntro();
       return;
@@ -1866,8 +1868,14 @@ export class Shell {
         if (!(fading && b === d.overlay)) fill(b);
       }
       d.overlay.classList.toggle('is-fading', fading);
+      // Nothing in it can be pressed while it fades (a second start, a page over the game)
+      d.overlay.inert = fading;
+      if (fading && d.overlay.contains(document.activeElement)) {
+        (document.activeElement as HTMLElement).blur();
+      }
     } else {
       d.overlay.classList.remove('is-fading');
+      d.overlay.inert = false;
     }
     if (this.screen === null || this.screen === 'sound') this.fillChips();
     else fill(d.chips);
@@ -1883,7 +1891,7 @@ export class Shell {
     if (typeof window === 'undefined') return 'wide';
     const w = window.innerWidth;
     const h = window.innerHeight;
-    if (h < LAND_H && w >= 600) return 'land';
+    if (h < LAND_H) return 'land';
     // The frame as the page draws it (`site.css`): as tall as the window, at most 680 px wide,
     // and narrow enough to leave each board `WIDE_BOARD` px; three columns while it keeps as
     // much itself
@@ -2163,7 +2171,8 @@ export class Shell {
         h(
           'div',
           { class: 'mode-detail', 'aria-live': 'polite' },
-          this.modeDetail(shown, false, this.homeFold),
+          // (Land: with the chosen mode's name, which a narrow window's cards leave out)
+          this.modeDetail(shown, this.homeLayout === 'land', this.homeFold),
         ),
       ),
     );
@@ -2740,7 +2749,8 @@ export class Shell {
       h(
         'div',
         { class: 'page-bar' },
-        this.backButton(() => this.showMenu()),
+        // (Inside the frame, the tab bar leads home)
+        this.compact ? null : this.backButton(() => this.showMenu()),
         h(
           'div',
           { class: 'tabs', role: 'tablist', 'aria-label': t.filter },
@@ -2987,7 +2997,8 @@ export class Shell {
       h(
         'div',
         { class: 'page-bar' },
-        this.backButton(() => this.showMenu()),
+        // (Inside the frame, the tab bar leads home)
+        this.compact ? null : this.backButton(() => this.showMenu()),
         h(
           'div',
           { class: 'fridge-count' },
@@ -3151,11 +3162,13 @@ export class Shell {
       'section',
       { class: 'board board-page board-settings', 'aria-labelledby': 'o-h' },
       this.plank(t.settings, null, 'o-h', -1.2),
-      h(
-        'div',
-        { class: 'page-bar' },
-        this.backButton(() => this.leaveSettings()),
-      ),
+      this.compact
+        ? null
+        : h(
+            'div',
+            { class: 'page-bar' },
+            this.backButton(() => this.leaveSettings()),
+          ),
       h(
         'div',
         { class: 'check-grid' },
