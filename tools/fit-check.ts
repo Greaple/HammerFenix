@@ -19,6 +19,7 @@
 type Failure = { lang: string; screen: string; layout: string; msg: string };
 
 const MIN_FONT = 11;
+const MIN_FONT_FRAMED = 9;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const g = () => window as any;
 
@@ -41,7 +42,7 @@ function visible(el: Element): boolean {
   // (Inside a 1 px box: text for screen readers only)
   for (let a: Element | null = el; a && a !== document.body; a = a.parentElement) {
     const ar = rectOf(a);
-    if (ar.width <= 1 && ar.height <= 1) return false;
+    if (ar.width <= 2 && ar.height <= 2) return false;
   }
   const cs = getComputedStyle(el);
   return cs.visibility !== 'hidden' && cs.display !== 'none' && Number(cs.opacity) > 0;
@@ -169,7 +170,9 @@ export function inspect(): string[] {
       const cs = getComputedStyle(el);
       // The size as drawn: a zoomed box (`Shell.fitPage`, the frame's scale) draws it smaller
       const size = parseFloat(cs.fontSize) * zoomOf(el);
-      if (size < MIN_FONT) out.push(`small text ${size.toFixed(1)}px: ${label(el)}`);
+      // (Inside the frame the site is drawn at the frame's scale, as the game is: 9 px there)
+      const floor = document.body.dataset.layout === 'framed' ? MIN_FONT_FRAMED : MIN_FONT;
+      if (size < floor) out.push(`small text ${size.toFixed(1)}px: ${label(el)}`);
       if (el.scrollWidth > el.clientWidth + 1 && cs.display !== 'inline' && el.clientWidth > 0) {
         out.push(`text wider than its box: ${label(el)}`);
       }

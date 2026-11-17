@@ -692,7 +692,11 @@ type TextKind = keyof typeof FONT;
 /** Fridge shelves: items per row and rows per page (the redesign's glass shelves). */
 const FRIDGE_COLS = 8;
 const FRIDGE_ROWS = 3;
-const FRIDGE_PAGE = FRIDGE_COLS * FRIDGE_ROWS;
+/** Inside the frame (`framed`): six items a row, and the quests four at a time. */
+const FRIDGE_FRAME_COLS = 6;
+const QUEST_FRAME_PAGE = 4;
+/** Inside the frame the results show this many items found (two rows), the rest counted. */
+const FOUND_FRAME = 16;
 
 /** The settings' picture: item 1208, the "Manette S-Téhéf" joystick (the canvas's choice). */
 const SETTINGS_ART: Icon = { item: 1208 };
@@ -731,8 +735,6 @@ const WIDE_ROOM_Y = 64 + 24 + 24;
 const SHORT_BOARD = 500;
 const SHORT_ROOM_X = 32 + 24;
 const SHORT_ROOM_Y = 64 + 12 + 24;
-/** The frame's scale for the site inside it (`framed`): never smaller, at most this larger. */
-const FRAME_K_MAX = 1.35;
 
 type QuestTab = 'progress' | 'done' | 'all';
 type FridgeFilter = 'all' | 'almost' | 'never';
@@ -743,14 +745,12 @@ interface SiteDom {
   modes: HTMLElement;
   /** Right of the frame: the player's notebook (home, wide screens). */
   book: HTMLElement;
-  /** Over the frame: the modes on a phone, the sound panel over the paused game. */
+  /** Over the frame: the whole site inside it (`framed`), the sound panel over the paused game. */
   overlay: HTMLElement;
-  /** Under the frame: the keys (wide screens), the chosen mode (phone). */
+  /** Under the frame: the keys (wide screens). */
   below: HTMLElement;
   /** The full pages (quests, fridge, settings, controls, results), in place of the frame. */
   page: HTMLElement;
-  /** The phone's tab bar. */
-  tabbar: HTMLElement;
   /** The mode of the game under way, in the top bar. */
   chips: HTMLElement;
 }
@@ -800,6 +800,8 @@ export class Shell {
   private questId: number | null = null;
   private fridgeFilter: FridgeFilter = 'all';
   private fridgePage = 0;
+  /** The page of the quest list inside the frame, four quests at a time. */
+  private questPage = 0;
   private fridgeId: number | null = null;
   /** The home page shows an option's hint: moving the focus off it redraws the page. */
   private hintShown = false;
@@ -886,7 +888,6 @@ export class Shell {
       overlay: el('frame-overlay'),
       below: el('site-below'),
       page: el('site-page'),
-      tabbar: el('site-tabbar'),
       chips: el('play-chips'),
     };
     this.dom = dom;
@@ -906,6 +907,7 @@ export class Shell {
       requestAnimationFrame(() => {
         pending = false;
         const now = this.homeKey;
+        this.scaleFrameSite();
         if (now !== layout) {
           layout = now;
           this.refresh();
@@ -924,8 +926,9 @@ export class Shell {
   }
 
   /**
-   * The size the site inside the frame is laid out at (`--lw`, `--lh`) and its scale (`--k`):
-   * the frame's size on a phone, a tablet's frame drawn larger, at most `FRAME_K_MAX` times.
+   * The size the site inside the frame is laid out at (`--lw`, `--lh`: the game's own 420 x 520)
+   * and its scale (`--k`), as the frame draws the game: every screen fits it without scrolling,
+   * smaller on a phone, larger on a tablet.
    */
   private scaleFrameSite(): void {
     const box = this.dom?.overlay;
@@ -933,9 +936,9 @@ export class Shell {
     const w = box.clientWidth;
     const h = box.clientHeight;
     if (w <= 0 || h <= 0) return;
-    const k = Math.max(1, Math.min(FRAME_K_MAX, w / 420));
+    const k = w / 420;
     box.style.setProperty('--k', String(k));
-    box.style.setProperty('--lw', `${w / k}px`);
+    box.style.setProperty('--lw', '420px');
     box.style.setProperty('--lh', `${h / k}px`);
   }
 
@@ -1284,7 +1287,7 @@ export class Shell {
   private navElements(): HTMLElement[] {
     const d = this.dom;
     if (!d) return [];
-    const boxes = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    const boxes = [d.modes, d.book, d.overlay, d.below, d.page];
     return boxes.flatMap((b) =>
       [...b.querySelectorAll<HTMLElement>('[data-nav]')].filter(
         (el) => el.getClientRects().length > 0 && !el.closest('[hidden]'),
@@ -1437,8 +1440,7 @@ export class Shell {
     const inSite =
       !active ||
       active === document.body ||
-      (d !== null &&
-        [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar].some((b) => b.contains(active)));
+      (d !== null && [d.modes, d.book, d.overlay, d.below, d.page].some((b) => b.contains(active)));
     if (!inSite) return;
     if (active !== el) el.focus({ preventScroll: true });
     if (scroll) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -1864,7 +1866,7 @@ export class Shell {
     if (this.screen === null) {
       // (The site inside the frame fades out with the village: emptied once that is over)
       const fading = this.fadeReady !== null;
-      for (const b of [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar]) {
+      for (const b of [d.modes, d.book, d.overlay, d.below, d.page]) {
         if (!(fading && b === d.overlay)) fill(b);
       }
       d.overlay.classList.toggle('is-fading', fading);
@@ -1925,7 +1927,7 @@ export class Shell {
     const host = framed ? d.overlay : d.page;
     const same = host.dataset.screen === this.screen;
     const kept = same ? (host.querySelector('[data-scroll]')?.scrollTop ?? 0) : 0;
-    const empty = [d.modes, d.book, d.overlay, d.below, d.page, d.tabbar];
+    const empty = [d.modes, d.book, d.overlay, d.below, d.page];
     for (const b of empty) fill(b);
     let page: HTMLElement | null = null;
     switch (this.screen) {
@@ -1952,9 +1954,11 @@ export class Shell {
         fill(d.overlay, this.panelSound());
         break;
     }
-    if (framed) this.scaleFrameSite();
     if (page && framed) fill(d.overlay, this.frameSite(page));
-    else if (page) fill(d.page, page);
+    if (framed) {
+      this.scaleFrameSite();
+      this.fitFrame();
+    } else if (page) fill(d.page, page);
     d.overlay.dataset.screen = framed ? this.screen : '';
     d.page.dataset.screen = framed ? '' : this.screen;
     const area = host.querySelector('[data-scroll]');
@@ -1965,47 +1969,55 @@ export class Shell {
   }
 
   /**
-   * The site inside the frame (`framed`): the page in a scrolling area, its main button (Start,
-   * Continue) pinned under it, and the tab bar at the bottom, laid out at the frame's size over
-   * its scale (`scaleFrameSite`).
+   * The site inside the frame (`framed`): the page laid out at the game's size and drawn at the
+   * frame's (`scaleFrameSite`), as the original's menus were; nothing scrolls.
    */
   private frameSite(page: HTMLElement): HTMLElement {
-    const main = page.querySelector<HTMLElement>('.btn-start');
-    const action = main ? h('div', { class: 'frame-action' }, main) : null;
-    return h(
-      'div',
-      { class: 'frame-site' },
-      h('div', { class: 'frame-scroll', 'data-scroll': '' }, page),
-      action,
-      this.tabbar(),
-    );
+    return h('div', { class: 'frame-site' }, page);
   }
 
   /**
-   * The home page inside the frame: the village and the logo (drawn in the frame), the modes
-   * and the chosen mode under them, as the phone's.
+   * A screen inside the frame still taller than it (a long language, a long list of options)
+   * turns denser: the cards lose their short line, the guide's longer hints go.
+   */
+  private fitFrame(): void {
+    const site = this.dom?.overlay.querySelector<HTMLElement>(':scope > .frame-site');
+    const box =
+      site?.querySelector<HTMLElement>(':scope > .frame-home') ??
+      site?.querySelector<HTMLElement>(':scope > .board-page, :scope > .result > .board-page');
+    if (!box) return;
+    delete box.dataset.density;
+    if (box.scrollHeight > box.clientHeight + 1) box.dataset.density = 'compact';
+  }
+
+  /**
+   * The home page inside the frame, as the live site's menu: the village and the logo (drawn in
+   * the frame) over one panel with the modes and their short line, the chosen mode's options,
+   * the quests and the fridge, and the main button with the settings beside it.
    */
   private framedHome(): HTMLElement {
     const t = this.t;
     this.hintShown = false;
     const shown = MODES.find((m) => m.mode === this.chosen) ?? null;
+    const detail = this.modeDetail(shown, false, false);
+    const start = detail.pop() ?? null;
+    const book = this.notebookFolded();
+    const gear = book.querySelector<HTMLElement>('.fold-gear');
+    gear?.remove();
     return h(
       'div',
       { class: 'frame-home' },
       h(
         'section',
-        { class: 'board board-modes board-phone', 'aria-labelledby': 'modes-h' },
-        this.plank(t.modesTitle, null, 'modes-h', -1.5, 2),
+        { class: 'board fs-panel', 'aria-label': t.modesTitle },
         h(
           'div',
-          { class: 'mode-grid', role: 'radiogroup', 'aria-labelledby': 'modes-h' },
-          this.modeCards(true),
+          { class: 'mode-grid', role: 'radiogroup', 'aria-label': t.modesTitle },
+          this.modeCards(false),
         ),
-        h(
-          'div',
-          { class: 'mode-detail board-detail', 'aria-live': 'polite' },
-          this.modeDetail(shown, true),
-        ),
+        h('div', { class: 'mode-detail fs-detail', 'aria-live': 'polite' }, detail),
+        book,
+        h('div', { class: 'fs-go' }, start, gear),
       ),
     );
   }
@@ -2130,7 +2142,7 @@ export class Shell {
       'button',
       { type: 'button', class: 'btn-wood btn-back', 'data-nav': 'back', onclick: action },
       svgIcon(ICON.back, { size: 18 }),
-      this.t.back,
+      h('span', { class: 'btn-label' }, this.t.back),
     );
   }
 
@@ -2577,40 +2589,6 @@ export class Shell {
     };
   }
 
-  /** The phone's tab bar: play, quests, fridge, settings, each with the game's picture. */
-  private tabbar(): HTMLElement {
-    const t = this.t;
-    const cur =
-      this.screen === 'quests'
-        ? 'quests'
-        : this.screen === 'fridge'
-          ? 'fridge'
-          : this.screen === 'settings' || this.screen === 'controls'
-            ? 'settings'
-            : 'play';
-    const tab = (id: string, label: string, icon: Icon, go: () => void) =>
-      h(
-        'button',
-        {
-          type: 'button',
-          class: `tab${cur === id ? ' is-current' : ''}`,
-          'aria-current': cur === id ? 'page' : false,
-          'data-nav': `nav:${id}`,
-          onclick: go,
-        },
-        this.img(icon, 'tab-art'),
-        h('span', null, label),
-      );
-    return h(
-      'div',
-      { class: 'tabbar-inner' },
-      tab('play', t.tabPlay, { clip: 'hammer_player' }, () => this.showMenu()),
-      tab('quests', t.quests, { item: 20 }, () => this.showQuests()),
-      tab('fridge', t.tabFridge, { item: 1018 }, () => this.showFridge()),
-      tab('settings', t.options, SETTINGS_ART, () => this.showSettings()),
-    );
-  }
-
   /**
    * The name of the quest that gives mode `mode` (`give mode=` in `quests.xml`). The boss rush
    * comes with Tuberculoz's cape (`BOSS_RUSH_FAMILY`), so the quest that gives that family.
@@ -2738,9 +2716,18 @@ export class Shell {
       ['done', t.done, count('done')],
       ['all', t.all, count('progress') + count('done')],
     ];
-    const list = this.questList();
-    if (this.questId === null || !list.includes(this.questId)) this.questId = list[0] ?? null;
-    const phone = this.compact;
+    const all = this.questList();
+    if (this.questId === null || !all.includes(this.questId)) this.questId = all[0] ?? null;
+    // Inside the frame: four at a time, the page of the chosen quest
+    const framed = this.compact;
+    const pages = framed ? Math.max(1, Math.ceil(all.length / QUEST_FRAME_PAGE)) : 1;
+    if (framed && this.questId !== null) {
+      this.questPage = Math.floor(all.indexOf(this.questId) / QUEST_FRAME_PAGE);
+    }
+    this.questPage = Math.max(0, Math.min(pages - 1, this.questPage));
+    const list = framed
+      ? all.slice(this.questPage * QUEST_FRAME_PAGE, (this.questPage + 1) * QUEST_FRAME_PAGE)
+      : all;
     const none = count('none');
     return h(
       'section',
@@ -2749,8 +2736,7 @@ export class Shell {
       h(
         'div',
         { class: 'page-bar' },
-        // (Inside the frame, the tab bar leads home)
-        this.compact ? null : this.backButton(() => this.showMenu()),
+        this.backButton(() => this.showMenu()),
         h(
           'div',
           { class: 'tabs', role: 'tablist', 'aria-label': t.filter },
@@ -2766,6 +2752,7 @@ export class Shell {
                 'data-nav': `qtab:${id}`,
                 onclick: () => {
                   this.questTab = id;
+                  this.questPage = 0;
                   this.questId = this.questList()[0] ?? null;
                   this.focusKey = `qtab:${id}`;
                   this.render();
@@ -2783,8 +2770,13 @@ export class Shell {
         { class: 'quest-split' },
         h(
           'div',
-          // The page's one scrolling area (on a phone, the page scrolls instead)
-          { class: 'quest-list', id: 'q-list', role: 'tabpanel', 'data-scroll': phone ? null : '' },
+          // The page's one scrolling area (inside the frame, pages of four instead)
+          {
+            class: 'quest-list',
+            id: 'q-list',
+            role: 'tabpanel',
+            'data-scroll': framed ? null : '',
+          },
           list.length === 0 ? h('p', { class: 'empty' }, t.noQuest) : null,
           list.map((id) => {
             const done = q.status(p, id) === 'done';
@@ -2816,14 +2808,53 @@ export class Shell {
                 this.bar(done ? 1 : pr.f, done ? 'done' : 'progress'),
               ),
             );
-            // On a phone the chosen quest opens under its row
-            return on && phone ? [row, this.questDetail(id)] : row;
+            return row;
           }),
-          none > 0 && list.length > 0 ? h('p', { class: 'note' }, fmt(t.moreQuests, none)) : null,
+          framed && pages > 1
+            ? this.pager('q', this.questPage, pages, (page) => {
+                this.questPage = page;
+                this.questId = all[page * QUEST_FRAME_PAGE] ?? null;
+                this.render();
+              })
+            : null,
+          none > 0 && list.length > 0 && !framed
+            ? h('p', { class: 'note' }, fmt(t.moreQuests, none))
+            : null,
         ),
-        this.questId === null || phone ? null : this.questDetail(this.questId),
+        this.questId === null ? null : this.questDetail(this.questId),
       ),
       h('p', { class: 'note page-rule' }, t.questRule),
+    );
+  }
+
+  /**
+   * Previous and next page buttons around "Page n of m" (`key`prev, `key`next for the focus).
+   */
+  private pager(key: string, page: number, pages: number, go: (page: number) => void): HTMLElement {
+    const t = this.t;
+    const btn = (dir: -1 | 1) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-round',
+          'aria-label': dir < 0 ? t.prevPage : t.nextPage,
+          'aria-disabled': (dir < 0 ? page > 0 : page < pages - 1) ? false : 'true',
+          'data-nav': `${key}${dir < 0 ? 'prev' : 'next'}`,
+          onclick: () => {
+            this.focusKey = `${key}${dir < 0 ? 'prev' : 'next'}`;
+            const to = page + dir;
+            if (to >= 0 && to < pages) go(to);
+          },
+        },
+        svgIcon(dir < 0 ? ICON.prev : ICON.next, { size: 18 }),
+      );
+    return h(
+      'div',
+      { class: 'pager' },
+      btn(-1),
+      h('span', { class: 'pager-text' }, fmt(t.pageOf, page + 1, pages)),
+      btn(1),
     );
   }
 
@@ -2890,6 +2921,15 @@ export class Shell {
 
   // ------------------------------------------------------------ fridge
 
+  /** Items a shelf holds: fewer inside the frame. */
+  private get fridgeCols(): number {
+    return this.compact ? FRIDGE_FRAME_COLS : FRIDGE_COLS;
+  }
+
+  private get fridgePageSize(): number {
+    return this.fridgeCols * FRIDGE_ROWS;
+  }
+
   /** The items the fridge's filter shows, in id order. */
   private fridgeIds(): number[] {
     const q = this.profile.quests;
@@ -2913,12 +2953,12 @@ export class Shell {
   private turnFridgePage(dx: number, key: string): void {
     const ids = this.fridgeIds();
     const i = ids.indexOf(Number(key.slice(2)));
-    const pages = Math.ceil(ids.length / FRIDGE_PAGE);
+    const pages = Math.ceil(ids.length / this.fridgePageSize);
     const page = this.fridgePage + dx;
     if (i < 0 || page < 0 || page >= pages) return;
-    const row = Math.floor((i % FRIDGE_PAGE) / FRIDGE_COLS);
-    const col = dx > 0 ? 0 : FRIDGE_COLS - 1;
-    const n = Math.min(ids.length - 1, page * FRIDGE_PAGE + row * FRIDGE_COLS + col);
+    const row = Math.floor((i % this.fridgePageSize) / this.fridgeCols);
+    const col = dx > 0 ? 0 : this.fridgeCols - 1;
+    const n = Math.min(ids.length - 1, page * this.fridgePageSize + row * this.fridgeCols + col);
     this.fridgePage = page;
     this.setFocus(`f:${ids[n]}`);
   }
@@ -2926,7 +2966,7 @@ export class Shell {
   private goFridgePage(page: number): void {
     const ids = this.fridgeIds();
     this.fridgePage = page;
-    this.fridgeId = ids[page * FRIDGE_PAGE] ?? null;
+    this.fridgeId = ids[page * this.fridgePageSize] ?? null;
     this.render();
   }
 
@@ -2936,12 +2976,13 @@ export class Shell {
     const p = this.profile.data;
     const [have, all] = this.counts().fridge;
     const ids = this.fridgeIds();
-    const pages = Math.max(1, Math.ceil(ids.length / FRIDGE_PAGE));
+    const pages = Math.max(1, Math.ceil(ids.length / this.fridgePageSize));
     if (this.fridgeId !== null && ids.includes(this.fridgeId)) {
-      this.fridgePage = Math.floor(ids.indexOf(this.fridgeId) / FRIDGE_PAGE);
+      this.fridgePage = Math.floor(ids.indexOf(this.fridgeId) / this.fridgePageSize);
     }
     this.fridgePage = Math.max(0, Math.min(pages - 1, this.fridgePage));
-    const shown = ids.slice(this.fridgePage * FRIDGE_PAGE, (this.fridgePage + 1) * FRIDGE_PAGE);
+    const size = this.fridgePageSize;
+    const shown = ids.slice(this.fridgePage * size, (this.fridgePage + 1) * size);
     if (this.fridgeId === null || !ids.includes(this.fridgeId)) this.fridgeId = shown[0] ?? null;
     const filters: [FridgeFilter, string][] = [
       ['all', t.fridgeAll],
@@ -2950,7 +2991,7 @@ export class Shell {
     ];
     const shelves: HTMLElement[] = [];
     for (let r = 0; r < FRIDGE_ROWS; r++) {
-      const row = shown.slice(r * FRIDGE_COLS, (r + 1) * FRIDGE_COLS);
+      const row = shown.slice(r * this.fridgeCols, (r + 1) * this.fridgeCols);
       if (row.length === 0 && r > 0) break;
       shelves.push(
         h(
@@ -2997,8 +3038,7 @@ export class Shell {
       h(
         'div',
         { class: 'page-bar' },
-        // (Inside the frame, the tab bar leads home)
-        this.compact ? null : this.backButton(() => this.showMenu()),
+        this.backButton(() => this.showMenu()),
         h(
           'div',
           { class: 'fridge-count' },
@@ -3162,13 +3202,11 @@ export class Shell {
       'section',
       { class: 'board board-page board-settings', 'aria-labelledby': 'o-h' },
       this.plank(t.settings, null, 'o-h', -1.2),
-      this.compact
-        ? null
-        : h(
-            'div',
-            { class: 'page-bar' },
-            this.backButton(() => this.leaveSettings()),
-          ),
+      h(
+        'div',
+        { class: 'page-bar' },
+        this.backButton(() => this.leaveSettings()),
+      ),
       h(
         'div',
         { class: 'check-grid' },
@@ -3579,7 +3617,11 @@ export class Shell {
             ? h(
                 'div',
                 { class: 'found-grid', 'data-scroll': this.compact ? null : '' },
-                picks.map(([id, n]) =>
+                // Inside the frame: two rows, the rest counted
+                (this.compact && picks.length > FOUND_FRAME
+                  ? picks.slice(0, FOUND_FRAME - 1)
+                  : picks
+                ).map(([id, n]) =>
                   h(
                     'div',
                     { class: 'found-cell', title: this.texts.getItemName(id) },
@@ -3587,6 +3629,13 @@ export class Shell {
                     h('span', { class: 'badge is-wood' }, `×${n}`),
                   ),
                 ),
+                this.compact && picks.length > FOUND_FRAME
+                  ? h(
+                      'div',
+                      { class: 'found-cell found-more' },
+                      `+${picks.length - FOUND_FRAME + 1}`,
+                    )
+                  : null,
               )
             : null,
         ),

@@ -186,8 +186,7 @@ body[data-page='playing'] .play-chips {
 .site-side,
 .site-below,
 .site-page,
-.frame-overlay,
-.site-tabbar {
+.frame-overlay {
   font-family: var(--f-body);
   color: var(--ink);
   user-select: none;
@@ -197,8 +196,7 @@ body[data-page='playing'] .play-chips {
 .site-side button,
 .site-below button,
 .site-page button,
-.frame-overlay button,
-.site-tabbar button {
+.frame-overlay button {
   font: inherit;
   color: inherit;
   cursor: pointer;
@@ -582,7 +580,6 @@ html.touch .btn-back {
 
 .site-side,
 .site-page,
-.site-tabbar,
 .play-tools {
   display: none;
 }
@@ -944,6 +941,24 @@ body[data-page='home'][data-layout='land'] .board-modes .btn-start {
 body[data-page='home'][data-layout='land'] .book-fold {
   flex-direction: column;
   gap: 8px;
+}
+
+/* The chosen mode's name and short line (`Shell.modeDetail` for the land layout) */
+.detail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detail-name {
+  font: 17px/1.2 var(--f-label);
+  color: var(--wood);
+}
+
+.detail-short {
+  font-size: 12px;
+  color: var(--ink-soft);
 }
 
 /* The chosen mode's name: the cards have it, except on a narrow window (below) */
@@ -3051,23 +3066,22 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   width: min(760px, 100cqw - 100px, max(240px, var(--frame-h) * 420 / 520));
 }
 
-/* Laid out at the frame's size over its scale (`Shell.scaleFrameSite`): `--lw` x `--lh`, drawn
-   `--k` times larger. Sizes are fixed here: the frame's height, not the window's, is the room */
+/* Laid out at the game's own size, 420 x 520, and drawn at the frame's (`Shell.scaleFrameSite`:
+   `--k`), as the original's menus were: every screen fits the frame, nothing scrolls */
 .frame-site {
-  --fs-h: 20px;
-  --fs-l: 15px;
-  --fs-b: 13px;
-  --gap: 10px;
-  --pad: 12px;
-  --plank-fs: 28px;
+  --fs-h: 17px;
+  --fs-l: 14px;
+  --fs-b: 12px;
+  --gap: 7px;
+  --pad: 9px;
+  --plank-fs: 24px;
   position: absolute;
   left: 0;
   top: 0;
-  width: var(--lw, 100%);
-  height: var(--lh, 100%);
+  width: var(--lw, 420px);
+  height: var(--lh, 520px);
   zoom: var(--k, 1);
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
   font-family: var(--f-body);
   color: var(--ink);
   user-select: none;
@@ -3088,216 +3102,384 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   transition: opacity 0.45s ease;
 }
 
-/* The page's one scrolling area, the main button under it, the tab bar at the bottom */
-.frame-scroll {
-  flex: 1 1 auto;
-  padding: 0 8px 10px;
-}
-
-/* The fridge's item card is pinned at the foot: the focused cell stays above it */
-.frame-scroll:has(.item-card) {
-  scroll-padding-bottom: 104px;
-}
-
-.frame-action {
-  flex: none;
-  padding: 4px 10px 8px;
-}
-
-.frame-action .btn-start {
-  width: 100%;
-  height: 48px;
-  font-size: 20px;
-}
-
-.frame-site .tabbar-inner {
-  flex: none;
-  height: 62px;
-  padding: 4px 6px 6px;
-}
-
-/* Home: the village and the logo above the modes board, which sits at the bottom */
+/* --- Home: the logo (drawn in the frame) over one parchment panel, as the live site's menu:
+   the modes with their short line, the chosen mode's options, the quests and the fridge, and
+   the main button with the settings beside it */
 .frame-home {
-  box-sizing: border-box;
-  min-height: 100%;
+  position: absolute;
+  inset: 0;
+  padding: 100px 10px 10px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding-top: calc(var(--lh, 520px) * 0.2);
 }
 
-.board-phone {
-  padding: 30px 10px 12px;
-  gap: 10px;
-}
-
-.board-phone .mode-grid {
-  gap: 6px;
-}
-
-.board-phone .mode-card {
-  min-height: 44px;
-  padding: 4px 18px 4px 6px;
-}
-
-.board-phone .mode-icon {
-  width: 28px;
-  height: 28px;
-}
-
-/* (No hyphens: the game's font has no hyphen to draw) */
-.board-phone .mode-name {
-  font-size: 13px;
-  overflow-wrap: break-word;
-}
-
-/* A small phone's frame: the longest names still on one line */
-@container frame (max-width: 360px) {
-  .board-phone .mode-card {
-    gap: 6px;
-    padding: 4px 16px 4px 5px;
-  }
-
-  .board-phone .mode-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .board-phone .mode-name {
-    font-size: 12px;
-  }
-}
-
-.board-detail {
+.fs-panel {
   display: flex;
   flex-direction: column;
+  gap: 7px;
+  padding: 9px;
+  border-radius: var(--r-inset);
+}
+
+.fs-panel .mode-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.fs-panel .mode-card {
+  min-height: 38px;
+  gap: 6px;
+  padding: 3px 18px 3px 5px;
+}
+
+.fs-panel .mode-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.fs-panel .mode-name {
+  font-size: 13px;
+  line-height: 1.1;
+}
+
+.fs-panel .mode-short {
+  font-size: 12px;
+  line-height: 1.15;
+}
+
+.fs-panel .mode-card .lock {
+  top: 4px;
+  right: 4px;
+}
+
+.fs-detail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 2px 0;
+  border-top: 2px dashed rgba(95, 69, 44, 0.25);
+}
+
+/* The mode's text when it has no options to show (the options say more about it) */
+.fs-detail .mode-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
+.fs-detail:has(.mode-options) .mode-desc {
+  display: none;
+}
+
+.fs-detail :is(.lock-note, .best-time) {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.fs-detail .mode-options {
+  gap: 3px;
+}
+
+.fs-detail .opt-title {
+  font: 12px/1.2 var(--f-label);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fs-detail .opt-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 10px;
+}
+
+.fs-detail .opt {
+  min-height: 22px;
+  padding: 0 2px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.fs-detail .opt .box {
+  width: 18px;
+  height: 18px;
+}
+
+.fs-detail .opt-hint {
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fs-detail .field-btn {
+  width: 36px;
+  height: 28px;
+  font-size: 14px !important;
+}
+
+.fs-panel .book-fold {
+  flex-direction: row;
+  gap: 7px;
+}
+
+.fs-panel .fold-btn {
+  padding: 4px 8px;
+  box-shadow: 2px 4px 0 rgba(var(--night), 0.25);
+}
+
+.fs-panel .fold-art {
+  width: 26px;
+  height: 26px;
+}
+
+.fs-panel .fold-text .tile-name {
+  font-size: 13px;
+}
+
+/* Denser (`Shell.fitFrame`): the cards keep their name only */
+.frame-home[data-density='compact'] .mode-short {
+  display: none;
+}
+
+.frame-home[data-density='compact'] .mode-card {
+  min-height: 32px;
+}
+
+.fs-go {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.detail-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+.fs-go .btn-start {
+  flex: 1;
+  height: 40px;
+  font-size: 19px;
+}
+
+.fs-go .fold-gear {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+
+/* --- Pages: one board over the village, its title plank over its top edge, as tall as the
+   frame; long lists turn pages (`Shell.pager`) */
+.frame-site > .board-page,
+.frame-site > .result {
+  position: absolute;
+  inset: 30px 8px 8px;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+}
+
+.frame-site > .board-page {
+  padding: calc(var(--plank-over) + 6px) 9px 9px;
+  gap: 7px;
+}
+
+.frame-site .board-page > * {
+  flex-shrink: 0;
+}
+
+.frame-site .plank {
+  padding: 5px 16px 5px;
+}
+
+.frame-site .page-rule,
+.frame-site .board-page > .note,
+.frame-site .set-hint,
+.frame-site .sub-title,
+.frame-site .item-card .family {
+  display: none;
+}
+
+.frame-site .page-bar {
+  gap: 6px;
+}
+
+/* Back: a round arrow (its word for screen readers), so the page's tabs fit beside it */
+.frame-site .btn-back {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.frame-site .btn-back .btn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.frame-site .tabs {
+  gap: 5px;
+}
+
+.frame-site .tab-btn {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 13px !important;
+}
+
+.frame-site .tab-btn .count {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+
+.frame-site .tab-btn .dot {
+  display: none;
+}
+
+.frame-site .pager {
   gap: 10px;
 }
 
-.detail-name {
-  font: 17px/1.2 var(--f-label);
-  color: var(--wood);
-}
-
-.detail-short {
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.board-detail .mode-desc {
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.board-detail .opt {
-  min-height: 40px;
-}
-
-/* The tab bar: play, quests, fridge, settings */
-.tabbar-inner {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: var(--wood);
-  border-top: 4px solid var(--wood-dark);
-  box-shadow: 0 -4px 10px rgba(var(--night), 0.25);
-}
-
-.tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  border: none;
-  background: none;
-  color: var(--gold-dull) !important;
-  font: 13px/1 var(--f-label) !important;
-}
-
-.tab.is-current {
-  color: var(--focus) !important;
-}
-
-.tab-art {
+.frame-site .pager .btn-round {
   width: 30px;
   height: 30px;
 }
 
-/* Pages in the frame: one column, as tall as their content; the frame's area scrolls */
-.frame-site .board-page,
-.frame-site .board-page.is-full,
-.frame-site .result {
-  width: auto;
-  max-width: none;
-  height: auto;
-  max-height: none;
-  margin: calc(var(--plank-over) + 6px) 0 0;
+.frame-site .pager-text {
+  font-size: 13px;
 }
 
-.frame-site .board-page {
-  padding: calc(var(--plank-over) + 8px) 10px 12px;
-}
-
+/* Quests: four at a time, the chosen one under them */
 .frame-site .quest-split,
 .frame-site .fridge-split {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  gap: 7px;
+  min-height: 0;
 }
 
-.frame-site .fridge-inside {
-  display: flex;
-  flex-direction: column;
+.frame-site .quest-list {
+  gap: 4px;
 }
 
-.frame-site .shelf-row {
-  max-height: none;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  row-gap: 2px;
+.frame-site .quest-row {
+  min-height: 34px;
+  padding: 2px 8px;
+  gap: 8px;
 }
 
-@container frame (min-width: 480px) {
-  .frame-site .shelf-row {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
+.frame-site .seal {
+  width: 32px;
+  height: 32px;
+  border-width: 2px;
+  font-size: 12px;
 }
 
-.frame-site .cell {
-  height: 72px;
+.frame-site .quest-name {
+  font-size: 13px;
 }
 
-.frame-site .cell .art {
-  width: 50px;
-  height: 50px;
+.frame-site .quest-main {
+  gap: 3px;
 }
 
-.frame-site .found {
-  min-height: 0 !important;
-}
-
-.frame-site .slot {
-  flex-wrap: wrap;
-  padding: 4px 2px;
-}
-
-.frame-site .plank {
-  padding: 6px 18px 5px;
+.frame-site .quest-main .bar {
+  height: 5px;
 }
 
 .frame-site .quest-detail {
-  padding: 12px;
+  padding: 8px;
+  gap: 6px;
 }
 
+.frame-site .detail-title h2 {
+  font-size: 16px;
+}
+
+.frame-site .state-chip {
+  font-size: 12px;
+  padding: 3px 9px;
+}
+
+.frame-site .board-page .need-grid {
+  --need: 46px;
+  gap: 3px;
+}
+
+.frame-site .need .unknown {
+  font-size: 18px;
+}
+
+.frame-site .need {
+  padding: 2px;
+  gap: 1px;
+}
+
+.frame-site .need-art {
+  width: 24px;
+  height: 24px;
+}
+
+.frame-site .need-name,
+.frame-site .need .bar {
+  display: none;
+}
+
+.frame-site .need-count {
+  font-size: 12px;
+}
+
+.frame-site .reward {
+  margin-top: 0;
+  padding: 5px 8px;
+  gap: 8px;
+}
+
+.frame-site .reward-art {
+  width: 22px;
+  height: 22px;
+}
+
+.frame-site .reward {
+  align-items: center;
+}
+
+.frame-site .reward p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+/* A quest with many items: the reward's text on one line, and no reward box while it is
+   still hidden (it only says the quest must be done first) */
+.frame-site .board-page[data-density='compact'] .reward p {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.frame-site .board-page[data-density='compact'] .reward:has(.is-hidden) {
+  display: none;
+}
+
+/* Fridge: six a shelf, three shelves a page, the chosen item under them */
 .frame-site .fridge-count {
+  order: 3;
   flex: 1 1 100%;
-  font-size: 15px;
+  font-size: 13px;
+  gap: 8px;
 }
 
 .frame-site .fridge-count .bar.wide {
@@ -3305,62 +3487,130 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
   width: auto;
 }
 
-/* The chosen item stays in view at the foot of the frame's area, without its family */
+.frame-site .fridge-inside {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 8px 6px;
+  gap: 2px;
+}
+
+.frame-site .shelf-row {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  padding: 0 2px;
+}
+
+.frame-site .cell {
+  height: 50px;
+  padding-bottom: 7px;
+}
+
+.frame-site .cell .art {
+  width: 34px;
+  height: 34px;
+}
+
+.frame-site .cell .badge {
+  font-size: 12px;
+  padding: 0 4px;
+  top: 1px;
+  right: 1px;
+}
+
+.frame-site .cell-bar {
+  left: 8px;
+  right: 8px;
+  bottom: 2px;
+  height: 4px;
+}
+
+.frame-site .glass {
+  height: 6px;
+}
+
 .frame-site .item-card {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  padding: 10px 12px;
+  padding: 6px 9px;
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  column-gap: 12px;
-  row-gap: 4px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 2px;
   align-items: center;
-  box-shadow:
-    0 2px 0 rgba(95, 69, 44, 0.22),
-    0 -4px 16px rgba(var(--night), 0.18);
 }
 
 .frame-site .item-card .item-disc {
   grid-row: span 3;
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
 }
 
-.frame-site .item-card h2,
-.frame-site .item-status {
+.frame-site .item-card h2 {
+  font-size: 15px;
   text-align: left;
 }
 
 .frame-site .item-status {
   font-size: 12px;
+  text-align: left;
 }
 
-.frame-site .item-card .family {
-  display: none;
+/* Settings and controls */
+.frame-site .check-grid {
+  gap: 6px;
 }
 
-.frame-site .need-grid {
-  --need: 80px;
+.frame-site .check-card {
+  padding: 6px 8px;
   gap: 8px;
 }
 
-.frame-site .need-art {
-  width: 40px;
-  height: 40px;
+.frame-site .check-card .box {
+  width: 22px;
+  height: 22px;
 }
 
-.frame-site .check-grid,
+.frame-site .check-name {
+  font-size: 13px;
+}
+
+.frame-site .check-hint {
+  font-size: 12px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+
 .frame-site .set-pair {
   grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }
 
-.frame-site .result {
-  --pic: 200px;
+.frame-site .set-row {
+  padding: 6px 10px;
+  gap: 4px 10px;
 }
 
-.frame-site .result-title {
-  font-size: 36px;
+.frame-site .set-label,
+.frame-site .set-value {
+  font-size: 13px;
+}
+
+.frame-site .slider {
+  min-width: 100px;
+  height: 26px;
+}
+
+.frame-site .btn-ghost {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px !important;
+}
+
+.frame-site .ctl-table {
+  padding: 8px 10px;
+  gap: 4px;
 }
 
 .frame-site .ctl-row {
@@ -3375,6 +3625,119 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 
 .frame-site .ctl-head {
   font-size: 12px;
+}
+
+.frame-site .slot {
+  min-height: 30px;
+  flex-wrap: wrap;
+  padding: 2px;
+}
+
+.frame-site .ctl-foot {
+  gap: 6px 10px;
+}
+
+.frame-site .ctl-help :is(.note, .prompt-cancel, .prompt-note) {
+  font-size: 12px;
+}
+
+.frame-site .prompt {
+  font-size: 14px;
+}
+
+/* Results: the picture over the board, the scores, the quests done, the items found (two rows,
+   then "+N"), Continue at the foot */
+.frame-site > .result {
+  --pic: 170px;
+  inset: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.frame-site > .result > .board-result {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: calc(var(--pic) * 84 / 300) 9px 9px;
+  gap: 7px;
+}
+
+.frame-site > .result:not(.is-over) > .board-result {
+  padding-top: calc(var(--pic) * 60 / 300);
+}
+
+.frame-site .result-title {
+  font-size: 30px;
+}
+
+.frame-site .stat {
+  min-width: 0;
+  padding: 4px 12px;
+}
+
+.frame-site .stat-value {
+  font-size: 17px;
+}
+
+.frame-site .banners {
+  gap: 5px;
+}
+
+.frame-site .banner {
+  flex: 1 1 100%;
+  padding: 4px 9px;
+  gap: 8px;
+}
+
+.frame-site .banner-art {
+  width: 24px;
+  height: 24px;
+}
+
+.frame-site .banner-title {
+  font-size: 13px;
+}
+
+.frame-site .banner-sub {
+  display: none;
+}
+
+.frame-site .found {
+  min-height: 0 !important;
+  gap: 4px;
+}
+
+.frame-site .found-grid {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.frame-site .found-cell {
+  height: 44px;
+  padding: 3px 2px;
+  gap: 1px;
+}
+
+.frame-site .found-cell .art {
+  width: 26px;
+}
+
+.frame-site .found-cell .badge {
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+.frame-site .found-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 13px/1 var(--f-label);
+  color: var(--wood);
+}
+
+.frame-site .btn-continue {
+  margin-top: auto;
+  height: 40px;
+  font-size: 18px;
 }
 
 /* ========================================================
