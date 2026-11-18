@@ -32,6 +32,7 @@ When Flash was deprecated, Motion Twin graciously open-sourced the original code
 - **Original Source & Assets**: [motion-twin/hammerfest](https://github.com/motion-twin/hammerfest).
 - **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
 - **Fonts**: [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) and [Anton](https://github.com/googlefonts/AntonFont) (SIL Open Font License 1.1, license texts in `public/fonts/`) stand in for the commercial Franklin Gothic Heavy and Impact embedded in the original SWF.
+- **Support**: if you enjoy HammerFenix, you can support its developer on [Ko-fi](https://ko-fi.com/greaple). It is optional and unlocks nothing: the game stays free and whole for everyone.
 - **Legal Notice**: This project is created strictly for non-commercial educational, preservation, and research purposes. All trademarks, characters, artwork, and audio remain the property of Motion Twin.
 
 ---

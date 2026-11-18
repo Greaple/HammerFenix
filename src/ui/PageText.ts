@@ -56,6 +56,7 @@ const TEXT: Record<Lang, PageTexts> = {
       '<strong>Hammerfest</strong> a été créé par <strong>Motion Twin</strong> en 2006. Son code source et ses graphismes ont été publiés sous licence CC BY-NC-SA 4.0. HammerFenix est un remake indépendant et non commercial, pour préserver le jeu ; les graphismes, sons et niveaux restent ceux de Motion Twin.',
     linkOriginal: 'Code source original (Motion Twin)',
     linkPort: 'Code source de HammerFenix',
+    linkKofi: 'Soutenir le développeur sur Ko-fi (facultatif, rien à débloquer)',
     linkLicense: 'Licence CC BY-NC-SA 4.0',
     padIcons: 'Icônes de manettes, de Figma Community (CC BY 4.0) :',
     hdBitmaps:
@@ -122,6 +123,7 @@ const TEXT: Record<Lang, PageTexts> = {
       '<strong>Hammerfest</strong> was made by <strong>Motion Twin</strong> in 2006. Its source code and graphics were released under the CC BY-NC-SA 4.0 license. HammerFenix is an independent, non-commercial remake to preserve the game; the graphics, sounds and levels are still Motion Twin’s.',
     linkOriginal: 'Original source code (Motion Twin)',
     linkPort: 'HammerFenix source code',
+    linkKofi: 'Support the developer on Ko-fi (optional, nothing to unlock)',
     linkLicense: 'CC BY-NC-SA 4.0 license',
     padIcons: 'Controller icons, from Figma Community (CC BY 4.0):',
     hdBitmaps: 'Bitmaps for big screens upscaled with a model by Philip Hofmann (CC BY 4.0):',
@@ -187,6 +189,7 @@ const TEXT: Record<Lang, PageTexts> = {
       '<strong>Hammerfest</strong> fue creado por <strong>Motion Twin</strong> en 2006. Su código fuente y sus gráficos se publicaron con la licencia CC BY-NC-SA 4.0. HammerFenix es un remake independiente y sin ánimo de lucro para preservar el juego; los gráficos, sonidos y niveles siguen siendo de Motion Twin.',
     linkOriginal: 'Código fuente original (Motion Twin)',
     linkPort: 'Código fuente de HammerFenix',
+    linkKofi: 'Apoyar al desarrollador en Ko-fi (opcional, no desbloquea nada)',
     linkLicense: 'Licencia CC BY-NC-SA 4.0',
     padIcons: 'Iconos de mandos, de Figma Community (CC BY 4.0):',
     hdBitmaps:
