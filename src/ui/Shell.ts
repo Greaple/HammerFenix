@@ -5,7 +5,7 @@
  * HTML pages around the game frame, as the original's were web pages around the game, in the
  * port's parchment and wood (`src/site.css`) with the game's own drawings: item clips drawn as
  * pictures (`site/ItemArt.ts`), the game's fonts (Satans titles, Franklin Gothic Heavy labels,
- * extracted from `_gfx.swf` by `tools/build-fonts.ts`), the title logo and the game over
+ * from `tools/build-fonts.ts`; the labels' font is a free look-alike), the title logo and the game over
  * picture. The frame keeps what the game draws: the village scene (`menu`, vector) and the
  * logo behind the home page, and the site's intro.
  *

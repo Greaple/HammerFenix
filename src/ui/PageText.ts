@@ -60,6 +60,7 @@ const TEXT: Record<Lang, PageTexts> = {
     padIcons: 'Icônes de manettes, de Figma Community (CC BY 4.0) :',
     hdBitmaps:
       'Images agrandies pour les grands écrans avec un modèle de Philip Hofmann (CC BY 4.0) :',
+    fonts: 'Polices libres (SIL OFL 1.1) à la place de Franklin Gothic et Impact :',
     devKeysTitle: 'Touches de développement',
     devKeysNote:
       'Celles du jeu original en mode développeur. Les chiffres sont ceux du pavé numérique ou de la rangée du haut. Elles ne marchent pas pendant un enregistrement ou un replay, et les lettres gardent leur usage normal (W saute aussi).',
@@ -124,6 +125,7 @@ const TEXT: Record<Lang, PageTexts> = {
     linkLicense: 'CC BY-NC-SA 4.0 license',
     padIcons: 'Controller icons, from Figma Community (CC BY 4.0):',
     hdBitmaps: 'Bitmaps for big screens upscaled with a model by Philip Hofmann (CC BY 4.0):',
+    fonts: 'Free fonts (SIL OFL 1.1) standing in for Franklin Gothic and Impact:',
     devKeysTitle: 'Developer keys',
     devKeysNote:
       'The original game’s own dev mode keys. Digits are the numpad’s or the top row’s. They are off while recording or replaying, and letters keep their game use (W also jumps).',
@@ -189,6 +191,7 @@ const TEXT: Record<Lang, PageTexts> = {
     padIcons: 'Iconos de mandos, de Figma Community (CC BY 4.0):',
     hdBitmaps:
       'Imágenes ampliadas para pantallas grandes con un modelo de Philip Hofmann (CC BY 4.0):',
+    fonts: 'Fuentes libres (SIL OFL 1.1) en lugar de Franklin Gothic e Impact:',
     devKeysTitle: 'Teclas de desarrollo',
     devKeysNote:
       'Las del modo desarrollador del juego original. Las cifras son las del teclado numérico o de la fila de arriba. No funcionan durante una grabación o una repetición, y las letras siguen con su uso normal (W también salta).',

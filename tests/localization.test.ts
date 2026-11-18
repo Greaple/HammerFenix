@@ -114,9 +114,17 @@ describe('localization (3.4)', () => {
     for (const l of ['en', 'es'] as const) expect([...SHELL_TEXT_KEYS[l]].sort()).toEqual(fr);
   });
 
-  it('has the game fonts extracted from the SWF', () => {
-    for (const f of ['franklin-gothic-heavy.otf', 'satans.otf', 'impact.otf']) {
+  it('has the game fonts: Satans from the SWF, free look-alikes for the commercial ones', () => {
+    for (const f of ['satans.otf', 'libre-franklin-black.woff2', 'anton.woff2']) {
       expect(readFileSync(join(PUBLIC, 'fonts', f)).length).toBeGreaterThan(10000);
     }
+    for (const f of ['libre-franklin-black', 'anton']) {
+      const license = readFileSync(join(PUBLIC, 'fonts', `${f}.LICENSE.txt`), 'utf-8');
+      expect(license).toContain('SIL Open Font License');
+    }
+    // Franklin Gothic Heavy and Impact are not Motion Twin's to license: never published again
+    const files = readdirSync(join(PUBLIC, 'fonts'));
+    expect(files).not.toContain('franklin-gothic-heavy.otf');
+    expect(files).not.toContain('impact.otf');
   });
 });

@@ -1901,6 +1901,8 @@ body[data-page='page'] .site-page.is-scrolling {
   border: 3px solid var(--progress);
   color: var(--wood);
   font: 12px/1 var(--f-label);
+  /* "100%" fits the smallest seal in Libre Franklin, whose figures and % are wide */
+  letter-spacing: -0.05em;
 }
 
 .seal.is-done {
@@ -3390,8 +3392,8 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 }
 
 .frame-site .seal {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-width: 2px;
   font-size: 12px;
 }

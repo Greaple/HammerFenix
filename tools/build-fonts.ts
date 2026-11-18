@@ -1,17 +1,19 @@
 /**
- * Writes the fonts embedded in the game's SWF (`DefineFont3` glyph outlines of `_gfx.swf`) as
- * OpenType files in `public/fonts/`, so the browser draws the game's texts in its own fonts
- * instead of a fallback (Arial Black). Flash drew these fields with the embedded outlines; the
- * port's text fields (`SwfMovieClip`) and site screens (`Shell`) name the same families, and
- * `src/engine/Fonts.ts` registers the files under those names.
+ * Writes the game's fonts to `public/fonts/`, so the browser draws the game's texts in them
+ * instead of a fallback (Arial Black). The port's text fields (`SwfMovieClip`) and site screens
+ * (`Shell`) name the SWF's families, and `src/engine/Fonts.ts` registers the files under those
+ * names.
  *
- * Only the fonts with outlines are written, the fullest one per family: Franklin Gothic Heavy
- * (484 glyphs, accents included), Satans (ASCII only) and Impact. Verdana and Arial were device
- * fonts in the original, without outlines.
+ * The SWF (`_gfx.swf`) embeds the outlines (`DefineFont3`) of three fonts: Franklin Gothic Heavy
+ * (484 glyphs), Satans (ASCII only) and Impact. Verdana and Arial were device fonts, without
+ * outlines. Franklin Gothic Heavy and Impact are commercial fonts (ITC / Monotype) that Motion
+ * Twin's CC BY-NC-SA license cannot cover, so they are not extracted: free look-alikes under the
+ * SIL Open Font License stand in for them (`LOOKALIKES`, copied from their npm packages with
+ * their license texts). Satans, whose origin is unknown, is still extracted from the SWF.
  *
  * Usage: `npx tsx tools/build-fonts.ts` (part of `npm run assets`).
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import opentype from 'opentype.js';
 import { parseSwf } from 'swf-parser';
@@ -21,12 +23,33 @@ const ROOT = join(import.meta.dirname, '..');
 const SWF = join(ROOT, 'assets-src/original/swf/_gfx.swf');
 const OUT = join(ROOT, 'public/fonts');
 
-/** The families written, and their file names. */
+/** The SWF families extracted, and their file names. */
 export const FONT_FILES: Record<string, string> = {
-  'Franklin Gothic Heavy': 'franklin-gothic-heavy.otf',
   Satans: 'satans.otf',
-  Impact: 'impact.otf',
 };
+
+/**
+ * The free fonts standing in for the SWF's commercial ones: the font file and license of an
+ * `@fontsource` package (Latin subset, enough for French, English and Spanish), and the names
+ * they get in `public/fonts/`.
+ */
+export const LOOKALIKES: { family: string; pkg: string; file: string; out: string }[] = [
+  {
+    family: 'Franklin Gothic Heavy',
+    pkg: '@fontsource/libre-franklin',
+    file: 'files/libre-franklin-latin-900-normal.woff2',
+    out: 'libre-franklin-black.woff2',
+  },
+  {
+    family: 'Impact',
+    pkg: '@fontsource/anton',
+    file: 'files/anton-latin-400-normal.woff2',
+    out: 'anton.woff2',
+  },
+];
+
+/** Files of earlier builds that must not be published any more (the extracted commercial fonts). */
+const REMOVED = ['franklin-gothic-heavy.otf', 'impact.otf'];
 
 /** Units per em of the files: DefineFont3 outlines use 20480, divided by 20. */
 const UPM = 1024;
@@ -390,6 +413,13 @@ function main(): void {
     writeFileSync(join(OUT, FONT_FILES[name]), bytes);
     console.log(`fonts: ${name}, ${tag.glyphs.length} glyphs -> public/fonts/${FONT_FILES[name]}`);
   }
+  for (const { family, pkg, file, out } of LOOKALIKES) {
+    const dir = join(ROOT, 'node_modules', pkg);
+    copyFileSync(join(dir, file), join(OUT, out));
+    copyFileSync(join(dir, 'LICENSE'), join(OUT, out.replace(/\.woff2$/, '.LICENSE.txt')));
+    console.log(`fonts: ${family} -> public/fonts/${out} (${pkg}, SIL OFL 1.1)`);
+  }
+  for (const f of REMOVED) rmSync(join(OUT, f), { force: true });
 }
 
 main();
