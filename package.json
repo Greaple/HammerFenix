@@ -21,6 +21,7 @@
     "orig": "tsx tools/normalize-original.ts"
   },
   "dependencies": {
+    "firebase": "^13.4.0",
     "pixi.js": "^8.22.0"
   },
   "devDependencies": {

@@ -1,0 +1,24 @@
+rules_version = '2';
+
+// The online save (src/cloud/CloudSave.ts): one document per player, `saves/{uid}`, that only its
+// owner can read, write or delete. Everything else is closed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /saves/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+          ['v', 'profile', 'save', 'settings', 'controls', 'settingsAt', 'updatedAt'])
+        && request.resource.data.v == 1
+        && request.resource.data.profile is string
+        && request.resource.data.profile.size() < 20000
+        && request.resource.data.controls is string
+        && request.resource.data.controls.size() < 5000
+        && request.resource.data.save is map
+        && request.resource.data.settings is map
+        && request.resource.data.settingsAt is number
+        && request.resource.data.updatedAt == request.time;
+    }
+  }
+}

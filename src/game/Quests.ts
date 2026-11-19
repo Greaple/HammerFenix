@@ -166,6 +166,20 @@ export class QuestEngine {
   }
 
   /**
+   * Completes quests `ids` in the order given, whatever the items, applying their rewards: the
+   * profile a list of done quests leads to (cloud save merge, `src/cloud/merge.ts`). Quests
+   * already done or unknown are skipped.
+   */
+  replay(p: ProfileData, ids: readonly number[]): void {
+    for (const id of ids) {
+      const q = this.get(id);
+      if (!q || p.quests.includes(id)) continue;
+      p.quests.push(id);
+      for (const a of q.actions) this.apply(p, a);
+    }
+  }
+
+  /**
    * Applies one `give` or `remove` entry. Returns false for an entry it does not know. The one
    * `log` reward (quest 74) has no known effect and is ignored.
    */
