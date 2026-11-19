@@ -3,9 +3,13 @@ import type { SwfLibrary } from '../../engine/swf/SwfLibrary';
 
 /**
  * An item clip or another clip used as a picture on the site pages: special items below 1000,
- * score items from 1000.
+ * score items from 1000. `host` stands for the entity a clip's frame scripts read their fields
+ * from (`SwfMovieClip.scriptHost`): without it they find nothing, and the parts they set stay
+ * on their first frame and visible (Igor drawn with the tuft of item 99 and the carrot nose).
  */
-export type Icon = { item: number; twice?: boolean } | { clip: string; frame?: string };
+export type Icon =
+  | { item: number; twice?: boolean }
+  | { clip: string; frame?: string; host?: Record<string, unknown> };
 
 /** The side of the square every picture is drawn in (CSS px; drawn at twice that). */
 const BOX = 96;
@@ -27,7 +31,10 @@ export class ItemArt {
 
   /** The picture of `icon`, as a URL for an `<img>`; empty if the clip cannot be drawn. */
   url(icon: Icon): string {
-    const key = 'item' in icon ? `i${icon.item}` : `c${icon.clip}:${icon.frame ?? '1'}`;
+    const key =
+      'item' in icon
+        ? `i${icon.item}`
+        : `c${icon.clip}:${icon.frame ?? '1'}${icon.host ? JSON.stringify(icon.host) : ''}`;
     let url = this.cache.get(key);
     if (url === undefined) {
       url = this.draw(icon);
@@ -45,7 +52,10 @@ export class ItemArt {
         mc.gotoAndStop(String(id >= 1000 ? id - 999 : id + 1));
       } else {
         mc = this.lib.attach(icon.clip);
+        if (icon.host) mc.scriptHost = { ...icon.host };
         mc.gotoAndStop(icon.frame ?? '1');
+        // The frame scripts run once the clip is live: with a host, as in the game
+        if (icon.host) mc.goLive();
       }
     } catch {
       return '';

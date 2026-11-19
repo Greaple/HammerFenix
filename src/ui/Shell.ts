@@ -115,6 +115,19 @@ interface ModeEntry {
 }
 
 /**
+ * Igor as a new game shows him: the `Player` fields his parts' frame scripts read (head, skin,
+ * the weapon in his hands, and the carrot nose and tuft of the items that give them), at their
+ * starting values (`entity/Player.mt`).
+ */
+export const IGOR = {
+  head: Data.HEAD_NORMAL,
+  skin: 1,
+  currentWeapon: Data.WEAPON_B_CLASSIC,
+  fl_carot: false,
+  fl_chourou: false,
+};
+
+/**
  * The modes of the menu, as a grid read row by row: one-player modes on the left, two-player
  * ones on the right, so each row pairs related modes (the port's layout; the site listed them in
  * one column). A new player has the Adventure and the free Learning mode (site guide, section
@@ -122,7 +135,7 @@ interface ModeEntry {
  * coming soon. Icons echo the site's (`menu/i*.gif`: a clock, two clocks, a ball, a bolt).
  */
 const MODES: ModeEntry[] = [
-  { mode: 'solo', icon: { clip: 'hammer_player' }, enabled: true },
+  { mode: 'solo', icon: { clip: 'hammer_player', host: IGOR }, enabled: true },
   // Unlocked by quest 67 ("Sandy commence l'aventure !"); item 1221 is one of Sandy's kit
   { mode: 'multicoop', icon: { item: 1221 }, enabled: true },
   // Item 7, the shoe that speeds Igor up; unlocked by quest 73 (4.1)

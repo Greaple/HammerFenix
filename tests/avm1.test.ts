@@ -5,6 +5,7 @@ import { type Avm1Clip, runAvm1 } from '../src/engine/swf/Avm1';
 import { SwfLibrary } from '../src/engine/swf/SwfLibrary';
 import { SwfMovieClip } from '../src/engine/swf/SwfMovieClip';
 import type { SpriteDef, SwfLibraryData } from '../src/engine/swf/types';
+import { IGOR } from '../src/ui/Shell';
 
 const lib = JSON.parse(
   readFileSync(join(__dirname, '../public/gfx/library.json'), 'utf-8'),
@@ -76,6 +77,40 @@ describe('AVM1 frame scripts of the player body', () => {
     const b = makePart({ fl_chourou: true });
     runAvm1(frameScript(483), b.part);
     expect(b.calls.visible).toEqual([true]);
+  });
+});
+
+describe("Igor's picture on the site (the Adventure card)", () => {
+  const swf = SwfLibrary.headless(lib);
+  /** The parts of the standing animation (`sub`), by depth: visible and frame. */
+  const parts = (host: Record<string, unknown> | null) => {
+    const mc = swf.attach('hammer_player');
+    if (host) mc.scriptHost = { ...host };
+    mc.gotoAndStop('1');
+    if (host) mc.goLive();
+    const sub = mc.getClip('sub')!;
+    const out = new Map<number, { visible: boolean; frame: number }>();
+    const walk = (c: { children: unknown[] }) => {
+      for (const k of c.children) {
+        if (k instanceof SwfMovieClip)
+          out.set(k.getDepth(), { visible: k.visible, frame: k._currentframe });
+        else if (k && typeof k === 'object' && 'children' in k) walk(k as { children: unknown[] });
+      }
+    };
+    walk(sub);
+    return out;
+  };
+
+  it('hides the tuft (item 99) and the carrot nose, as a new game does', () => {
+    // No host: the frame scripts never run, and both show
+    expect(parts(null).get(40)?.visible).toBe(true);
+    const igor = parts(IGOR);
+    // The tuft (`chourou`, depth 40) and the carrot (depth 35) follow `fl_chourou`, `fl_carot`
+    expect(igor.get(40)?.visible).toBe(false);
+    expect(igor.get(35)?.visible).toBe(false);
+    // Both hands hold the classic bomb (`currentWeapon` + 1)
+    expect(igor.get(5)?.frame).toBe(2);
+    expect(igor.get(31)?.frame).toBe(2);
   });
 });
 
