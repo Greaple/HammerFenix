@@ -3240,12 +3240,19 @@ export class Shell {
     if (!cloud.signedInNow) cloud.preload();
     const t = this.t;
     const s = cloud.state;
-    const btn = (key: string, label: string, action: () => void) =>
+    /** `tone`: `primary` (the safe choice), `danger` (loses data), or plain. */
+    const btn = (
+      key: string,
+      label: string,
+      icon: string,
+      action: () => void,
+      tone: 'primary' | 'danger' | 'danger-armed' | '' = '',
+    ) =>
       h(
         'button',
         {
           type: 'button',
-          class: 'btn-ghost',
+          class: tone === 'primary' ? 'btn-wood cloud-btn' : `btn-ghost cloud-btn ${tone}`,
           'data-nav': `cloud:${key}`,
           disabled: s.kind === 'busy',
           onclick: () => {
@@ -3253,46 +3260,71 @@ export class Shell {
             action();
           },
         },
+        svgIcon(icon, { size: 18 }),
         label,
       );
     let status = cloud.email;
-    if (s.kind === 'busy') status = t.cloudBusy;
+    let tone = 'off';
+    if (s.kind === 'busy') [status, tone] = [t.cloudBusy, 'busy'];
     else if (s.kind === 'error')
-      status = s.code === 'auth/popup-blocked' ? t.cloudPopup : t.cloudError;
-    else if (s.kind === 'choose') status = t.cloudChoose;
+      [status, tone] = [s.code === 'auth/popup-blocked' ? t.cloudPopup : t.cloudError, 'error'];
+    else if (s.kind === 'choose') [status, tone] = [t.cloudChoose, 'alert'];
     else if (s.kind === 'synced') {
       const time = new Date(s.at).toLocaleTimeString(this.lang, {
         hour: '2-digit',
         minute: '2-digit',
       });
-      status = `${cloud.email} · ${t.cloudSynced.replace('{time}', time)}`;
+      status = t.cloudSynced.replace('{time}', time);
+      tone = 'ok';
     } else if (!cloud.signedInNow) status = t.cloudOut;
     const sure = performance.now() - this.deleteArmed < 3000;
     const buttons =
       s.kind === 'choose'
         ? [
-            btn('keep', t.cloudKeepDevice, () => void cloud.choose(true)),
-            btn('take', t.cloudTakeAccount, () => void cloud.choose(false)),
+            btn('keep', t.cloudKeepDevice, ICON.device, () => void cloud.choose(true), 'primary'),
+            // Replaces this device's progress
+            btn('take', t.cloudTakeAccount, ICON.cloud, () => void cloud.choose(false), 'danger'),
           ]
         : cloud.signedInNow
           ? [
-              btn('out', t.cloudSignOut, () => void cloud.signOut()),
-              btn('delete', sure ? t.cloudDeleteSure : t.cloudDelete, () => {
-                if (performance.now() - this.deleteArmed < 3000) {
-                  this.deleteArmed = 0;
-                  void cloud.deleteCloudSave();
-                } else {
-                  this.deleteArmed = performance.now();
-                  this.render();
-                }
-              }),
+              btn('out', t.cloudSignOut, ICON.signOut, () => void cloud.signOut()),
+              btn(
+                'delete',
+                sure ? t.cloudDeleteSure : t.cloudDelete,
+                sure ? ICON.warn : ICON.trash,
+                () => {
+                  if (performance.now() - this.deleteArmed < 3000) {
+                    this.deleteArmed = 0;
+                    void cloud.deleteCloudSave();
+                  } else {
+                    // Armed for 3 s, then back to its first label
+                    this.deleteArmed = performance.now();
+                    this.render();
+                    setTimeout(() => this.refreshCloud(), 3100);
+                  }
+                },
+                sure ? 'danger-armed' : 'danger',
+              ),
             ]
-          : [btn('in', t.cloudSignIn, () => void cloud.signIn())];
+          : [btn('in', t.cloudSignIn, ICON.cloud, () => void cloud.signIn(), 'primary')];
     return h(
       'div',
-      { class: 'inset set-row cloud-row' },
+      { class: `inset set-row cloud-row${s.kind === 'choose' ? ' is-alert' : ''}` },
       h('span', { class: 'set-label', id: 'cloud-l' }, t.cloud),
-      h('span', { class: 'cloud-status', role: 'status', 'aria-live': 'polite' }, status),
+      // The state, and under it the account
+      h(
+        'span',
+        { class: 'cloud-info' },
+        h(
+          'span',
+          { class: `cloud-status is-${tone}`, role: 'status', 'aria-live': 'polite' },
+          h('span', { class: 'cloud-dot', 'aria-hidden': 'true' }),
+          h('span', { class: 'cloud-text' }, status),
+        ),
+        cloud.signedInNow && s.kind !== 'choose'
+          ? h('span', { class: 'cloud-email' }, cloud.email)
+          : null,
+      ),
       h('span', { class: 'cloud-btns' }, buttons),
       h('p', { class: 'set-hint' }, t.cloudHint),
     );

@@ -88,4 +88,11 @@ export const ICON = {
   giveUp: 'M5 21V4h11l-1.5 4L16 12H5',
   lock: 'M7 11V8a5 5 0 0 1 10 0v3M5.5 11h13v9.5h-13z',
   check: 'M5 12.5l4.5 4.5L19 7.5',
+  // The online save's buttons
+  cloud:
+    'M7 18.5h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.4 9.3 4.6 4.6 0 0 0 7 18.5zM12 16v-5M9.5 13.5L12 11l2.5 2.5',
+  device: 'M7 3.5h10v17H7zM11 17.5h2',
+  signOut: 'M14 4.5h5v15h-5M10 8l-4 4 4 4M6 12h10',
+  trash: 'M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 12.5h9l1-12.5M10.5 11v5M13.5 11v5',
+  warn: 'M12 4l9 15.5H3zM12 10v4M12 16.8v.2',
 };
