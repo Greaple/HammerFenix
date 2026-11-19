@@ -18,6 +18,16 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rolldownOptions: {
+      output: {
+        // The online save's Firebase, loaded on sign-in only: the service worker keeps it when
+        // first fetched, not at install (`tools/vite-plugin-offline.ts`)
+        chunkFileNames: (chunk) =>
+          chunk.moduleIds.some((id) => /node_modules[\\/]@?firebase[\\/]/.test(id))
+            ? 'assets/firebase-[hash].js'
+            : 'assets/[name]-[hash].js',
+      },
+    },
   },
   test: {
     include: ['tests/**/*.test.ts'],

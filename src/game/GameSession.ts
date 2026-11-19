@@ -28,7 +28,7 @@ import { TimeAttackMulti } from './mode/TimeAttackMulti';
 import { Tutorial } from './mode/Tutorial';
 import type { GameMode } from './mode/GameMode';
 
-const SAVE_KEY = 'igorsquest_save_v1';
+export const SAVE_KEY = 'igorsquest_save_v1';
 
 export interface GameSaveData {
   highScore: number;
@@ -341,6 +341,12 @@ export class GameSession {
     } catch {
       // ignore storage quota / sandbox write errors
     }
+  }
+
+  /** Reads the save again after the cloud save changed it (`src/cloud/CloudSave.ts`). */
+  reloadSave(): void {
+    this.savedData = this.loadSave();
+    this.highScore = this.savedData.highScore;
   }
 
   private loadSave(): GameSaveData {

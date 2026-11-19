@@ -2479,6 +2479,21 @@ html.touch .pager .btn-round {
   min-width: 120px;
 }
 
+/* The online save (port addition): its state, then its buttons on the right */
+.cloud-status {
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+
+.cloud-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .slider {
   position: relative;
   flex: 1;

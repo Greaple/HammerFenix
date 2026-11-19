@@ -5,6 +5,8 @@ import { AudioEngine } from './engine/Audio';
 import { loadGameFonts } from './engine/Fonts';
 import { InputController, type ControlAction } from './engine/Input';
 import { bindingKeys, loadBindings, saveBindings } from './engine/Bindings';
+import { CloudSave } from './cloud/CloudSave';
+import { loadSettings } from './game/GameParameters';
 import { showHelpKeys } from './ui/HelpKeys';
 import { SwfLibrary } from './engine/swf/SwfLibrary';
 import { pickBitmapScale } from './engine/swf/BitmapDetail';
@@ -155,6 +157,10 @@ async function main(): Promise<void> {
   // The player's profile: what the hammerfest.fr server kept (roadmap 3.2)
   const profile = new Profile(new QuestEngine(dataStore.quests, dataStore.items));
   const shell = new Shell(lib, input, dataStore, profile);
+  // The optional online save (port addition): the saves stay in localStorage, a player signed in
+  // with Google also has them in the cloud
+  const cloud = new CloudSave(profile.quests, () => dataStore.langId);
+  shell.cloud = cloud;
   await shell.load(baseUrl);
   shell.attachPage(app.renderer);
   app.stage.addChild(shell.root);
@@ -261,6 +267,7 @@ async function main(): Promise<void> {
         )
       : null;
     shell.showResult(result, record, time);
+    cloud.markDirty();
   };
   (window as any).profile = profile;
   (window as any).shell = shell;
@@ -274,6 +281,7 @@ async function main(): Promise<void> {
     if (document.hidden) {
       session.requestPause();
       audio.setSuspended(true);
+      cloud.flush();
     } else {
       audio.setSuspended(false);
     }
@@ -416,6 +424,24 @@ async function main(): Promise<void> {
   if (langSelect) langSelect.value = dataStore.langId;
   langSelect?.addEventListener('change', () => void changeLang(langSelect.value));
   shell.onLang = (id) => void changeLang(id);
+
+  // A sync of the online save that changed the saves: read them again
+  cloud.isBusy = () => !shell.visible;
+  cloud.onChange = () => shell.refreshCloud();
+  cloud.onApplied = (_before, after) => {
+    profile.data = profile.load();
+    session.reloadSave();
+    session.setSettings(loadSettings());
+    shell.settings = { ...session.settings };
+    shell.bindings = loadBindings();
+    applyBindings();
+    showSound(true);
+    if (after.save.preferredLang !== dataStore.langId) void changeLang(after.save.preferredLang);
+    else shell.refresh();
+  };
+  cloud.restore();
+  window.addEventListener('pagehide', () => cloud.flush());
+  (window as any).cloudSave = cloud;
 
   // The toolbar beside the frame while a game plays: the game's own keys, as buttons
   const tools = document.getElementById('play-tools');

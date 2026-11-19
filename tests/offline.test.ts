@@ -48,6 +48,15 @@ describe('offline play (5.3)', () => {
     expect(re.test('/gfx/bitmaps/b4.jpg')).toBe(false);
   });
 
+  it('keeps Firebase for its first fetch, only players who sign in load it', () => {
+    const src = serviceWorker('0123456789ab', ['assets/index-a.js', 'assets/firebase-b.js']);
+    expect(src).toContain('["./","assets/index-a.js"]');
+    const onDemand = /(\/.*\/)\.test\(new URL\(req\.url\)\.pathname\)/.exec(src)![1];
+    const re = new RegExp(onDemand.slice(1, -1));
+    expect(re.test('/IgorsQuest/assets/firebase-b.js')).toBe(true);
+    expect(re.test('/assets/index-a.js')).toBe(false);
+  });
+
   it('declares the manifest and icons the page links to', () => {
     const root = join(__dirname, '..');
     const html = readFileSync(join(root, 'index.html'), 'utf-8');

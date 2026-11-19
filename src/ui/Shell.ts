@@ -50,6 +50,7 @@ import {
   savedBitmapChoice,
 } from '../engine/swf/BitmapDetail';
 import type { SwfLibrary } from '../engine/swf/SwfLibrary';
+import type { CloudSave } from '../cloud/CloudSave';
 import { Data } from '../game/Data';
 import {
   type PadButton,
@@ -288,6 +289,21 @@ const TEXT: Record<Lang, Record<string, string>> = {
     hd: 'Images HD',
     hdHint:
       'Les décors agrandis pour les grands écrans (télé). Auto : selon votre écran. Le jeu se recharge en sortant.',
+    cloud: 'Sauvegarde en ligne',
+    cloudHint:
+      'Retrouvez votre progression et vos réglages sur vos autres appareils. Seuls votre compte Google et vos données de jeu sont gardés, et rien n’est partagé.',
+    cloudOut: 'Non connecté',
+    cloudBusy: 'Synchronisation…',
+    cloudSynced: 'Synchronisé à {time}',
+    cloudError: 'Échec, nouvel essai plus tard',
+    cloudPopup: 'Fenêtre de Google bloquée : autorisez-la et réessayez',
+    cloudSignIn: 'Se connecter avec Google',
+    cloudSignOut: 'Se déconnecter',
+    cloudDelete: 'Supprimer en ligne',
+    cloudDeleteSure: 'Appuyez encore pour supprimer',
+    cloudChoose: 'Cet appareil a la progression d’un autre compte.',
+    cloudKeepDevice: 'Garder celle de l’appareil',
+    cloudTakeAccount: 'Prendre celle du compte',
     hdAuto: 'Auto',
     hdOff: 'Non',
     controls: 'Touches et manette',
@@ -442,6 +458,21 @@ const TEXT: Record<Lang, Record<string, string>> = {
     shakeHint: 'If you think the vibrations are slowing down the game, disable this box.',
     volume: 'Volume',
     volumeHint: 'Turn up or down the volume with this option.',
+    cloud: 'Online save',
+    cloudHint:
+      'Find your progress and settings on your other devices. Only your Google account and your game data are kept, and nothing is shared.',
+    cloudOut: 'Not signed in',
+    cloudBusy: 'Syncing…',
+    cloudSynced: 'Synced at {time}',
+    cloudError: 'Failed, will try again later',
+    cloudPopup: 'Google’s window was blocked: allow it and try again',
+    cloudSignIn: 'Sign in with Google',
+    cloudSignOut: 'Sign out',
+    cloudDelete: 'Delete online save',
+    cloudDeleteSure: 'Press again to delete',
+    cloudChoose: 'This device has another account’s progress.',
+    cloudKeepDevice: 'Keep this device’s',
+    cloudTakeAccount: 'Take the account’s',
     hd: 'HD pictures',
     hdHint:
       'The scenery upscaled for big screens (TV). Auto: from your screen. The game reloads as you leave.',
@@ -600,6 +631,21 @@ const TEXT: Record<Lang, Record<string, string>> = {
       'Si te parece que las vibraciones en el juego entorpecen tu juego, desactiva esta casilla.',
     volume: 'Volumen del sonido',
     volumeHint: 'Puedes cambiar el volumen del sonido con esta opción.',
+    cloud: 'Guardado en línea',
+    cloudHint:
+      'Recupera tu progreso y tus ajustes en tus otros dispositivos. Solo se guardan tu cuenta de Google y tus datos de juego, y no se comparte nada.',
+    cloudOut: 'Sin conectar',
+    cloudBusy: 'Sincronizando…',
+    cloudSynced: 'Sincronizado a las {time}',
+    cloudError: 'Error, se reintentará más tarde',
+    cloudPopup: 'Ventana de Google bloqueada: permítela y vuelve a intentarlo',
+    cloudSignIn: 'Conectarse con Google',
+    cloudSignOut: 'Desconectarse',
+    cloudDelete: 'Borrar en línea',
+    cloudDeleteSure: 'Pulsa otra vez para borrar',
+    cloudChoose: 'Este dispositivo tiene el progreso de otra cuenta.',
+    cloudKeepDevice: 'Mantener el del dispositivo',
+    cloudTakeAccount: 'Tomar el de la cuenta',
     hd: 'Imágenes HD',
     hdHint:
       'Los decorados ampliados para pantallas grandes (tele). Auto: según tu pantalla. El juego se recarga al salir.',
@@ -845,6 +891,10 @@ export class Shell {
   onSettings?: (s: PlayerSettings) => void;
   /** A language chosen on the settings page. */
   onLang?: (lang: string) => void;
+  /** The optional cloud save, for the settings page's row (absent: no row). */
+  cloud: CloudSave | null = null;
+  /** `performance.now()` of the first press of "Delete online save". */
+  private deleteArmed = 0;
 
   constructor(lib: SwfLibrary, input: InputController, texts: ShellTexts, profile: Profile) {
     this.lib = lib;
@@ -1100,6 +1150,11 @@ export class Shell {
   refresh(): void {
     if (this.screen) this.render();
     else this.showLayout();
+  }
+
+  /** The cloud save's state changed: the settings page shows it. */
+  refreshCloud(): void {
+    if (this.visible && this.screen === 'settings') this.render();
   }
 
   /**
@@ -3127,6 +3182,7 @@ export class Shell {
           h('p', { class: 'set-hint', id: 'hd-h' }, t.hdHint),
         ),
       ),
+      this.cloudRow(),
       h(
         'div',
         { class: 'set-foot' },
@@ -3170,6 +3226,75 @@ export class Shell {
         ),
       ),
       h('p', { class: 'note center' }, t.settingsNote),
+    );
+  }
+
+  /**
+   * The cloud save's row (port addition, `src/cloud/CloudSave.ts`): its state and its buttons.
+   * None without a Firebase config.
+   */
+  private cloudRow(): HTMLElement | null {
+    const cloud = this.cloud;
+    if (!cloud?.available) return null;
+    // Google's popup must open in the press itself: Firebase loads with the page
+    if (!cloud.signedInNow) cloud.preload();
+    const t = this.t;
+    const s = cloud.state;
+    const btn = (key: string, label: string, action: () => void) =>
+      h(
+        'button',
+        {
+          type: 'button',
+          class: 'btn-ghost',
+          'data-nav': `cloud:${key}`,
+          disabled: s.kind === 'busy',
+          onclick: () => {
+            this.focusKey = `cloud:${key}`;
+            action();
+          },
+        },
+        label,
+      );
+    let status = cloud.email;
+    if (s.kind === 'busy') status = t.cloudBusy;
+    else if (s.kind === 'error')
+      status = s.code === 'auth/popup-blocked' ? t.cloudPopup : t.cloudError;
+    else if (s.kind === 'choose') status = t.cloudChoose;
+    else if (s.kind === 'synced') {
+      const time = new Date(s.at).toLocaleTimeString(this.lang, {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      status = `${cloud.email} · ${t.cloudSynced.replace('{time}', time)}`;
+    } else if (!cloud.signedInNow) status = t.cloudOut;
+    const sure = performance.now() - this.deleteArmed < 3000;
+    const buttons =
+      s.kind === 'choose'
+        ? [
+            btn('keep', t.cloudKeepDevice, () => void cloud.choose(true)),
+            btn('take', t.cloudTakeAccount, () => void cloud.choose(false)),
+          ]
+        : cloud.signedInNow
+          ? [
+              btn('out', t.cloudSignOut, () => void cloud.signOut()),
+              btn('delete', sure ? t.cloudDeleteSure : t.cloudDelete, () => {
+                if (performance.now() - this.deleteArmed < 3000) {
+                  this.deleteArmed = 0;
+                  void cloud.deleteCloudSave();
+                } else {
+                  this.deleteArmed = performance.now();
+                  this.render();
+                }
+              }),
+            ]
+          : [btn('in', t.cloudSignIn, () => void cloud.signIn())];
+    return h(
+      'div',
+      { class: 'inset set-row cloud-row' },
+      h('span', { class: 'set-label', id: 'cloud-l' }, t.cloud),
+      h('span', { class: 'cloud-status', role: 'status', 'aria-live': 'polite' }, status),
+      h('span', { class: 'cloud-btns' }, buttons),
+      h('p', { class: 'set-hint' }, t.cloudHint),
     );
   }
 
