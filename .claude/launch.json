@@ -20,7 +20,7 @@
         "vite",
         "preview",
         "--base",
-        "/HammerFenix/",
+        "/IgorsQuest/",
         "--port",
         "4174",
         "--strictPort"

@@ -1,19 +1,19 @@
-# HammerFenix 🔨❄️
+<h1 align="center"><img src="assets-src/logo/logo-line.webp" alt="Igor's Quest" width="640" /></h1>
 
 > A faithful, high-performance web recreation of Motion Twin's classic 2D platformer **Hammerfest** (2006), built with TypeScript, PixiJS v8, Vite, and Web Audio.
 
-[![CI](https://github.com/Greaple/HammerFenix/actions/workflows/ci.yml/badge.svg)](https://github.com/Greaple/HammerFenix/actions/workflows/ci.yml)
+[![CI](https://github.com/Greaple/IgorsQuest/actions/workflows/ci.yml/badge.svg)](https://github.com/Greaple/IgorsQuest/actions/workflows/ci.yml)
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
 
-**▶️ Play it in your browser: [greaple.github.io/HammerFenix](https://greaple.github.io/HammerFenix/)** (desktop, phone or controller; works offline once loaded)
+**▶️ Play it in your browser: [greaple.github.io/IgorsQuest](https://greaple.github.io/IgorsQuest/)** (desktop, phone or controller; works offline once loaded)
 
 ---
 
 ## 🌟 Overview
 
-**HammerFenix** revives the iconic Flash game **Hammerfest**, originally developed by the legendary French studio [Motion Twin](https://motion-twin.com/) in 2006.
+**Igor's Quest** revives the iconic Flash game **Hammerfest**, originally developed by the legendary French studio [Motion Twin](https://motion-twin.com/) in 2006.
 
-When Flash was deprecated, Motion Twin graciously open-sourced the original codebase and asset archives under the **CC BY-NC-SA 4.0** license. HammerFenix reconstructs the entire game engine from the ground up for modern browsers with:
+When Flash was deprecated, Motion Twin graciously open-sourced the original codebase and asset archives under the **CC BY-NC-SA 4.0** license. Igor's Quest reconstructs the entire game engine from the ground up for modern browsers with:
 
 - **100% Faithful Physics & Simulation**: Subpixel movement, one-way platforms, bomb kicking, bouncing, fruit monster AI, Tubby hurry-up mechanics, and 32 Hz fixed-timestep physics.
 - **782 Levels across 17 Level Sets**: Adventure, Basic Adventure, Deepnight, Ayame, Bumdum, Time Attack, Tutorial, Soccer, and more.
@@ -32,7 +32,7 @@ When Flash was deprecated, Motion Twin graciously open-sourced the original code
 - **Original Source & Assets**: [motion-twin/hammerfest](https://github.com/motion-twin/hammerfest).
 - **License**: Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
 - **Fonts**: [Libre Franklin](https://github.com/googlefonts/Libre-Franklin) and [Anton](https://github.com/googlefonts/AntonFont) (SIL Open Font License 1.1, license texts in `public/fonts/`) stand in for the commercial Franklin Gothic Heavy and Impact embedded in the original SWF.
-- **Support**: if you enjoy HammerFenix, you can support its developer on [Ko-fi](https://ko-fi.com/greaple). It is optional and unlocks nothing: the game stays free and whole for everyone.
+- **Support**: if you enjoy Igor's Quest, you can support its developer on [Ko-fi](https://ko-fi.com/greaple). It is optional and unlocks nothing: the game stays free and whole for everyone.
 - **Legal Notice**: This project is created strictly for non-commercial educational, preservation, and research purposes. All trademarks, characters, artwork, and audio remain the property of Motion Twin.
 
 ---
@@ -63,7 +63,7 @@ flowchart TD
         BuildData --> JSONData["public/data/ (levels, items, quests, lang)"]
     end
 
-    subgraph Engine["HammerFenix Engine"]
+    subgraph Engine["Igor's Quest Engine"]
         PixiApp["PixiJS v8 Application (420x520)"]
         SwfLib["SwfLibrary & ShapeRasterizer"]
         AudioEng["Web Audio Multi-Channel Engine"]
@@ -103,8 +103,8 @@ flowchart TD
 
 ```bash
 # Clone the repository
-git clone https://github.com/Greaple/HammerFenix.git
-cd HammerFenix
+git clone https://github.com/Greaple/IgorsQuest.git
+cd IgorsQuest
 
 # Install dependencies (use legacy-peer-deps for npm)
 npm install --legacy-peer-deps

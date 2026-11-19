@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS: Readonly<PlayerSettings> = {
 };
 
 /** `localStorage` key of the settings (the site kept them on the server); a new format gets a new key. */
-export const SETTINGS_KEY = 'hammerfenix_settings_v1';
+export const SETTINGS_KEY = 'igorsquest_settings_v1';
 
 /** The volume steps of the settings screen. */
 export const VOLUME_STEP = 10;

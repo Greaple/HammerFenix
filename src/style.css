@@ -111,7 +111,7 @@ body::before {
   height: 100dvh;
 }
 
-/* Floating header: the name on the left, round buttons on the right, no bar behind them */
+/* Floating header: the logo on the left, round buttons on the right, no bar behind them */
 .topbar {
   display: flex;
   flex-wrap: wrap;
@@ -131,15 +131,19 @@ body::before {
 }
 
 .logo {
-  font-family: var(--font-display);
-  font-size: clamp(1.3rem, 1.05rem + 1vw, 1.75rem);
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -0.01em;
-  color: #fff;
-  text-shadow:
-    0 2px 0 var(--sky-deep),
-    0 4px 14px rgba(10, 40, 90, 0.35);
+  /* The one-line logo's height (\`logo-line.webp\`, 1000 x 204) */
+  --logo-h: 30px;
+  margin: 0;
+  line-height: 0;
+}
+
+.logo-img {
+  display: block;
+  height: var(--logo-h);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
 }
 
 .credit {
@@ -776,7 +780,7 @@ html[data-input='gamepad'] .touch-controls {
   }
 
   html.touch .logo {
-    font-size: 1.05rem;
+    --logo-h: 22px;
   }
 
   html.touch .app-main {

@@ -1,3 +1,5 @@
+// First: the saves of the HammerFenix name move to their Igor's Quest keys before any read
+import './engine/StorageRename';
 import { Application, UPDATE_PRIORITY } from 'pixi.js';
 import { AudioEngine } from './engine/Audio';
 import { loadGameFonts } from './engine/Fonts';
@@ -289,14 +291,14 @@ async function main(): Promise<void> {
     session.fl_debug = on; // the original's dev keys
     if (devToggle) devToggle.checked = on;
     try {
-      localStorage.setItem('hammerfenix.dev', on ? '1' : '0');
+      localStorage.setItem('igorsquest.dev', on ? '1' : '0');
     } catch {
       // storage blocked: the choice lasts for this page only
     }
   };
   let devOn = new URLSearchParams(location.search).has('dev');
   try {
-    devOn ||= localStorage.getItem('hammerfenix.dev') === '1';
+    devOn ||= localStorage.getItem('igorsquest.dev') === '1';
   } catch {
     // ignore
   }
@@ -489,7 +491,7 @@ async function main(): Promise<void> {
       levelSetSelect.value = setName;
     }
     document.title = document.body.classList.contains('dev')
-      ? `Level ${lvl} (${setName}) — HammerFenix`
+      ? `Level ${lvl} (${setName}) — Igor’s Quest`
       : pageText(lang(), 'pageTitle');
   };
 

@@ -1,7 +1,7 @@
 {
-  "name": "HammerFenix — The Caverns of Hammerfest",
-  "short_name": "HammerFenix",
-  "description": "A faithful remake of the Flash platformer The Caverns of Hammerfest (Motion Twin, 2006).",
+  "name": "Igor’s Quest — The Caverns of Hammerfest",
+  "short_name": "Igor’s Quest",
+  "description": "Igor’s Quest, a faithful remake of the Flash platformer The Caverns of Hammerfest (Motion Twin, 2006).",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

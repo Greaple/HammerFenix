@@ -1,6 +1,7 @@
-# HammerFenix
+# Igor's Quest
 
 Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScript, PixiJS v8, Vite, Vitest.
+Named HammerFenix until 2026-11-19: the local folder and the git history keep that name, and `src/engine/StorageRename.ts` moves the players' old `hammerfenix_*` saves. The logos (one line in the top bar, two lines in the frame, the loading screen and the results) are in `assets-src/logo/`.
 
 **Plan and progress:** [docs/ROADMAP.md](docs/ROADMAP.md). Read its "Next up" section first.
 **What is ported, file by file:** [docs/PORT_STATUS.md](docs/PORT_STATUS.md). Read it only when you need a specific area.
@@ -11,7 +12,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - `npm install --legacy-peer-deps`
 - `npm run dev`: Vite dev server (`.claude/launch.json` config "vite")
 - `npm run build`, then launch config "preview": the production build, with the offline service worker (5.3). The dev server never registers it. To test offline, stop the server and reload.
-- Published at https://greaple.github.io/HammerFenix/: the `deploy` job of `.github/workflows/ci.yml` builds and deploys to GitHub Pages after the tests pass on every push to `main`. Launch config "pages" serves the build under `/HammerFenix/` as Pages does (after `npm run build`). A service worker left by an older local build on the same port can serve stale files: unregister it in the page if the build looks broken.
+- Published at https://greaple.github.io/IgorsQuest/: the `deploy` job of `.github/workflows/ci.yml` builds and deploys to GitHub Pages after the tests pass on every push to `main`. Launch config "pages" serves the build under `/IgorsQuest/` as Pages does (after `npm run build`). A service worker left by an older local build on the same port can serve stale files: unregister it in the page if the build looks broken.
 - `npm test`, `npm run typecheck`, `npm run format:check` (CI runs all three plus `npm run assets` and the build)
 - `npm run assets`: rebuild `public/data`, `public/gfx`, `public/fonts` (the SWF's fonts) and `public/images` from `assets-src/original`
 - `npm run orig`: write a greppable copy of the original source to `.cache/original/` (gitignored)
@@ -45,7 +46,7 @@ Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScri
 - Port faithfully: same names, logic and order as the original. Doc comment each class with its source, e.g. ``Port of `entity.item.SpecialItem` (`class/hammer/entity/item/SpecialItem.mt`)``.
 - No `Math.random` in `src/game`: use `game.rand.random(n)` for `Std.random(n)` and `game.rand.next()` for `Math.random()`, so seeded replays stay deterministic.
 - Never invent behavior. If the original is unclear, check the Ruffle side-by-side ("Flash" button) and note it. It can only start the Adventure (the original's `loader.swf` forces `$mode` to `solo`): compare the other modes by reading their code. Click it to start; its level field jumps with the original's own dev keys (Ctrl + three numpad digits, current dimension only). It runs in dev mode, with the dev item families.
-- Storage: there is no remote database or server. Anything that must persist (profile, quests, collection, options, scores) goes in the browser's `localStorage`, under a versioned `hammerfenix_*` key (e.g. `hammerfenix_save_v1` in `GameSession.ts`). Wrap every read and write in try/catch and fall back to defaults, as `loadSave()` does.
+- Storage: there is no remote database or server. Anything that must persist (profile, quests, collection, options, scores) goes in the browser's `localStorage`, under a versioned `igorsquest_*` key (e.g. `igorsquest_save_v1` in `GameSession.ts`). Wrap every read and write in try/catch and fall back to defaults, as `loadSave()` does.
 - Prettier: single quotes, width 100, trailing commas.
 
 ## Testing in the browser

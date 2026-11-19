@@ -6,7 +6,7 @@ import { offlineFiles, serviceWorker } from '../tools/vite-plugin-offline';
 
 describe('offline play (5.3)', () => {
   it('caches the build, without the Ruffle side-by-side, source maps or itself', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'hammerfenix-offline-'));
+    const dir = mkdtempSync(join(tmpdir(), 'igorsquest-offline-'));
     for (const f of [
       'index.html',
       'assets/index-abc.js',
@@ -24,7 +24,15 @@ describe('offline play (5.3)', () => {
   it('writes a service worker that is valid JavaScript and lists every file', () => {
     const src = serviceWorker('0123456789ab', ['index.html', 'gfx/library.json']);
     expect(() => new Function(src)).not.toThrow();
-    expect(src).toContain("const CACHE = 'hammerfenix-0123456789ab';");
+    expect(src).toContain("const CACHE = 'igorsquest-0123456789ab';");
+    // The caches of the builds named HammerFenix go too
+    const old = /\.filter\(\(k\) => (\/.*\/)\.test\(k\)/.exec(src)![1];
+    const prefix = new RegExp(old.slice(1, -1));
+    expect(['igorsquest-1', 'hammerfenix-1', 'other-1'].map((k) => prefix.test(k))).toEqual([
+      true,
+      true,
+      false,
+    ]);
     expect(src).toContain('["./","index.html","gfx/library.json"]');
     expect(src).toContain('ignoreVary: true');
   });
@@ -35,7 +43,7 @@ describe('offline play (5.3)', () => {
     expect(src).toContain('["./","gfx/bitmaps/b4.jpg"]');
     const onDemand = /(\/.*\/)\.test\(new URL\(req\.url\)\.pathname\)/.exec(src)![1];
     const re = new RegExp(onDemand.slice(1, -1));
-    expect(re.test('/HammerFenix/gfx/bitmaps-x4/b4.jpg')).toBe(true);
+    expect(re.test('/IgorsQuest/gfx/bitmaps-x4/b4.jpg')).toBe(true);
     expect(re.test('/gfx/bitmaps-x2/b4.a.png')).toBe(true);
     expect(re.test('/gfx/bitmaps/b4.jpg')).toBe(false);
   });

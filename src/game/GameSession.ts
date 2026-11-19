@@ -28,7 +28,7 @@ import { TimeAttackMulti } from './mode/TimeAttackMulti';
 import { Tutorial } from './mode/Tutorial';
 import type { GameMode } from './mode/GameMode';
 
-const SAVE_KEY = 'hammerfenix_save_v1';
+const SAVE_KEY = 'igorsquest_save_v1';
 
 export interface GameSaveData {
   highScore: number;

@@ -1,5 +1,5 @@
 /*
- * The site around the game frame (UI redesign, after the "HammerFenix UI Redesign" canvas):
+ * The site around the game frame (UI redesign, after the maintainer's "UI Redesign" canvas):
  * the port's parchment and wood, the game's fonts (`engine/Fonts.ts` registers them) and the
  * game's own drawings (`ui/site/ItemArt.ts`). Built by `ui/Shell.ts`; the page's layout follows
  * `body[data-page]`: home, page, intro or playing.
@@ -60,18 +60,9 @@
    Top bar
    ======================================================== */
 
-.logo {
-  font-family: var(--f-label);
-  font-weight: normal;
-  font-size: 22px;
-  letter-spacing: 0;
-  color: var(--gold);
-  text-shadow:
-    0 2px 0 var(--wood-dark),
-    2px 0 0 var(--wood-dark),
-    -2px 0 0 var(--wood-dark),
-    0 -2px 0 var(--wood-dark),
-    0 4px 0 rgba(var(--night), 0.35);
+/* Igor's Quest on one line (\`index.html\`), lifted off the sky as the boards are */
+.logo-img {
+  filter: drop-shadow(0 3px 0 rgba(var(--night), 0.35));
 }
 
 .credit {
@@ -2653,7 +2644,7 @@ html.touch .pager .btn-round {
 }
 
 .result:not(.is-over) {
-  padding-top: calc(var(--pic) * 110 / 300);
+  padding-top: calc(var(--pic) * 150 / 300);
 }
 
 .melted {
@@ -2666,11 +2657,12 @@ html.touch .pager .btn-round {
   z-index: 2;
 }
 
+/* Igor's Quest on two lines (\`logo-stacked.webp\`), its second line just over the board's edge */
 .result-logo {
   position: absolute;
   left: 50%;
-  top: calc(var(--pic) * -6 / 300);
-  width: calc(var(--pic) * 340 / 300);
+  top: calc(var(--pic) * -8 / 300);
+  width: calc(var(--pic) * 270 / 300);
   transform: translateX(-50%);
   filter: drop-shadow(0 6px 8px rgba(var(--night), 0.45));
   z-index: 2;
@@ -3798,6 +3790,10 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 
   .credit {
     display: none;
+  }
+
+  .logo {
+    --logo-h: 24px;
   }
 
   /* While playing: pause, the mode and the sound in the top bar */

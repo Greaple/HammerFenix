@@ -6,10 +6,10 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>HammerFenix — The Caverns of Hammerfest</title>
+    <title>Igor’s Quest — The Caverns of Hammerfest</title>
     <meta
       name="description"
-      content="Play The Caverns of Hammerfest (Motion Twin, 2006) in your browser: a faithful remake of the Flash platformer."
+      content="Igor’s Quest: play The Caverns of Hammerfest (Motion Twin, 2006) in your browser, a faithful remake of the Flash platformer."
     />
     <meta name="theme-color" content="#3a86d8" />
     <link rel="icon" href="./icons/favicon.ico" sizes="16x16" />
@@ -18,7 +18,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="HammerFenix" />
+    <meta name="apple-mobile-web-app-title" content="Igor’s Quest" />
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/site.css" />
   </head>
@@ -26,7 +26,15 @@
     <div id="app" class="app-container">
       <header class="topbar">
         <div class="brand">
-          <h1 class="logo">HammerFenix</h1>
+          <h1 class="logo">
+            <img
+              class="logo-img"
+              src="/images/logo-line.webp"
+              alt="Igor’s Quest"
+              width="1000"
+              height="204"
+            />
+          </h1>
           <p class="credit">
             <span data-i18n="credit">Hammerfest © Motion Twin</span> ·
             <button type="button" class="link-btn" id="footer-about-link">CC BY-NC-SA 4.0</button>
@@ -115,7 +123,7 @@
             <!-- A controller was plugged in or unplugged (main.ts) -->
             <div id="pad-notice" class="pad-notice" role="status" aria-live="polite"></div>
             <div id="loading" class="loading" role="status">
-              <img class="loading-logo" src="/images/mainTitle.webp" alt="" />
+              <img class="loading-logo" src="/images/logo-stacked.webp" alt="" />
               <p class="loading-text" data-i18n="loading">Travelling to Hammerfest…</p>
               <div class="loading-bar"><div id="loading-fill" class="loading-fill"></div></div>
               <button type="button" class="parchment-btn loading-retry" onclick="location.reload()">
@@ -346,12 +354,12 @@
               </li>
               <li>
                 <a
-                  href="https://github.com/Greaple/HammerFenix"
+                  href="https://github.com/Greaple/IgorsQuest"
                   target="_blank"
                   rel="noopener noreferrer"
                   data-i18n="linkPort"
                 >
-                  HammerFenix source code
+                  Igor’s Quest source code
                 </a>
               </li>
               <li>

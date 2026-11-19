@@ -16,7 +16,7 @@ export const INTRO_FPS = 40;
 export const INTRO_URL = '/try.html#play';
 
 /** `localStorage` key set once the intro played on the first launch. */
-const SEEN_KEY = 'hammerfenix_intro_v1';
+const SEEN_KEY = 'igorsquest_intro_v1';
 
 /**
  * Whether the intro should play on this launch (port addition, roadmap 3.5): once, for a new

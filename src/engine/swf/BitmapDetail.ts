@@ -16,7 +16,7 @@ export type BitmapScale = 1 | 2 | 4;
 /** The player's choice: a set, or the screen's (`auto`). */
 export type BitmapChoice = 'auto' | BitmapScale;
 
-const STORAGE_KEY = 'hammerfenix_hd_v1';
+const STORAGE_KEY = 'igorsquest_hd_v1';
 
 /** The set this page loaded, once `pickBitmapScale` ran. */
 let loaded: BitmapScale | null = null;

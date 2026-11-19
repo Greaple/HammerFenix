@@ -5,9 +5,9 @@
  * HTML pages around the game frame, as the original's were web pages around the game, in the
  * port's parchment and wood (`src/site.css`) with the game's own drawings: item clips drawn as
  * pictures (`site/ItemArt.ts`), the game's fonts (Satans titles, Franklin Gothic Heavy labels,
- * from `tools/build-fonts.ts`; the labels' font is a free look-alike), the title logo and the game over
- * picture. The frame keeps what the game draws: the village scene (`menu`, vector) and the
- * logo behind the home page, and the site's intro.
+ * from `tools/build-fonts.ts`; the labels' font is a free look-alike), the Igor’s Quest logo and the
+ * game over picture. The frame keeps what the game draws: the village scene (`menu`, vector)
+ * behind the home page with the logo over it, and the site's intro.
  *
  * Not a port: the original showed these as web pages (PORT_STATUS.md, "Site screens"). The
  * mode list and texts follow the site guide; the results show what the game sends the site;
@@ -23,10 +23,13 @@ import {
   BlurFilter,
   Container,
   Graphics,
+  ImageSource,
   Rectangle,
   type Renderer,
+  Sprite,
   Text,
   TextStyle,
+  Texture,
 } from 'pixi.js';
 import {
   BINDABLE_BUTTONS,
@@ -86,10 +89,14 @@ export interface ShellTexts {
 }
 
 /**
- * The game's title logo, the one image not in the SWFs: `mainTitle.png` of the original
- * (420 x 180) upscaled to 2000 x 857 by the maintainer (`assets-src/upscaled/`).
+ * The Igor’s Quest logo on two lines (888 x 644, transparent), given by the maintainer
+ * (`assets-src/logo/`): over the village in the frame of the home page, over the results
+ * page and on the loading screen (`index.html`). The top bar has the one-line logo.
  */
-export const TITLE_FILE = 'images/mainTitle.webp';
+export const LOGO_FILE = 'images/logo-stacked.webp';
+/** The logo's width in the frame (of 420), and the height of its middle (of 520). */
+const LOGO_W = 300;
+const LOGO_Y = 262;
 
 /**
  * The game over picture of the results page (a melted Igor), the site's `.artResult`: never
@@ -207,7 +214,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     lostRun: 'Partie perdue : pas de temps',
     start: 'Commencer',
     soon: 'Bientôt',
-    soonNote: 'Ce mode n’est pas encore disponible dans HammerFenix.',
+    soonNote: 'Ce mode n’est pas encore disponible dans Igor’s Quest.',
     gameOver: 'Partie terminée',
     endGame: 'Fin de l’aventure !',
     collected: 'Objets trouvés',
@@ -365,7 +372,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     lostRun: 'Game lost: no time',
     start: 'Start game',
     soon: 'Soon',
-    soonNote: 'This mode is not in HammerFenix yet.',
+    soonNote: 'This mode is not in Igor’s Quest yet.',
     gameOver: 'Game over',
     endGame: 'End of the adventure!',
     collected: 'Items found',
@@ -522,7 +529,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     lostRun: 'Partida perdida: sin tiempo',
     start: 'Comenzar',
     soon: 'Pronto',
-    soonNote: 'Este modo aún no está en HammerFenix.',
+    soonNote: 'Este modo aún no está en Igor’s Quest.',
     gameOver: 'Fin de la partida',
     endGame: '¡Fin de la aventura!',
     collected: 'Objetos encontrados',
@@ -744,7 +751,7 @@ interface SiteDom {
 }
 
 /**
- * The site around the game frame (UI redesign, after the "HammerFenix UI Redesign" canvas):
+ * The site around the game frame (UI redesign, after the maintainer's "UI Redesign" canvas):
  * the home page (the modes beside the frame, the notebook on the other side), and the quest,
  * fridge, settings, controls and results pages, as HTML in the parchment and wood of the port.
  * The frame keeps what the game draws: the village behind the home page and the site's intro.
@@ -793,6 +800,8 @@ export class Shell {
   private hintShown = false;
   /** The village behind the home page, and its blur while it fades into the game. */
   private bgLayer: Container | null = null;
+  /** The logo over the village (`LOGO_FILE`), once loaded. */
+  private logo: Texture | null = null;
   private fadeBlur: BlurFilter | null = null;
   /** The give up button was pressed once (`performance.now()`): a second press gives up. */
   private quitArmed = 0;
@@ -844,9 +853,10 @@ export class Shell {
     this.introLayer.on('pointerdown', () => this.intro?.click());
   }
 
-  /** Where the site's pictures are (the results' logo and game over picture). */
+  /** Where the site's pictures are (the logo and the game over picture); loads the logo. */
   async load(baseUrl: string): Promise<void> {
     this.baseUrl = baseUrl;
+    this.logo = await loadTexture(`${baseUrl}${LOGO_FILE}`);
   }
 
   /**
@@ -1558,9 +1568,10 @@ export class Shell {
       this.root.addChild(this.introLayer);
       this.actionButton(this.t.introSkip, BUTTON_Y, () => this.endIntro());
     } else {
-      // The village: the home page's frame, and behind the pages inside the frame (`framed`).
-      // No title over it: the site's logo is in the top bar
+      // The village: the home page's frame, with the logo over it, and behind the pages
+      // inside the frame (`framed`), which take the room the logo would have
       this.drawBackground();
+      if (this.screen === 'menu' && !this.compact) this.drawLogo();
     }
     this.renderPage();
   }
@@ -1587,6 +1598,16 @@ export class Shell {
     layer.cacheAsTexture({ resolution: 1.5 });
     this.root.addChild(layer);
     this.bgLayer = layer;
+  }
+
+  /** The logo in the middle of the frame, over the village's sky (fades out with it). */
+  private drawLogo(): void {
+    if (!this.logo) return;
+    const s = new Sprite(this.logo);
+    s.scale.set(LOGO_W / this.logo.width);
+    s.anchor.set(0.5);
+    s.position.set(W / 2, LOGO_Y);
+    this.root.addChild(s);
   }
 
   private text(
@@ -3439,8 +3460,8 @@ export class Shell {
         ? h('img', { class: 'melted', src: `${this.baseUrl}${GAME_OVER_FILE}`, alt: t.gameOver })
         : h('img', {
             class: 'result-logo',
-            src: `${this.baseUrl}${TITLE_FILE}`,
-            alt: 'Hammerfest',
+            src: `${this.baseUrl}${LOGO_FILE}`,
+            alt: 'Igor’s Quest',
           }),
       h(
         'section',
@@ -3528,8 +3549,8 @@ export class Shell {
         ? h('img', { class: 'melted', src: `${this.baseUrl}${GAME_OVER_FILE}`, alt: t.gameOver })
         : h('img', {
             class: 'result-logo',
-            src: `${this.baseUrl}${TITLE_FILE}`,
-            alt: 'Hammerfest',
+            src: `${this.baseUrl}${LOGO_FILE}`,
+            alt: 'Igor’s Quest',
           }),
       h(
         'section',
@@ -3578,4 +3599,21 @@ export function formatRunTime(ms: number): string {
 /** Scores with dot thousands, as the site wrote them: `8.684.323`. */
 function formatScore(n: number): string {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
+ * An image as a mipmapped texture (it shows smaller than its size), or null if it fails.
+ * Waits for `load`, not `img.decode()`: in a hidden tab Chrome can fail or never settle a
+ * decode, and the page then stayed on the loading screen.
+ */
+async function loadTexture(url: string): Promise<Texture | null> {
+  if (typeof Image === 'undefined') return null;
+  const img = new Image();
+  const loaded = new Promise<boolean>((resolve) => {
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+  });
+  img.src = url;
+  if (!(await loaded)) return null;
+  return new Texture({ source: new ImageSource({ resource: img, autoGenerateMipmaps: true }) });
 }

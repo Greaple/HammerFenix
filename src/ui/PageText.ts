@@ -15,7 +15,7 @@ type PageTexts = Record<string, string>;
 
 const TEXT: Record<Lang, PageTexts> = {
   fr: {
-    pageTitle: 'HammerFenix — Les Cavernes de Hammerfest',
+    pageTitle: 'Igor’s Quest — Les Cavernes de Hammerfest',
     loading: 'Voyage vers Hammerfest…',
     loadError: 'Le voyage a échoué : le jeu n’a pas pu se charger.',
     retry: 'Réessayer',
@@ -53,9 +53,9 @@ const TEXT: Record<Lang, PageTexts> = {
     padLostPaused: 'Manette débranchée : partie en pause',
     creditsTitle: 'Crédits',
     credits:
-      '<strong>Hammerfest</strong> a été créé par <strong>Motion Twin</strong> en 2006. Son code source et ses graphismes ont été publiés sous licence CC BY-NC-SA 4.0. HammerFenix est un remake indépendant et non commercial, pour préserver le jeu ; les graphismes, sons et niveaux restent ceux de Motion Twin.',
+      '<strong>Hammerfest</strong> a été créé par <strong>Motion Twin</strong> en 2006. Son code source et ses graphismes ont été publiés sous licence CC BY-NC-SA 4.0. Igor’s Quest est un remake indépendant et non commercial, pour préserver le jeu ; les graphismes, sons et niveaux restent ceux de Motion Twin.',
     linkOriginal: 'Code source original (Motion Twin)',
-    linkPort: 'Code source de HammerFenix',
+    linkPort: 'Code source d’Igor’s Quest',
     linkKofi: 'Soutenir le développeur sur Ko-fi (facultatif, rien à débloquer)',
     linkLicense: 'Licence CC BY-NC-SA 4.0',
     padIcons: 'Icônes de manettes, de Figma Community (CC BY 4.0) :',
@@ -82,7 +82,7 @@ const TEXT: Record<Lang, PageTexts> = {
     ok: 'Compris !',
   },
   en: {
-    pageTitle: 'HammerFenix — The Caverns of Hammerfest',
+    pageTitle: 'Igor’s Quest — The Caverns of Hammerfest',
     loading: 'Travelling to Hammerfest…',
     loadError: 'The journey failed: the game could not load.',
     retry: 'Try again',
@@ -120,9 +120,9 @@ const TEXT: Record<Lang, PageTexts> = {
     padLostPaused: 'Controller unplugged: game paused',
     creditsTitle: 'Credits',
     credits:
-      '<strong>Hammerfest</strong> was made by <strong>Motion Twin</strong> in 2006. Its source code and graphics were released under the CC BY-NC-SA 4.0 license. HammerFenix is an independent, non-commercial remake to preserve the game; the graphics, sounds and levels are still Motion Twin’s.',
+      '<strong>Hammerfest</strong> was made by <strong>Motion Twin</strong> in 2006. Its source code and graphics were released under the CC BY-NC-SA 4.0 license. Igor’s Quest is an independent, non-commercial remake to preserve the game; the graphics, sounds and levels are still Motion Twin’s.',
     linkOriginal: 'Original source code (Motion Twin)',
-    linkPort: 'HammerFenix source code',
+    linkPort: 'Igor’s Quest source code',
     linkKofi: 'Support the developer on Ko-fi (optional, nothing to unlock)',
     linkLicense: 'CC BY-NC-SA 4.0 license',
     padIcons: 'Controller icons, from Figma Community (CC BY 4.0):',
@@ -148,7 +148,7 @@ const TEXT: Record<Lang, PageTexts> = {
     ok: 'Got it!',
   },
   es: {
-    pageTitle: 'HammerFenix — Las Cavernas de Hammerfest',
+    pageTitle: 'Igor’s Quest — Las Cavernas de Hammerfest',
     loading: 'Viajando a Hammerfest…',
     loadError: 'El viaje ha fallado: el juego no se ha podido cargar.',
     retry: 'Reintentar',
@@ -186,9 +186,9 @@ const TEXT: Record<Lang, PageTexts> = {
     padLostPaused: 'Mando desconectado: partida en pausa',
     creditsTitle: 'Créditos',
     credits:
-      '<strong>Hammerfest</strong> fue creado por <strong>Motion Twin</strong> en 2006. Su código fuente y sus gráficos se publicaron con la licencia CC BY-NC-SA 4.0. HammerFenix es un remake independiente y sin ánimo de lucro para preservar el juego; los gráficos, sonidos y niveles siguen siendo de Motion Twin.',
+      '<strong>Hammerfest</strong> fue creado por <strong>Motion Twin</strong> en 2006. Su código fuente y sus gráficos se publicaron con la licencia CC BY-NC-SA 4.0. Igor’s Quest es un remake independiente y sin ánimo de lucro para preservar el juego; los gráficos, sonidos y niveles siguen siendo de Motion Twin.',
     linkOriginal: 'Código fuente original (Motion Twin)',
-    linkPort: 'Código fuente de HammerFenix',
+    linkPort: 'Código fuente de Igor’s Quest',
     linkKofi: 'Apoyar al desarrollador en Ko-fi (opcional, no desbloquea nada)',
     linkLicense: 'Licencia CC BY-NC-SA 4.0',
     padIcons: 'Iconos de mandos, de Figma Community (CC BY 4.0):',

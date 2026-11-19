@@ -4,7 +4,7 @@ import type { GameResult } from './Loader';
 import { newProfile, type ProfileData, type QuestEngine, START_MODES } from './Quests';
 
 /** `localStorage` key of the profile; a new format gets a new key. */
-export const PROFILE_KEY = 'hammerfenix_profile_v1';
+export const PROFILE_KEY = 'igorsquest_profile_v1';
 
 /** What one game added to the profile, for the results screen. */
 export interface GameRecord {

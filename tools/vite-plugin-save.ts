@@ -10,7 +10,7 @@ import type { Plugin } from 'vite';
 export function saveEndpoint(): Plugin {
   const dir = join(import.meta.dirname, '../.cache/level-sheets');
   return {
-    name: 'hammerfenix-save',
+    name: 'igorsquest-save',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use('/__save', (req, res) => {

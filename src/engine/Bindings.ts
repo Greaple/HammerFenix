@@ -22,7 +22,7 @@ export interface Bindings {
 }
 
 /** `localStorage` key of the bindings; a new format gets a new key. */
-export const BINDINGS_KEY = 'hammerfenix_controls_v1';
+export const BINDINGS_KEY = 'igorsquest_controls_v1';
 
 const code = (letter: string) => letter.charCodeAt(0);
 
