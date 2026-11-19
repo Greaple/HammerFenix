@@ -8,6 +8,8 @@
  * side-by-side (`original-swf/`, a dev tool that also needs Ruffle from the network) and the
  * source maps. The HD bitmaps (`gfx/bitmaps-x2/`, `-x4/`, for big screens) are not fetched at
  * install: a screen loads one set at most, so each file is kept when the game first fetches it.
+ * Firebase (`assets/firebase-*.js`, the online save's, `vite.config.ts`) is kept the same way:
+ * only players who open the settings page or sign in load it.
  */
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -16,7 +18,7 @@ import type { Plugin } from 'vite';
 
 const SKIP = [/^original-swf\//, /\.map$/, /^sw\.js$/];
 /** Cached when first fetched, not at install (still in the version hash). */
-const ON_DEMAND = /^gfx\/bitmaps-x\d+\//;
+const ON_DEMAND = /^(gfx\/bitmaps-x\d+\/|assets\/firebase-)/;
 
 function walk(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -78,7 +80,7 @@ self.addEventListener('fetch', (event) => {
           : await cache.match(req, { ignoreSearch: true, ignoreVary: true });
       if (hit) return hit;
       const res = await fetch(req);
-      if (res.ok && /\\/gfx\\/bitmaps-x\\d+\\//.test(new URL(req.url).pathname)) {
+      if (res.ok && /\\/(gfx\\/bitmaps-x\\d+\\/|assets\\/firebase-)/.test(new URL(req.url).pathname)) {
         await cache.put(req, res.clone());
       }
       return res;

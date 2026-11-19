@@ -39,6 +39,7 @@ Named HammerFenix until 2026-11-19: the local folder and the git history keep th
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
 - `src/game/Data.ts`: port of `Data.mt`. Values must match the original exactly.
 - `src/game/Quests.ts`, `Profile.ts`: the hammerfest.fr server's quests and the player profile (not a port; rules and guesses in PORT_STATUS.md "Quests and profile")
+- `src/cloud/`: the optional online save (Google sign-in, Firestore; PORT_STATUS.md "Online save (5.7)")
 - `src/ui/`: the site screens (`Shell.ts`: home, results, quests, fridge, settings, as HTML pages around the frame, or inside it on small screens (`framed`); `site/ItemArt.ts` draws the game's clips as pictures for them, `src/site.css` styles them) and the site's intro (`Intro.ts`, `public/gfx/intro.json`, in the frame), debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
 
 ## Conventions
@@ -46,12 +47,12 @@ Named HammerFenix until 2026-11-19: the local folder and the git history keep th
 - Port faithfully: same names, logic and order as the original. Doc comment each class with its source, e.g. ``Port of `entity.item.SpecialItem` (`class/hammer/entity/item/SpecialItem.mt`)``.
 - No `Math.random` in `src/game`: use `game.rand.random(n)` for `Std.random(n)` and `game.rand.next()` for `Math.random()`, so seeded replays stay deterministic.
 - Never invent behavior. If the original is unclear, check the Ruffle side-by-side ("Flash" button) and note it. It can only start the Adventure (the original's `loader.swf` forces `$mode` to `solo`): compare the other modes by reading their code. Click it to start; its level field jumps with the original's own dev keys (Ctrl + three numpad digits, current dimension only). It runs in dev mode, with the dev item families.
-- Storage: there is no remote database or server. Anything that must persist (profile, quests, collection, options, scores) goes in the browser's `localStorage`, under a versioned `igorsquest_*` key (e.g. `igorsquest_save_v1` in `GameSession.ts`). Wrap every read and write in try/catch and fall back to defaults, as `loadSave()` does.
+- Storage: anything that must persist (profile, quests, collection, options, scores) goes in the browser's `localStorage`, under a versioned `igorsquest_*` key (e.g. `igorsquest_save_v1` in `GameSession.ts`). Wrap every read and write in try/catch and fall back to defaults, as `loadSave()` does. The only server is the optional online save (`src/cloud/`, Firebase project `igor-s-quest`): it copies those keys to Firestore `saves/{uid}` for a player signed in with Google, and merges them with their other devices'. A new key that should follow the player needs a place in `CloudSnapshot`, `merge.ts`, `CloudDoc.ts` and `firestore.rules`. Deploy the rules with `npx firebase-tools deploy --only firestore` (or the Firebase MCP tools).
 - Prettier: single quotes, width 100, trailing commas.
 
 ## Testing in the browser
 
-- Debug handles: `window.gameSession`, `window.gameLib`, `window.debugToolkit`. The current game is `window.gameSession.game` (e.g. `s.game.world.currentId`, `s.game.player`, `s.game.getBads()`); it is a new object after each new game, so read it again rather than keeping it.
+- Debug handles: `window.gameSession`, `window.gameLib`, `window.debugToolkit`, `window.cloudSave`. The current game is `window.gameSession.game` (e.g. `s.game.world.currentId`, `s.game.player`, `s.game.getBads()`); it is a new object after each new game, so read it again rather than keeping it.
 - A hidden browser pane throttles `requestAnimationFrame`, so real-time play is unreliable. Drive the game deterministically:
   `s = window.gameSession; s.gameLoop.stop(); s.gameLoop.stepSingleFrame()` (one logic tick), and send keys with `window.dispatchEvent(new KeyboardEvent('keydown', {key: ' ', code: 'Space'}))`.
 - Level 0 (village): bombing the bucket at tile (11,19) is the original's secret warp to level 10. It is not a bug.

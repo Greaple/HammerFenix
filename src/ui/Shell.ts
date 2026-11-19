@@ -3233,6 +3233,8 @@ export class Shell {
   private cloudRow(): HTMLElement | null {
     const cloud = this.cloud;
     if (!cloud?.available) return null;
+    // Google's popup must open in the press itself: Firebase loads with the page
+    if (!cloud.signedInNow) cloud.preload();
     const t = this.t;
     const s = cloud.state;
     const btn = (key: string, label: string, action: () => void) =>

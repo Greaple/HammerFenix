@@ -346,7 +346,7 @@ export class GameSession {
   /** Reads the save again after the cloud save changed it (`src/cloud/CloudSave.ts`). */
   reloadSave(): void {
     this.savedData = this.loadSave();
-    this.highScore = Math.max(this.highScore, this.savedData.highScore);
+    this.highScore = this.savedData.highScore;
   }
 
   private loadSave(): GameSaveData {

@@ -57,8 +57,8 @@ const CHECK_EVERY = 15000;
 /**
  * The optional cloud save (not a port: the hammerfest.fr server kept the player's data). The
  * saves stay in `localStorage`; a player signed in with Google also has them in Firestore,
- * `saves/{uid}`, merged with the other devices' (`merge.ts`). Firebase loads only once the player
- * signs in, or at launch for a player who was signed in.
+ * `saves/{uid}`, merged with the other devices' (`merge.ts`). Firebase loads only with the settings
+ * page (its sign-in button), or at launch for a player who was signed in.
  */
 export class CloudSave {
   state: CloudState;
@@ -75,6 +75,12 @@ export class CloudSave {
   private readonly lang: () => string;
   private meta: CloudMeta;
   private sdk: Promise<Sdk> | null = null;
+  /** Firebase once loaded, so a press can open Google's popup at once. */
+  private ready: Sdk | null = null;
+  /** The sync under way. */
+  private running: Promise<void> | null = null;
+  /** Set while the account is being deleted: no sync may write the save again. */
+  private deleting = false;
   private user: User | null = null;
   private dirty = false;
   private syncing = false;
@@ -118,19 +124,27 @@ export class CloudSave {
       .catch((e) => this.fail(e));
   }
 
+  /** Loads Firebase ahead of a press (the settings page shows the sign-in button). */
+  preload(): void {
+    if (this.available && !this.sdk) this.load().catch(() => {});
+  }
+
   async signIn(): Promise<void> {
-    if (!this.available || this.syncing) return;
+    if (!this.available || this.syncing || this.user) return;
+    const popup = this.popup((s) =>
+      s.authLib.signInWithPopup(s.auth, new s.authLib.GoogleAuthProvider()),
+    );
     this.setState({ kind: 'busy' });
     try {
-      const { auth, authLib } = await this.load();
-      const { user } = await authLib.signInWithPopup(auth, new authLib.GoogleAuthProvider());
-      this.signedIn(user);
-      const local = this.readLocal();
-      if (
-        this.meta.lastUid &&
+      const { user } = await popup;
+      // Another account's progress on this device: the player chooses before anything merges,
+      // and the account is remembered only then
+      const other =
+        this.meta.lastUid !== null &&
         this.meta.lastUid !== user.uid &&
-        !isNewProfile(local.snap.profile)
-      ) {
+        !isNewProfile(this.readLocal().snap.profile);
+      this.signedIn(user, !other);
+      if (other) {
         this.setState({ kind: 'choose' });
         return;
       }
@@ -147,12 +161,13 @@ export class CloudSave {
    * otherwise this device takes the account's save (a new profile if it has none).
    */
   async choose(keepDevice: boolean): Promise<void> {
-    if (this.state.kind !== 'choose' || !this.user) return;
+    const user = this.user;
+    if (this.state.kind !== 'choose' || !user) return;
+    this.setState({ kind: 'busy' });
     if (!keepDevice) {
-      this.setState({ kind: 'busy' });
       try {
         const { db, fs } = await this.load();
-        const got = await fs.getDoc(fs.doc(db, 'saves', this.user.uid));
+        const got = await fs.getDoc(fs.doc(db, 'saves', user.uid));
         const before = this.readLocal();
         const remote = got.exists() ? fromCloudDoc(got.data(), this.lang()) : null;
         const fresh: CloudSnapshot = {
@@ -166,11 +181,12 @@ export class CloudSave {
         return;
       }
     }
+    this.saveMeta({ uid: user.uid });
     await this.sync();
   }
 
   async signOut(): Promise<void> {
-    if (!this.sdk) return;
+    if (!this.sdk || this.deleting) return;
     const { auth } = await this.load();
     await auth.signOut().catch(() => {});
     this.signedOut();
@@ -179,22 +195,29 @@ export class CloudSave {
   /** Deletes the cloud save and the account, and signs out. This device keeps its saves. */
   async deleteCloudSave(): Promise<void> {
     const user = this.user;
-    if (!user) return;
+    if (!user || this.deleting) return;
+    // Deleting an account needs a recent sign-in: Google asks again, in the press itself
+    const reauth = this.popup((s) =>
+      s.authLib.reauthenticateWithPopup(user, new s.authLib.GoogleAuthProvider()),
+    );
+    this.deleting = true;
+    this.stopTimers();
     this.setState({ kind: 'busy' });
     try {
+      await reauth;
+      await this.running;
       const { db, fs, authLib } = await this.load();
       await fs.deleteDoc(fs.doc(db, 'saves', user.uid));
-      try {
-        await authLib.deleteUser(user);
-      } catch (e) {
-        if (code(e) !== 'auth/requires-recent-login') throw e;
-        await authLib.reauthenticateWithPopup(user, new authLib.GoogleAuthProvider());
-        await authLib.deleteUser(user);
-      }
+      await authLib.deleteUser(user);
       this.saveMeta({ lastUid: null });
       this.signedOut();
     } catch (e) {
-      this.fail(e);
+      this.startTimers();
+      if (code(e) === 'auth/popup-closed-by-user' || code(e) === 'auth/cancelled-popup-request') {
+        this.setState({ kind: 'synced', at: this.meta.lastSync });
+      } else this.fail(e);
+    } finally {
+      this.deleting = false;
     }
   }
 
@@ -216,20 +239,25 @@ export class CloudSave {
   }
 
   /** Merges this device's saves with the cloud's, and keeps the result on both. */
-  async sync(): Promise<void> {
+  sync(): Promise<void> {
     const user = this.user;
-    if (!user || this.state.kind === 'choose') return;
+    if (!user || this.deleting || this.state.kind === 'choose') return Promise.resolve();
     if (this.syncing) {
       this.again = true;
-      return;
+      return Promise.resolve();
     }
     if (this.isBusy()) {
       this.dirty = true;
-      return;
+      return Promise.resolve();
     }
     this.syncing = true;
     this.dirty = false;
     this.setState({ kind: 'busy' });
+    this.running = this.runSync(user).finally(() => (this.running = null));
+    return this.running;
+  }
+
+  private async runSync(user: User): Promise<void> {
     try {
       const { db, fs } = await this.load();
       const before = this.readLocal();
@@ -240,12 +268,12 @@ export class CloudSave {
         const got = await tx.get(ref);
         const remote = got.exists() ? fromCloudDoc(got.data(), this.lang()) : null;
         const m = mergeSnapshots(before.snap, remote, this.quests);
-        tx.set(ref, toCloudDoc(m, fs.serverTimestamp()));
+        if (!remote || !sameSnapshot(m, remote)) tx.set(ref, toCloudDoc(m, fs.serverTimestamp()));
         return m;
       });
       // The cloud has the merge; this device takes it unless its saves changed meanwhile
-      if (this.readLocal().raw === before.raw && !this.isBusy()) this.apply(before.snap, merged);
-      else this.dirty = true;
+      if (this.readLocal().raw !== before.raw || this.isBusy()) this.dirty = true;
+      else if (!sameSnapshot(merged, before.snap)) this.apply(before.snap, merged);
       this.lastRaw = this.readLocal().raw;
       this.saveMeta({ lastUid: user.uid, lastSync: Date.now() });
       this.setState({ kind: 'synced', at: this.meta.lastSync });
@@ -295,7 +323,6 @@ export class CloudSave {
 
   /** Writes a sync's result to this device, through the same savers the game uses. */
   private apply(before: CloudSnapshot, after: CloudSnapshot): void {
-    if (before === after) return;
     try {
       localStorage.setItem(PROFILE_KEY, encodeProfile(after.profile));
       let stored: Record<string, unknown> = {};
@@ -333,10 +360,23 @@ export class CloudSave {
 
   // ------------------------------------------------------------------ Account
 
-  private signedIn(user: User): void {
+  /** `remember`: kept for the next launch (not before the player chose whose progress to keep). */
+  private signedIn(user: User, remember = true): void {
     this.user = user;
     this.email = user.email ?? '';
-    this.saveMeta({ uid: user.uid });
+    if (remember) this.saveMeta({ uid: user.uid });
+    this.startTimers();
+  }
+
+  private signedOut(): void {
+    this.user = null;
+    this.email = '';
+    this.stopTimers();
+    this.saveMeta({ uid: null });
+    this.setState({ kind: 'signedOut' });
+  }
+
+  private startTimers(): void {
     this.checkTimer ??= setInterval(() => {
       if (this.syncing) return;
       this.checkLocal();
@@ -344,14 +384,18 @@ export class CloudSave {
     }, CHECK_EVERY);
   }
 
-  private signedOut(): void {
-    this.user = null;
-    this.email = '';
+  private stopTimers(): void {
     if (this.checkTimer) clearInterval(this.checkTimer);
     if (this.pushTimer) clearTimeout(this.pushTimer);
     this.checkTimer = this.pushTimer = null;
-    this.saveMeta({ uid: null });
-    this.setState({ kind: 'signedOut' });
+  }
+
+  /**
+   * Opens one of Google's popups. With Firebase loaded it opens in the press itself; Safari
+   * blocks a popup opened after a wait.
+   */
+  private popup<T>(open: (s: Sdk) => Promise<T>): Promise<T> {
+    return this.ready ? open(this.ready) : this.load().then(open);
   }
 
   private fail(e: unknown): void {
@@ -380,7 +424,8 @@ export class CloudSave {
           isTokenAutoRefreshEnabled: true,
         });
       }
-      return { app, auth: authLib.getAuth(app), db: fs.getFirestore(app), authLib, fs };
+      this.ready = { app, auth: authLib.getAuth(app), db: fs.getFirestore(app), authLib, fs };
+      return this.ready;
     })();
     this.sdk.catch(() => (this.sdk = null));
     return this.sdk;
@@ -411,6 +456,11 @@ export class CloudSave {
       // storage blocked: this page only
     }
   }
+}
+
+/** Two snapshots that make the same cloud document. */
+function sameSnapshot(a: CloudSnapshot, b: CloudSnapshot): boolean {
+  return JSON.stringify(toCloudDoc(a, 0)) === JSON.stringify(toCloudDoc(b, 0));
 }
 
 function code(e: unknown): string {
