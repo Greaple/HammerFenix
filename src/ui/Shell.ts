@@ -90,8 +90,8 @@ export interface ShellTexts {
 
 /**
  * The Igor’s Quest logo on two lines (888 x 644, transparent), given by the maintainer
- * (`assets-src/logo/`): over the village in the frame of the home page, over the results
- * page and on the loading screen (`index.html`). The top bar has the one-line logo.
+ * (`assets-src/logo/`): over the village in the frame of the home page and over the results
+ * page. The top bar and the loading screen (`index.html`) have the one-line logo.
  */
 export const LOGO_FILE = 'images/logo-stacked.webp';
 /** The logo's width in the frame (of 420), and the height of its middle (of 520). */

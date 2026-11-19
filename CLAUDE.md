@@ -1,7 +1,7 @@
 # Igor's Quest
 
 Web remake of Hammerfest (Motion Twin, 2006). Goal: near-perfect clone. TypeScript, PixiJS v8, Vite, Vitest.
-Named HammerFenix until 2026-11-19: the local folder and the git history keep that name, and `src/engine/StorageRename.ts` moves the players' old `hammerfenix_*` saves. The logos (one line in the top bar, two lines in the frame, the loading screen and the results) are in `assets-src/logo/`.
+Named HammerFenix until 2026-11-19: the local folder and the git history keep that name, and `src/engine/StorageRename.ts` moves the players' old `hammerfenix_*` saves. The logos (one line in the top bar and on the loading screen, over Igor's animation that plays once; two lines in the frame and over the results) are in `assets-src/logo/`.
 
 **Plan and progress:** [docs/ROADMAP.md](docs/ROADMAP.md). Read its "Next up" section first.
 **What is ported, file by file:** [docs/PORT_STATUS.md](docs/PORT_STATUS.md). Read it only when you need a specific area.

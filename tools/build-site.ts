@@ -1,8 +1,8 @@
 /**
  * Copies the images that are not in the SWFs. The site (`index.html`, `src/ui/Shell.ts`) shows
  * the Igor’s Quest logo, given by the maintainer and kept in `assets-src/logo/` (transparent,
- * cropped to the letters): on one line in the top bar, on two lines in the frame, on the
- * loading screen and over the results. The screens draw everything else from the SWFs (UI batch
+ * cropped to the letters): on one line in the top bar and on the loading screen (over Igor's
+ * animation), on two lines in the frame and over the results. The screens draw everything else from the SWFs (UI batch
  * U.2), and the page around the frame has its own picture (`public/scenery/`).
  *
  * Also the HD bitmaps (port addition, for big screens): every file of `public/gfx/bitmaps/`
@@ -17,7 +17,7 @@ const FILES: [string, string][] = [
   // The logo on one line (1000 x 204) and on two (888 x 644)
   ['assets-src/logo/logo-line.webp', 'public/images/logo-line.webp'],
   ['assets-src/logo/logo-stacked.webp', 'public/images/logo-stacked.webp'],
-  // The loading screen's animation under the one-line logo (test, 2026-11-19): the maintainer's
+  // The loading screen's animation under the one-line logo (2026-11-19): the maintainer's
   // "Igor animation.gif" (1280 x 720, 62 frames at 25 fps) as a lossy WebP that plays once
   ['assets-src/logo/loading-anim.webp', 'public/images/loading-anim.webp'],
   // The results page's game over picture (`.artResult`), never archived: given by the maintainer
