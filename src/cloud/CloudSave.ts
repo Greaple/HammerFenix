@@ -182,6 +182,7 @@ export class CloudSave {
       }
     }
     this.saveMeta({ uid: user.uid });
+    this.startTimers();
     await this.sync();
   }
 
@@ -241,7 +242,10 @@ export class CloudSave {
   /** Merges this device's saves with the cloud's, and keeps the result on both. */
   sync(): Promise<void> {
     const user = this.user;
-    if (!user || this.deleting || this.state.kind === 'choose') return Promise.resolve();
+    // Only a confirmed account syncs (`meta.uid` waits for the choice of `choose`)
+    if (!user || this.deleting || this.meta.uid !== user.uid || this.state.kind === 'choose') {
+      return Promise.resolve();
+    }
     if (this.syncing) {
       this.again = true;
       return Promise.resolve();
@@ -364,7 +368,9 @@ export class CloudSave {
   private signedIn(user: User, remember = true): void {
     this.user = user;
     this.email = user.email ?? '';
-    if (remember) this.saveMeta({ uid: user.uid });
+    // No timer while the player chooses whose progress to keep: a push then would merge
+    if (!remember) return;
+    this.saveMeta({ uid: user.uid });
     this.startTimers();
   }
 
