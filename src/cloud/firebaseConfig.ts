@@ -4,12 +4,12 @@
  * Without an `apiKey` the settings page has no cloud save row.
  */
 export const FIREBASE_CONFIG = {
-  apiKey: '',
+  apiKey: 'AIzaSyCotozORF-K4bg-AqfrzfUEgu3W5yq7mbI',
   authDomain: 'igor-s-quest.firebaseapp.com',
   projectId: 'igor-s-quest',
   storageBucket: 'igor-s-quest.firebasestorage.app',
   messagingSenderId: '518039857229',
-  appId: '',
+  appId: '1:518039857229:web:75e93c04188750bd0e1404',
 };
 
 /**

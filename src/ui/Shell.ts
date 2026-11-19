@@ -296,6 +296,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudBusy: 'Synchronisation…',
     cloudSynced: 'Synchronisé à {time}',
     cloudError: 'Échec, nouvel essai plus tard',
+    cloudPopup: 'Fenêtre de Google bloquée : autorisez-la et réessayez',
     cloudSignIn: 'Se connecter avec Google',
     cloudSignOut: 'Se déconnecter',
     cloudDelete: 'Supprimer en ligne',
@@ -464,6 +465,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudBusy: 'Syncing…',
     cloudSynced: 'Synced at {time}',
     cloudError: 'Failed, will try again later',
+    cloudPopup: 'Google’s window was blocked: allow it and try again',
     cloudSignIn: 'Sign in with Google',
     cloudSignOut: 'Sign out',
     cloudDelete: 'Delete online save',
@@ -636,6 +638,7 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudBusy: 'Sincronizando…',
     cloudSynced: 'Sincronizado a las {time}',
     cloudError: 'Error, se reintentará más tarde',
+    cloudPopup: 'Ventana de Google bloqueada: permítela y vuelve a intentarlo',
     cloudSignIn: 'Conectarse con Google',
     cloudSignOut: 'Desconectarse',
     cloudDelete: 'Borrar en línea',
@@ -3254,7 +3257,8 @@ export class Shell {
       );
     let status = cloud.email;
     if (s.kind === 'busy') status = t.cloudBusy;
-    else if (s.kind === 'error') status = t.cloudError;
+    else if (s.kind === 'error')
+      status = s.code === 'auth/popup-blocked' ? t.cloudPopup : t.cloudError;
     else if (s.kind === 'choose') status = t.cloudChoose;
     else if (s.kind === 'synced') {
       const time = new Date(s.at).toLocaleTimeString(this.lang, {

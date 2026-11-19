@@ -251,7 +251,7 @@ Port addition (the site kept the profile on its server). `src/cloud/`: `CloudSav
 - **Sync:** a transaction reads the cloud's copy, merges and writes; this device takes the result only if its saves did not change meanwhile and no game is running. Triggers: sign-in, launch (signed in), the end of a game, a check every 15 s for changed saves (5 s later), and the page being hidden. Another account than the last one on this device asks whose progress to keep before anything merges.
 - **Firebase** loads with the settings page (Google's popup must open in the press itself, or Safari blocks it) or at launch for a player signed in; its chunks are `assets/firebase-*.js`, which the service worker keeps when first fetched, not at install.
 - "Delete online save" (two presses, then Google asks to sign in again) deletes the document and the account; this device keeps its saves.
-- Tested in `tests/cloud-merge.test.ts` (the replay rebuilds 200 random histories exactly; merges are idempotent). Not yet tried with a real sign-in.
+- Tested in `tests/cloud-merge.test.ts` (the replay rebuilds 200 random histories exactly; merges are idempotent), and with a real sign-in on the dev server (ROADMAP.md "Next up" 24). Not yet tried: Safari, an installed iPhone app, the delete button.
 
 ## Game options (3.3)
 
