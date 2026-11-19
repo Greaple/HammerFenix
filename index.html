@@ -123,7 +123,15 @@
             <!-- A controller was plugged in or unplugged (main.ts) -->
             <div id="pad-notice" class="pad-notice" role="status" aria-live="polite"></div>
             <div id="loading" class="loading" role="status">
-              <img class="loading-logo" src="/images/logo-stacked.webp" alt="" />
+              <img class="loading-logo" src="/images/logo-line.webp" alt="" />
+              <!-- Plays once and stays on its last frame (loop count 1) -->
+              <img
+                class="loading-anim"
+                src="/images/loading-anim.webp"
+                alt=""
+                width="1280"
+                height="720"
+              />
               <p class="loading-text" data-i18n="loading">Travelling to Hammerfest…</p>
               <div class="loading-bar"><div id="loading-fill" class="loading-fill"></div></div>
               <button type="button" class="parchment-btn loading-retry" onclick="location.reload()">

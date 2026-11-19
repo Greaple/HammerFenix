@@ -17,6 +17,9 @@ const FILES: [string, string][] = [
   // The logo on one line (1000 x 204) and on two (888 x 644)
   ['assets-src/logo/logo-line.webp', 'public/images/logo-line.webp'],
   ['assets-src/logo/logo-stacked.webp', 'public/images/logo-stacked.webp'],
+  // The loading screen's animation under the one-line logo (test, 2026-11-19): the maintainer's
+  // "Igor animation.gif" (1280 x 720, 62 frames at 25 fps) as a lossy WebP that plays once
+  ['assets-src/logo/loading-anim.webp', 'public/images/loading-anim.webp'],
   // The results page's game over picture (`.artResult`), never archived: given by the maintainer
   ['assets-src/upscaled/gameOver.webp', 'public/images/gameOver.webp'],
 ];
