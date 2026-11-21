@@ -524,23 +524,37 @@ export class CloudSave {
 }
 
 /**
- * Loads Google's reCAPTCHA Enterprise script. False when it fails or takes longer than
- * `RECAPTCHA_WAIT`; a script that still arrives later is used by the next call.
+ * Loads Google's reCAPTCHA Enterprise script and waits until it is ready, as Firebase does: the
+ * script fetches a second one (from gstatic.com) before that. False when either fails or it
+ * takes longer than `RECAPTCHA_WAIT`; a script that still gets ready later is used by the next
+ * call.
  */
 function loadRecaptcha(): Promise<boolean> {
-  const loaded = () =>
-    Boolean((globalThis as { grecaptcha?: { enterprise?: unknown } }).grecaptcha?.enterprise);
-  if (loaded()) return Promise.resolve(true);
+  type Enterprise = { ready(callback: () => void): void };
+  const enterprise = () =>
+    (globalThis as { grecaptcha?: { enterprise?: Enterprise } }).grecaptcha?.enterprise;
   return new Promise((resolve) => {
-    const script = document.createElement('script');
+    let script: HTMLScriptElement | null = null;
     const done = (ok: boolean) => {
       clearTimeout(timer);
-      script.onload = script.onerror = null;
-      if (!ok) script.remove();
-      resolve(ok && loaded());
+      if (script) {
+        script.onload = script.onerror = null;
+        if (!ok && !enterprise()) script.remove();
+      }
+      resolve(ok);
     };
     const timer = setTimeout(() => done(false), RECAPTCHA_WAIT);
-    script.onload = () => done(true);
+    const whenReady = () => {
+      const e = enterprise();
+      if (e) e.ready(() => done(true));
+      else done(false);
+    };
+    if (enterprise()) {
+      whenReady();
+      return;
+    }
+    script = document.createElement('script');
+    script.onload = whenReady;
     script.onerror = () => done(false);
     script.async = true;
     script.src = RECAPTCHA_URL;
