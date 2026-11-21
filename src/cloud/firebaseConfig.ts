@@ -13,7 +13,12 @@ export const FIREBASE_CONFIG = {
 };
 
 /**
- * The reCAPTCHA v3 site key of App Check, which keeps scripts that copy the config above from
- * using the project's quota. Empty: no App Check.
+ * The reCAPTCHA Enterprise key of App Check (Google Cloud console, Security > reCAPTCHA), which
+ * keeps scripts that copy the config above from using the project's quota: once App Check is
+ * enforced for Firestore, only this site's pages reach the saves. Public too. Empty: no App Check.
+ *
+ * The key lists only the site's domain, as Firebase asks. On localhost App Check uses its debug
+ * provider instead, with the token in `VITE_APPCHECK_DEBUG_TOKEN` (`.env.local`, never
+ * committed), registered in the Firebase console (App Check > Apps > Manage debug tokens).
  */
-export const APP_CHECK_SITE_KEY = '';
+export const APP_CHECK_SITE_KEY: string = '';

@@ -2478,6 +2478,21 @@ html.touch .pager .btn-round {
   color: var(--ink-soft);
 }
 
+/* The reCAPTCHA notice of the online save: small, but in every layout */
+.cloud-legal {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--ink-soft);
+}
+
+.cloud-legal a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .hd-btn {
   margin-left: auto;
   min-width: 120px;
@@ -3766,6 +3781,12 @@ html:not(.touch) body[data-page='framed'] .game-canvas-container {
 
 .frame-site .cloud-row {
   row-gap: 6px;
+}
+
+.frame-site .cloud-legal {
+  /* 9 px or more once a phone scales the frame down */
+  font-size: 11.5px;
+  line-height: 1.3;
 }
 
 .frame-site .ctl-table {

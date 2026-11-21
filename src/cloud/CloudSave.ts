@@ -1,4 +1,5 @@
 import type { FirebaseApp } from 'firebase/app';
+import type { AppCheck } from 'firebase/app-check';
 import type { Auth, User } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore/lite';
 import { BINDINGS_KEY, loadBindings, saveBindings } from '../engine/Bindings';
@@ -47,12 +48,18 @@ type Sdk = {
   db: Firestore;
   authLib: typeof import('firebase/auth');
   fs: typeof import('firebase/firestore/lite');
+  /** Loaded with the rest when App Check has a key; turned on by `protect()`. */
+  appCheckLib: typeof import('firebase/app-check') | null;
 };
 
 /** Milliseconds between a change and its upload. */
 const PUSH_DELAY = 5000;
 /** How often a signed-in page looks for saves that changed. */
 const CHECK_EVERY = 15000;
+/** Google's reCAPTCHA Enterprise script, as Firebase App Check loads it. */
+const RECAPTCHA_URL = 'https://www.google.com/recaptcha/enterprise.js?render=explicit';
+/** Milliseconds the script may take before App Check stays off for now. */
+const RECAPTCHA_WAIT = 10000;
 
 /**
  * The optional cloud save (not a port: the hammerfest.fr server kept the player's data). The
@@ -82,6 +89,11 @@ export class CloudSave {
   /** Set while the account is being deleted: no sync may write the save again. */
   private deleting = false;
   private user: User | null = null;
+  /** App Check, once Google's reCAPTCHA script loaded. */
+  private appCheck: AppCheck | null = null;
+  private protecting: Promise<void> | null = null;
+  /** The last try to load reCAPTCHA failed (an ad blocker, or offline). */
+  private blocked = false;
   private dirty = false;
   private syncing = false;
   private again = false;
@@ -105,11 +117,16 @@ export class CloudSave {
     return this.user !== null;
   }
 
+  /** Google's reCAPTCHA guards the requests (App Check): the settings page says so. */
+  get recaptcha(): boolean {
+    return this.available && APP_CHECK_SITE_KEY !== '';
+  }
+
   /** At launch: a player who was signed in is signed in again, and synced. */
   restore(): void {
     if (!this.available || !this.meta.uid) return;
     this.setState({ kind: 'busy' });
-    void this.load()
+    void this.firebase()
       .then(async ({ auth }) => {
         await auth.authStateReady();
         const user = auth.currentUser;
@@ -124,9 +141,18 @@ export class CloudSave {
       .catch((e) => this.fail(e));
   }
 
-  /** Loads Firebase ahead of a press (the settings page shows the sign-in button). */
+  /**
+   * Loads Firebase ahead of a press, with an App Check token (the settings page shows the
+   * buttons). Google's popups wait for that token before they open, and Safari blocks a popup
+   * opened after a wait.
+   */
   preload(): void {
-    if (this.available && !this.sdk) this.load().catch(() => {});
+    if (!this.available) return;
+    this.firebase()
+      .then((s) => {
+        if (this.appCheck) return s.appCheckLib?.getToken(this.appCheck);
+      })
+      .catch(() => {});
   }
 
   async signIn(): Promise<void> {
@@ -166,7 +192,7 @@ export class CloudSave {
     this.setState({ kind: 'busy' });
     if (!keepDevice) {
       try {
-        const { db, fs } = await this.load();
+        const { db, fs } = await this.firebase();
         const got = await fs.getDoc(fs.doc(db, 'saves', user.uid));
         const before = this.readLocal();
         const remote = got.exists() ? fromCloudDoc(got.data(), this.lang()) : null;
@@ -207,7 +233,7 @@ export class CloudSave {
     try {
       await reauth;
       await this.running;
-      const { db, fs, authLib } = await this.load();
+      const { db, fs, authLib } = await this.firebase();
       await fs.deleteDoc(fs.doc(db, 'saves', user.uid));
       await authLib.deleteUser(user);
       this.saveMeta({ lastUid: null });
@@ -263,7 +289,7 @@ export class CloudSave {
 
   private async runSync(user: User): Promise<void> {
     try {
-      const { db, fs } = await this.load();
+      const { db, fs } = await this.firebase();
       const before = this.readLocal();
       this.notePrefs(before);
       before.snap.settingsAt = this.meta.settingsAt;
@@ -406,7 +432,9 @@ export class CloudSave {
 
   private fail(e: unknown): void {
     console.warn('Cloud save:', e);
-    this.setState({ kind: 'error', code: code(e) });
+    // Refused while reCAPTCHA could not load: Firestore wants the App Check token
+    const refused = code(e) === 'permission-denied' || code(e) === 'unauthenticated';
+    this.setState({ kind: 'error', code: this.blocked && refused ? 'recaptcha-blocked' : code(e) });
   }
 
   private setState(s: CloudState): void {
@@ -417,24 +445,55 @@ export class CloudSave {
   /** Firebase, loaded the first time it is needed. */
   private load(): Promise<Sdk> {
     this.sdk ??= (async () => {
-      const [appLib, authLib, fs] = await Promise.all([
+      const [appLib, authLib, fs, appCheckLib] = await Promise.all([
         import('firebase/app'),
         import('firebase/auth'),
         import('firebase/firestore/lite'),
+        APP_CHECK_SITE_KEY ? import('firebase/app-check') : null,
       ]);
       const app = appLib.initializeApp(FIREBASE_CONFIG);
-      if (APP_CHECK_SITE_KEY) {
-        const ac = await import('firebase/app-check');
-        ac.initializeAppCheck(app, {
-          provider: new ac.ReCaptchaV3Provider(APP_CHECK_SITE_KEY),
-          isTokenAutoRefreshEnabled: true,
-        });
-      }
-      this.ready = { app, auth: authLib.getAuth(app), db: fs.getFirestore(app), authLib, fs };
+      const auth = authLib.getAuth(app);
+      this.ready = { app, auth, db: fs.getFirestore(app), authLib, fs, appCheckLib };
       return this.ready;
     })();
     this.sdk.catch(() => (this.sdk = null));
     return this.sdk;
+  }
+
+  /** Firebase with App Check on, or off for now if Google's script could not load. */
+  private async firebase(): Promise<Sdk> {
+    const s = await this.load();
+    await this.protect(s);
+    return s;
+  }
+
+  /**
+   * Turns App Check on once Google's reCAPTCHA script has loaded. Firebase would wait forever
+   * for a script that an ad blocker or a lost connection stops, and every request with it; so
+   * the script is loaded here first, and App Check stays off until a later call manages to (the
+   * requests then go without a token, which Firestore refuses once App Check is enforced).
+   */
+  private protect(s: Sdk): Promise<void> {
+    const lib = s.appCheckLib;
+    if (!lib || this.appCheck) return Promise.resolve();
+    this.protecting ??= loadRecaptcha().then((ok) => {
+      this.protecting = null;
+      this.blocked = !ok;
+      if (!ok || this.appCheck) return;
+      if (isLocalhost()) {
+        // The key does not list localhost: the debug provider, with a token from the console
+        (
+          globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }
+        ).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+      }
+      // No refresh in the background: a token is fetched when a request needs one, and when the
+      // settings page shows (`preload`), so idle pages use none of the free assessments
+      this.appCheck = lib.initializeAppCheck(s.app, {
+        provider: new lib.ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+        isTokenAutoRefreshEnabled: false,
+      });
+    });
+    return this.protecting;
   }
 
   private loadMeta(): CloudMeta {
@@ -462,6 +521,35 @@ export class CloudSave {
       // storage blocked: this page only
     }
   }
+}
+
+/**
+ * Loads Google's reCAPTCHA Enterprise script. False when it fails or takes longer than
+ * `RECAPTCHA_WAIT`; a script that still arrives later is used by the next call.
+ */
+function loadRecaptcha(): Promise<boolean> {
+  const loaded = () =>
+    Boolean((globalThis as { grecaptcha?: { enterprise?: unknown } }).grecaptcha?.enterprise);
+  if (loaded()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      script.onload = script.onerror = null;
+      if (!ok) script.remove();
+      resolve(ok && loaded());
+    };
+    const timer = setTimeout(() => done(false), RECAPTCHA_WAIT);
+    script.onload = () => done(true);
+    script.onerror = () => done(false);
+    script.async = true;
+    script.src = RECAPTCHA_URL;
+    document.head.appendChild(script);
+  });
+}
+
+function isLocalhost(): boolean {
+  return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 }
 
 /** Two snapshots that make the same cloud document. */

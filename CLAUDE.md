@@ -39,7 +39,7 @@ Named HammerFenix until 2026-11-19: the local folder and the git history keep th
 - `src/game/levels/`: `LevelWorld.ts` (SetManager + GameMechanics), `LevelView.ts` (View), `ScriptRunner.ts` (ScriptEngine)
 - `src/game/Data.ts`: port of `Data.mt`. Values must match the original exactly.
 - `src/game/Quests.ts`, `Profile.ts`: the hammerfest.fr server's quests and the player profile (not a port; rules and guesses in PORT_STATUS.md "Quests and profile")
-- `src/cloud/`: the optional online save (Google sign-in, Firestore; PORT_STATUS.md "Online save (5.7)")
+- `src/cloud/`: the optional online save (Google sign-in, Firestore, App Check; PORT_STATUS.md "Online save (5.7)"). On localhost App Check needs `VITE_APPCHECK_DEBUG_TOKEN` in `.env.local` (gitignored), registered in the Firebase console
 - `src/ui/`: the site screens (`Shell.ts`: home, results, quests, fridge, settings, as HTML pages around the frame, or inside it on small screens (`framed`); `site/ItemArt.ts` draws the game's clips as pictures for them, `src/site.css` styles them) and the site's intro (`Intro.ts`, `public/gfx/intro.json`, in the frame), debug toolkit, SWF symbol browser, Ruffle side-by-side with the original game
 
 ## Conventions

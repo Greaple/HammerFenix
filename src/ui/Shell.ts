@@ -72,7 +72,7 @@ import {
 } from '../game/Profile';
 import { INTRO_FPS, INTRO_H, INTRO_W, IntroMovie } from './Intro';
 import type { Lang } from './Language';
-import { fill, h, ICON, svgIcon } from './site/dom';
+import { type Child, fill, h, ICON, svgIcon } from './site/dom';
 import { type Icon, ItemArt } from './site/ItemArt';
 
 /** The game's lang texts the screens reuse. */
@@ -297,6 +297,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudSynced: 'Synchronisé à {time}',
     cloudError: 'Échec, nouvel essai plus tard',
     cloudPopup: 'Fenêtre de Google bloquée : autorisez-la et réessayez',
+    cloudBlocked: 'Refusé : autorisez reCAPTCHA de Google (bloqueur de publicités ?)',
+    cloudRecaptcha:
+      'Ce service est protégé par reCAPTCHA : les {privacy} et les {terms} de Google s’appliquent.',
+    cloudPrivacy: 'règles de confidentialité',
+    cloudTerms: 'conditions d’utilisation',
     cloudSignIn: 'Se connecter avec Google',
     cloudSignOut: 'Se déconnecter',
     cloudDelete: 'Supprimer en ligne',
@@ -466,6 +471,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudSynced: 'Synced at {time}',
     cloudError: 'Failed, will try again later',
     cloudPopup: 'Google’s window was blocked: allow it and try again',
+    cloudBlocked: 'Refused: allow Google’s reCAPTCHA (ad blocker?)',
+    cloudRecaptcha:
+      'This service is protected by reCAPTCHA and the Google {privacy} and {terms} apply.',
+    cloudPrivacy: 'Privacy Policy',
+    cloudTerms: 'Terms of Service',
     cloudSignIn: 'Sign in with Google',
     cloudSignOut: 'Sign out',
     cloudDelete: 'Delete online save',
@@ -639,6 +649,11 @@ const TEXT: Record<Lang, Record<string, string>> = {
     cloudSynced: 'Sincronizado a las {time}',
     cloudError: 'Error, se reintentará más tarde',
     cloudPopup: 'Ventana de Google bloqueada: permítela y vuelve a intentarlo',
+    cloudBlocked: 'Rechazado: permite reCAPTCHA de Google (¿bloqueador de anuncios?)',
+    cloudRecaptcha:
+      'Este servicio está protegido por reCAPTCHA y se aplican la {privacy} y los {terms} de Google.',
+    cloudPrivacy: 'Política de privacidad',
+    cloudTerms: 'Términos del servicio',
     cloudSignIn: 'Conectarse con Google',
     cloudSignOut: 'Desconectarse',
     cloudDelete: 'Borrar en línea',
@@ -3236,8 +3251,9 @@ export class Shell {
   private cloudRow(): HTMLElement | null {
     const cloud = this.cloud;
     if (!cloud?.available) return null;
-    // Google's popup must open in the press itself: Firebase loads with the page
-    if (!cloud.signedInNow) cloud.preload();
+    // Google's popups must open in the press itself: Firebase and its App Check token load with
+    // the page
+    cloud.preload();
     const t = this.t;
     const s = cloud.state;
     /** `tone`: `primary` (the safe choice), `danger` (loses data), or plain. */
@@ -3266,9 +3282,15 @@ export class Shell {
     let status = cloud.email;
     let tone = 'off';
     if (s.kind === 'busy') [status, tone] = [t.cloudBusy, 'busy'];
-    else if (s.kind === 'error')
-      [status, tone] = [s.code === 'auth/popup-blocked' ? t.cloudPopup : t.cloudError, 'error'];
-    else if (s.kind === 'choose') [status, tone] = [t.cloudChoose, 'alert'];
+    else if (s.kind === 'error') {
+      const why =
+        s.code === 'auth/popup-blocked'
+          ? t.cloudPopup
+          : s.code === 'recaptcha-blocked'
+            ? t.cloudBlocked
+            : t.cloudError;
+      [status, tone] = [why, 'error'];
+    } else if (s.kind === 'choose') [status, tone] = [t.cloudChoose, 'alert'];
     else if (s.kind === 'synced') {
       const time = new Date(s.at).toLocaleTimeString(this.lang, {
         hour: '2-digit',
@@ -3327,7 +3349,21 @@ export class Shell {
       ),
       h('span', { class: 'cloud-btns' }, buttons),
       h('p', { class: 'set-hint' }, t.cloudHint),
+      // Stays in the compact layouts, which hide the hints
+      cloud.recaptcha ? h('p', { class: 'cloud-legal' }, this.recaptchaNote()) : null,
     );
+  }
+
+  /** The notice Google asks for where reCAPTCHA runs without its badge (App Check hides it). */
+  private recaptchaNote(): Child[] {
+    const t = this.t;
+    const link = (href: string, label: string) =>
+      h('a', { href, target: '_blank', rel: 'noopener noreferrer' }, label);
+    const links: Record<string, HTMLElement> = {
+      '{privacy}': link('https://policies.google.com/privacy', t.cloudPrivacy),
+      '{terms}': link('https://policies.google.com/terms', t.cloudTerms),
+    };
+    return t.cloudRecaptcha.split(/(\{privacy\}|\{terms\})/).map((part) => links[part] ?? part);
   }
 
   /** A setting's checkbox, with the guide's text for it. */
